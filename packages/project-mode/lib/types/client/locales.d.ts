@@ -11,6 +11,9 @@ export declare const en: {
     readonly fromCoordinator: "Coordinator";
     readonly fromAgent: "Agent";
     readonly fromUser: "User";
+    readonly messageFrom: "From {name}";
+    readonly messageContent: "Message content";
+    readonly truncatedContent: "… {count} characters";
     readonly awaitingReply: "Awaiting a reply…";
     readonly emptyReply: "No AI reply in this turn";
     readonly noArtifacts: "No recorded artifacts";

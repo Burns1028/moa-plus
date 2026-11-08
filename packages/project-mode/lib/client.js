@@ -1701,7 +1701,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 820,
+						"line": 824,
 						"column": 9
 					}
 				},
@@ -1979,7 +1979,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 836,
+						"line": 840,
 						"column": 9
 					}
 				},
@@ -2460,7 +2460,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 783,
+						"line": 787,
 						"column": 10
 					}
 				},
@@ -2516,7 +2516,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 810,
+						"line": 814,
 						"column": 10
 					}
 				},
@@ -2653,7 +2653,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 848,
+						"line": 852,
 						"column": 9
 					}
 				},
@@ -2745,7 +2745,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 902,
+						"line": 906,
 						"column": 3
 					}
 				},
@@ -2887,7 +2887,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 907,
+						"line": 911,
 						"column": 9
 					}
 				},
@@ -3358,7 +3358,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 758,
+						"line": 762,
 						"column": 9
 					}
 				},
@@ -3551,7 +3551,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 871,
+						"line": 875,
 						"column": 10
 					}
 				}
@@ -4629,6 +4629,14 @@ window.__ModuleLoader__.load({
 			}));
 		}
 		// src/client/tail.ts
+		function incoming(event) {
+			if (event.type !== "user/message" || event.surfaceOp !== "append") return;
+			const source = event.data.source;
+			if (source.kind === "moa-message" || source.kind === "project-mode-result" || source.kind === "project-mode-assignment") return {
+				source: event.data.source,
+				content: event.data.content
+			};
+		}
 		/** Human inputs split transcript placement without changing the native turn. */
 		const humanBoundaryDefinition = {
 			kind: "project-mode-human-boundary",
@@ -4648,9 +4656,10 @@ window.__ModuleLoader__.load({
 			kind: "project-mode-workers-tail",
 			target: "chat",
 			match(event) {
-				if (event.type === "user/message" && event.data.source.kind === "project-mode-result") return {
-					id: `result:${event.data.id}`,
-					role: "start"
+				if (event.type === "user/message" && incoming(event)) return {
+					id: `${event.data.source.kind === "project-mode-result" ? "result" : "message"}:${event.data.id}`,
+					role: "start",
+					exclusive: true
 				};
 				if (event.type !== "assistant/live-chunk" && event.type !== "assistant/message" && event.type !== "tool/call" && event.type !== "tool/result") return null;
 				if (!("turn" in event.data) || !("step" in event.data) || typeof event.data.turn !== "number" || typeof event.data.step !== "number") return null;
@@ -4661,6 +4670,7 @@ window.__ModuleLoader__.load({
 			},
 			start: (_context, match, reader) => ({
 				seq: match.event.seq,
+				...incoming(match.event) ? { incoming: incoming(match.event) } : {},
 				segmentStartSeq: reader.previous(humanBoundaryDefinition.kind)?.state.seq ?? (match.location.kind === "turn" || match.location.kind === "step" ? match.location.turn.start?.seq : void 0) ?? 0
 			}),
 			update: (context, match) => ({
@@ -4670,7 +4680,7 @@ window.__ModuleLoader__.load({
 			publication: (match) => match.event.type === "assistant/live-chunk" ? "animation-frame" : "immediate",
 			buildViewNode(context) {
 				const location = [context.start, ...context.matches].find((match) => match?.location.kind === "step")?.location;
-				if (location?.kind !== "step" || !context.state) {
+				if (!context.state || location?.kind !== "step" && !context.state.incoming) {
 					const previous = context.current.get("chat");
 					return previous ? {
 						...previous,
@@ -4683,23 +4693,24 @@ window.__ModuleLoader__.load({
 					kind: "project-mode-workers-tail",
 					target: "chat",
 					anchorSeq: context.state.seq + .2,
-					location: {
+					location: location?.kind === "step" ? {
 						kind: "turn",
 						turn: location.turn
-					},
+					} : context.start?.location ?? { kind: "unresolved" },
 					visibility: "visible",
-					groupTree: "turn",
+					groupTree: context.state.incoming ? "input" : "turn",
 					data: {
-						turn: location.turn.turn,
-						step: location.step.step,
-						segmentStartSeq: context.state.segmentStartSeq
+						turn: location?.kind === "step" ? location.turn.turn : 0,
+						step: location?.kind === "step" ? location.step.step : 0,
+						segmentStartSeq: context.state.segmentStartSeq,
+						...context.state.incoming ? { incoming: context.state.incoming } : {}
 					}
 				};
 			}
 		};
 		/** Pick exactly one native seat at the bottom of each human transcript segment. */
 		function segmentTail(snapshot, node) {
-			if (node.visibility !== "visible") return null;
+			if (node.visibility !== "visible" || node.data.turn === 0) return null;
 			const { turn, segmentStartSeq } = node.data;
 			return snapshot.nodes.values().filter((candidate) => candidate.kind === "project-mode-workers-tail" && candidate.visibility === "visible" && candidate.data.turn === turn && candidate.data.segmentStartSeq === segmentStartSeq).reduce((latest, candidate) => !latest || candidate.anchorSeq > latest.anchorSeq ? candidate : latest, void 0)?.key === node.key ? {
 				turn,
@@ -4731,6 +4742,9 @@ window.__ModuleLoader__.load({
 .pm-capsules{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0}.pm-capsules>li{display:flex;min-width:0;max-width:100%}.pm-capsule{box-sizing:border-box;display:inline-flex;min-width:0;max-width:min(100%,240px);height:28px;gap:6px;align-items:center;text-align:left;border:1px solid var(--dsw-alias-border-l4);border-radius:999px;padding:4px 8px;font-size:12px;line-height:18px}.pm-capsule strong{min-width:0;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.pm-progress{min-width:0;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary)}
 .pm-worker-icon{display:block;flex:0 0 auto;width:24px;height:24px}
 .pm-capsule .pm-worker-icon{width:16px;height:16px}
+.pm-agent-message{margin:12px 0;color:var(--dsw-alias-label-primary);font:inherit;min-width:0}
+.pm-agent-message>header{color:var(--dsw-alias-label-secondary);font-size:12px;margin-bottom:6px}
+.pm-agent-empty{color:var(--dsw-alias-label-tertiary)}
 `;
 		// src/client/components.tsx
 		function WorkerCapsuleList({ client, sessionId, turn, closed, segmentStartSeq, open, t }) {
@@ -4967,6 +4981,9 @@ window.__ModuleLoader__.load({
 			fromCoordinator: "Coordinator",
 			fromAgent: "Agent",
 			fromUser: "User",
+			messageFrom: "From {name}",
+			messageContent: "Message content",
+			truncatedContent: "… {count} characters",
 			awaitingReply: "Awaiting a reply…",
 			emptyReply: "No AI reply in this turn",
 			noArtifacts: "No recorded artifacts",
@@ -5057,6 +5074,9 @@ window.__ModuleLoader__.load({
 			fromCoordinator: "Coordinator",
 			fromAgent: "Agent",
 			fromUser: "用户",
+			messageFrom: "来自 {name}",
+			messageContent: "消息内容",
+			truncatedContent: "… {count} 字符",
 			awaitingReply: "等待回复…",
 			emptyReply: "本轮没有 AI 回复",
 			noArtifacts: "未记录产物",
@@ -5134,6 +5154,69 @@ window.__ModuleLoader__.load({
 			selected: "已选中",
 			running: "运行中：{count}"
 		};
+		// src/client/agent-message.tsx
+		/** Remove only the transport wrapper we authored; the delivered message stays unchanged. */
+		function messageBody(message) {
+			const source = message.source;
+			const first = message.content[0];
+			if (first?.type !== "text") return message.content;
+			if (source.kind === "moa-message") {
+				const prefix = `${typeof source.requestId === "string" ? `Request ID: ${source.requestId}\n` : ""}${typeof source.replyTo === "string" ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+				if (first.text.startsWith(prefix)) return [{
+					...first,
+					text: first.text.slice(prefix.length)
+				}, ...message.content.slice(1)];
+			}
+			if (source.kind === "project-mode-result" && typeof source.completionId === "string" && first.text.startsWith("Worker ") && first.text.includes(` (${source.workerId}), turn ${source.workerTurn}, outcome `) && first.text.includes(`Completion ${source.completionId}. `)) return message.content.slice(1);
+			return message.content;
+		}
+		/** The same incoming message row is used in Coordinator and Worker conversations. */
+		function AgentMessage({ message, client, t }) {
+			const source = message.source;
+			const id = [
+				source.senderSessionId,
+				source.senderId,
+				source.workerId,
+				source.coordinatorSessionId
+			].find((value) => typeof value === "string" && value !== "");
+			const name = useSelected(client.store.subscribe, () => {
+				if (typeof source.senderName === "string" && source.senderName) return source.senderName;
+				for (const project of client.store.projects()) {
+					const worker = project.workers.find((worker) => worker.workerId === id);
+					if (worker) return worker.name;
+					if (project.project.coordinatorSessionId === id) return t("fromCoordinator");
+				}
+				return id === source.rootId || source.kind === "project-mode-assignment" ? t("fromCoordinator") : t("fromAgent");
+			});
+			const labels = react.useMemo(() => ({
+				code: {
+					copyLabel: t("copy"),
+					copiedLabel: t("copied")
+				},
+				footnotes: t("footnotes")
+			}), [t]);
+			const content = messageBody(message);
+			const sender = t("messageFrom", { name });
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+				className: "pm-agent-message",
+				"data-moa-message": true,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("header", { children: sender }),
+					content.length ? content.map((block, index) => block.type === "text" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
+						text: block.text,
+						labels
+					}, index) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.JsonBlock, {
+						label: t("messageContent"),
+						payload: block,
+						truncatedLabel: (count) => t("truncatedContent", { count })
+					}, index)) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: "pm-agent-empty",
+						children: t("emptyReply")
+					})
+				]
+			});
+		}
 		// src/client/index.tsx
 		const inject = [
 			"remote",
@@ -5235,12 +5318,16 @@ window.__ModuleLoader__.load({
 					historyReady
 				]);
 				const closed = p.useChat((s) => s.timeline.turns.get(p.node.data.turn)?.end !== void 0);
-				return p.useChat((s) => segmentTail(s, p.node) !== null) ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerCapsuleList, {
+				const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [p.node.data.incoming && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(AgentMessage, {
+					...p,
+					message: p.node.data.incoming
+				}), selected && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerCapsuleList, {
 					...p,
 					turn: p.node.data.turn,
 					segmentStartSeq: p.node.data.segmentStartSeq,
 					closed
-				}) : null;
+				})] });
 			}));
 			ctx.slots.inject("sidebar.workspaces.session.branch", () => bindProjectBranches(ctx, client, open));
 			ctx.slots.inject("conversation.composer", () => {

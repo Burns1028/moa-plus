@@ -85,6 +85,8 @@ declare module "@deepseek-ai/dsh-llm" {
             form: "relay";
             rootId: string;
             senderId: string;
+            senderSessionId?: string;
+            senderName?: string;
             operationId: string;
             requestId?: string;
             replyTo?: string;

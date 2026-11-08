@@ -14,12 +14,16 @@ declare module "@deepseek-ai/dsh-llm" {
             completionId: string;
             workerId: SessionId;
             workerTurn: number;
+            senderSessionId?: string;
+            senderName?: string;
         };
         "project-mode-assignment": {
             kind: "project-mode-assignment";
             form: "relay";
             operationId: string;
             coordinatorSessionId: SessionId;
+            senderSessionId?: string;
+            senderName?: string;
         };
         "project-mode-notice": {
             kind: "project-mode-notice";

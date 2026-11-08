@@ -3190,12 +3190,14 @@ function createSendMessageTool(broker) {
 }
 const routeKey = (id) => `moa:route:${id}`;
 const receiptKey = (id) => `moa:receipt:${id}`;
-function nativeMessage(envelope) {
+function nativeMessage(envelope, senderName) {
 	const source = {
 		kind: "moa-message",
 		form: "relay",
 		rootId: envelope.rootId,
 		senderId: envelope.senderId,
+		senderSessionId: envelope.senderId,
+		...senderName ? { senderName } : {},
 		operationId: envelope.operationId,
 		...envelope.requestId ? { requestId: envelope.requestId } : {},
 		...envelope.replyTo ? { replyTo: envelope.replyTo } : {}
@@ -3233,6 +3235,7 @@ function hasCommittedAnswer(events, route) {
 /** Bind the broker to native session inboxes and the Project's durable aggregate. */
 function createNativeMessageBroker(host, judge) {
 	let detach = () => {};
+	const senderName = (rootId, senderId) => senderId === rootId ? "Coordinator" : host.record(SessionId(rootId))?.workers.find((worker) => worker.id === senderId)?.name;
 	const broker = new MoAMessageBroker({
 		listeners: host.listeners,
 		judge,
@@ -3265,7 +3268,7 @@ function createNativeMessageBroker(host, judge) {
 					operationId: `answer-recovery:${route.requestId}`,
 					replyTo: route.requestId,
 					delivery: "steer"
-				});
+				}, senderName(rootId, route.targetId));
 				if (step) {
 					signal.throwIfAborted();
 					step.agent.send(message, "next-step", false);
@@ -3319,7 +3322,7 @@ function createNativeMessageBroker(host, judge) {
 				var _usingCtx3 = _usingCtx();
 				signal.throwIfAborted();
 				const targetId = SessionId(envelope.targetId);
-				const message = nativeMessage(envelope);
+				const message = nativeMessage(envelope, senderName(envelope.rootId, envelope.senderId));
 				const prior = _usingCtx3.u(await observeForTurn(host.ctx, targetId, signal)).events.findLast((event) => event.type === "agent/inbox/spliced" && JSON.stringify(event.data).includes(JSON.stringify(envelope.operationId)));
 				let priorId;
 				if (prior && prior.type === "agent/inbox/spliced") {
@@ -3660,7 +3663,9 @@ var CompletionOutbox = class {
 					form: "relay",
 					completionId: id,
 					workerId,
-					workerTurn: finished.turn
+					workerTurn: finished.turn,
+					senderSessionId: workerId,
+					senderName: this.host.worker(r, workerId).name
 				},
 				content: [{
 					type: "text",
@@ -4065,15 +4070,21 @@ var WorkerOperations = class {
 				this.host.notify();
 			});
 			return activation.messageId;
-		} else return (req.delivery === "queue" ? queueHostSubagentPrompt : steerHostSubagentPrompt)(this.host.ctx.subagents, agent, workerId, [{
-			type: "text",
-			text: req.message
-		}], {
-			kind: "project-mode-assignment",
-			form: "relay",
-			operationId,
-			coordinatorSessionId: agent.id
-		}, signal);
+		} else {
+			const deliver = req.delivery === "queue" ? queueHostSubagentPrompt : steerHostSubagentPrompt;
+			const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
+			return deliver(this.host.ctx.subagents, agent, workerId, [{
+				type: "text",
+				text: req.message
+			}], {
+				kind: "project-mode-assignment",
+				form: "relay",
+				operationId,
+				coordinatorSessionId: agent.id,
+				senderSessionId: agent.id,
+				senderName: agent.id === record?.project.coordinatorSessionId ? "Coordinator" : record?.workers.find((worker) => worker.id === agent.id)?.name
+			}, signal);
+		}
 	}
 	async acceptReceipt(agent, operationId, workerId, assignmentId, messageId, turn, delivery, rootId = agent.id) {
 		const receipt = {
