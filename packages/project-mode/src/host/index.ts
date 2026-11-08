@@ -1,4 +1,10 @@
 import { bindAgentEvents } from "./agent-events.ts";
+import { judgeInterrupt } from "./moa/judge.ts";
+import {
+  createNativeMessageBroker,
+  createSendMessageTool,
+  type MoAMessageBroker,
+} from "./moa/messages.ts";
 import { buildProjectSnapshot } from "./project-views.ts";
 import { ProjectLifecycle, hasOwnTurn } from "./project-lifecycle.ts";
 import { isVisibleWorker } from "../shared/worker-membership.ts";
@@ -102,6 +108,8 @@ export default class ProjectMode extends TypertRemoteService {
   private outbox!: CompletionOutbox;
   private workers!: WorkerOperations;
   private turns!: TurnCoordination;
+  private messages!: MoAMessageBroker;
+  private messageTool!: ReturnType<typeof createSendMessageTool>;
   private lifecycle!: ProjectLifecycle;
   private get access(): HostAccess {
     return {
@@ -161,6 +169,18 @@ export default class ProjectMode extends TypertRemoteService {
     this.outbox = new CompletionOutbox(this.access);
     this.workers = new WorkerOperations(this.access);
     this.turns = new TurnCoordination(this.access);
+    this.messages = createNativeMessageBroker(
+      this.access,
+      (agent, messages, description, signal) =>
+        judgeInterrupt(
+          this.ctx,
+          agent,
+          messages,
+          { kind: "request", description },
+          signal,
+        ),
+    );
+    this.messageTool = createSendMessageTool(this.messages);
     this.lifecycle = new ProjectLifecycle(this.access, {
       put: (id, record) => this.domain.table("projects").put(id, record),
       attach: (agent) => this.attach(agent),
@@ -242,6 +262,7 @@ export default class ProjectMode extends TypertRemoteService {
         this.closing.abort();
         this.notify();
         this.outbox.dispose();
+        this.messages.dispose();
         // The coordinator survives this plugin. drainDescendants permanently
         // closes its native admission scope until Agent disposal, so release
         // only our selected children after local in-flight admissions settle.
@@ -345,31 +366,50 @@ export default class ProjectMode extends TypertRemoteService {
   }
   private attach(agent: Agent) {
     const enabled = this.record(agent.id)?.project.mode === "enabled";
+    const participant =
+      enabled ||
+      (this.owner(agent.id)?.project.mode === "enabled" &&
+        this.owner(agent.id)?.workers.some(
+          (w) =>
+            w.id === agent.id &&
+            (w.lifecycle === "active" || w.lifecycle === "provisioning"),
+        ));
     if (this.reconcilingTools || this.closing.signal.aborted) return;
-    const deny = enabled
-      ? [...new Set(this.config.coordinatorHiddenTools)].sort()
+    const deny = participant
+      ? [
+          ...new Set([
+            ...(enabled ? this.config.coordinatorHiddenTools : []),
+            "send_message",
+          ]),
+        ].sort()
       : [];
-    const key = JSON.stringify([enabled, deny]);
+    const key = JSON.stringify([enabled, participant, deny]);
     const old = this.mounted.get(agent);
     if (old?.key === key) return;
     this.reconcilingTools = true;
     try {
       this.mounted.delete(agent);
       old?.dispose();
-      if (enabled) {
+      if (participant) {
         const restrictions = deny.length
           ? agent.ctx.tools.suppress({ deny })
           : () => {};
+        let tool = () => {};
         try {
-          const tool = agent.ctx.tools.register(this.controlTool);
+          tool = enabled
+            ? agent.ctx.tools.register(this.controlTool)
+            : () => {};
+          const messageTool = agent.ctx.tools.register(this.messageTool);
           this.mounted.set(agent, {
             key,
             dispose: () => {
+              messageTool();
               tool();
               restrictions();
             },
           });
         } catch (error) {
+          tool();
           restrictions();
           throw error;
         }
