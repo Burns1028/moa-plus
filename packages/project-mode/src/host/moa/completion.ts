@@ -123,7 +123,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
           ctx.tools.guard(() => "Rubric Builder cannot access tools or outputs");
         } else {
           ctx.tools.register(defineTool({ name: "read_rubric", description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
-          const names = ["subagent", "subagent_fork", "send_message", "control_workers", "Task", "Fork", "SendMessage", "QueryAgent", "KillAgent"];
+          const names = [...new Set([...host.config.coordinatorHiddenTools, "subagent", "subagent_fork", "workflow", "send_message", "control_workers", "Task", "Fork", "SendMessage", "QueryAgent", "KillAgent"])];
           ctx.tools.suppress({ deny: names });
         }
       },

@@ -28,7 +28,8 @@ it("restricts only coordinator tools and restores them on disable", async () => 
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     expect(f.ctx.tools.get("subagent", agent)).toBeUndefined();
     expect(f.ctx.tools.get("subagent", ordinary)).toBeDefined();
-    expect(f.ctx.tools.get("control_workers", agent)).toBeDefined();
+    expect(f.ctx.tools.get("Task", agent)).toBeDefined();
+    expect(f.ctx.tools.get("control_workers", agent)).toBeUndefined();
     await f.ctx.projectMode.setEnabled(agent.id, false, 1, "disable");
     expect(f.ctx.tools.get("subagent", agent)).toBeDefined();
   } finally {
@@ -98,7 +99,7 @@ it("creates an owned continuable worker immediately with role context before its
     await new Promise((r) => setTimeout(r, 10));
     expect(
       JSON.stringify(f.adapter.requests.find((r) => r.sessionId === workerId)),
-    ).toContain("Project worker");
+    ).toContain("MoA+ worker");
     expect(f.ctx.tools.get("control_workers", worker)).toBeUndefined();
     expect(
       (await f.ctx.subagents.listChildren(agent.id)).map((c) => c.id),
@@ -261,9 +262,7 @@ it("keeps preset tools on workers and restores coordinator tools on draft disabl
     expect(f.ctx.agentPresets.composedPreset(child.ctx)).toBe("standard");
     for (const name of nativeNames) {
       expect(f.ctx.tools.get(name, agent), name).toBeUndefined();
-      if (name === "send_message")
-        expect(f.ctx.tools.get(name, child), name).toBeUndefined();
-      else expect(f.ctx.tools.get(name, child), name).toBeDefined();
+      expect(f.ctx.tools.get(name, child), name).toBeUndefined();
       expect(f.ctx.tools.get(name, ordinary), name).toBeDefined();
     }
     expect(f.ctx.tools.get("SendMessage", agent)).toBeDefined();
@@ -1150,11 +1149,9 @@ it("treats a reused provider tool call ID in distinct native turns as distinct d
       const block = {
         type: "tool-call" as const,
         id: ToolCallId("provider-reuses-id"),
-        name: "control_workers",
+        name: "Task",
         arguments: JSON.stringify({
-          action: "spawn",
-          name: "worker",
-          task: "work",
+          tasks: [{ name: "worker", task: "work", role: "General-purpose", workspace: "shared" }],
         }),
       };
       return [

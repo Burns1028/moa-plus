@@ -32,12 +32,12 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     agent.followup(prompt("盘点磁盘使用情况，分类给我"));
     await agent.whenIdle();
     const first = f.adapter.requests[0];
-    expect(first.tools?.some((tool) => tool.name === "control_workers")).toBe(
+    expect(first.tools?.some((tool) => tool.name === "Task")).toBe(
       true,
     );
     const system = systemText(first);
-    expect(system).toContain("Project Mode coordinator");
-    expect(system).toContain("control_workers");
+    expect(system).toContain("MoA+ coordinator");
+    expect(system).toContain("Task");
     expect(system).toContain(coordinatorPrompt);
     expect(system).toContain("shared index");
     expect(system).toContain("existing worker");
@@ -46,7 +46,7 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     // Presets that own their complete system message still need the same role
     // in required runtime context. These two prompt surfaces must not drift.
     const coordinatorPolicy = system
-      .slice(system.indexOf("You are the Project Mode coordinator"))
+      .slice(system.indexOf("You are the MoA+ coordinator"))
       .trim();
     const runtime = first.messages
       .filter((message) => message.source.kind === "runtime-context")
@@ -69,7 +69,7 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     agent.followup(prompt("普通会话"));
     await agent.whenIdle();
     expect(systemText(f.adapter.requests.at(-1)!)).not.toContain(
-      "Project Mode coordinator",
+      "MoA+ coordinator",
     );
   } finally {
     await f.dispose();
@@ -101,8 +101,8 @@ it("does not give the coordinator policy to workers or ordinary sessions", async
       new AbortController().signal,
     );
     const workerRequest = await seen.promise;
-    expect(systemText(workerRequest)).not.toContain("Project Mode coordinator");
-    expect(JSON.stringify(workerRequest)).toContain("Project worker");
+    expect(systemText(workerRequest)).not.toContain("MoA+ coordinator");
+    expect(JSON.stringify(workerRequest)).toContain("MoA+ worker");
     gate.resolve();
     await f.ctx.agents
       .get((receipt as { workerId: ReturnType<typeof SessionId> }).workerId)!
@@ -116,7 +116,7 @@ it("does not give the coordinator policy to workers or ordinary sessions", async
     ordinary.followup(prompt("hello"));
     await ordinary.whenIdle();
     expect(systemText(f.adapter.requests.at(-1)!)).not.toContain(
-      "Project Mode coordinator",
+      "MoA+ coordinator",
     );
   } finally {
     gate.resolve();
@@ -176,7 +176,7 @@ it("omits hidden tool guidance only from the coordinator and restores it on disp
       "spawn-guidance",
       new AbortController().signal,
     );
-    expect(systemText(await workerRequest.promise)).toContain(workflowGuidance);
+    expect(systemText(await workerRequest.promise)).not.toContain(workflowGuidance);
     await coordinator.whenIdle();
     await f.plugin.dispose();
     coordinator.followup(prompt("Continue after plugin disposal"));

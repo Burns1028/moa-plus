@@ -5,7 +5,7 @@ import { withManagedAgent } from "./moa/residency.ts";
 import { projected } from "./native.ts";
 import { projection, type Projection } from "./state.ts";
 import type { HostAccess } from "./host-access.ts";
-import { participatingMemberships } from "./capsule-participation.ts";
+import { participatingMemberships, settleContinuedOutcomes } from "./capsule-participation.ts";
 import type { AgentDescriptor } from "./moa/agents.ts";
 import { consumedNativeReceipts } from "./native-receipt.ts";
 /** Serializes result collection and durable native inbox admission. */
@@ -93,7 +93,7 @@ export class CompletionOutbox {
           ...(finished.lastAssistant?.content ?? []),
         ],
       });
-      await this.host.update(parentId, (r) => ({
+      await this.host.update(parentId, (r) => settleContinuedOutcomes({
         ...r,
         completions: [...r.completions, completion],
         deliveries: [

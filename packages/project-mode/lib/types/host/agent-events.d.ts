@@ -1,5 +1,5 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import type { SessionId } from "@deepseek-ai/dsh-session";
+import { SessionId } from "@deepseek-ai/dsh-session";
 import type { HostAccess } from "./host-access.ts";
 import type { CompletionOutbox } from "./completion-outbox.ts";
 import type { WorkerOperations } from "./worker-operations.ts";

@@ -75,10 +75,141 @@ it("keeps a native tool call open until its explicit answer", async () => {
     release.resolve();
     await f.ctx.agents.get(SessionId(workerId))!.whenIdle();
     expect(workerCalls).toBe(2);
+    const recovered = createNativeMessageBroker((f.ctx.projectMode as any).access, async () => false);
+    await recovered.recover(agent.id);
+    await recovered.recover(agent.id);
+    using observed = await f.ctx.sessionQuery.observeSession(SessionId(workerId));
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo)).toHaveLength(0);
+    expect(workerCalls).toBe(2);
+    recovered.dispose();
   } finally {
     release.resolve();
     await f.dispose();
   }
+});
+
+it("wakes a cold sender for a saved but uncommitted answer once without inventing a root assignment", async () => {
+  const f = await fixture();
+  const signal = new AbortController().signal;
+  try {
+    const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("answer-recovery-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
+    const host = f.ctx.projectMode as any;
+    const [worker] = await host.moa.task(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
+    const workerId = SessionId(worker.workerId);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    await root.whenIdle();
+    const assignments = host.record(root.id).assignments.length;
+    await host.access.update(root.id, (record: any) => ({ ...record, operations: { ...record.operations,
+      "moa:route:saved-request": { rootId: root.id, senderId: workerId, targetId: root.id, requestId: "saved-request", operationId: "saved-request", state: "answered", answer: "saved exact answer" },
+      "moa:receipt:saved-request": { status: "answered", requestId: "saved-request", answer: "saved exact answer" },
+    } }));
+    let calls = 0;
+    f.adapter.handler = options => {
+      if (options.sessionId === workerId) {
+        calls++;
+        expect(JSON.stringify(options.messages)).toContain("saved exact answer");
+      }
+      return response("used the answer");
+    };
+    const broker = createNativeMessageBroker(host.access, async () => false);
+    await broker.recover(root.id);
+    await expect.poll(() => calls).toBe(1);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    await broker.recover(root.id);
+    using observed = await f.ctx.sessionQuery.observeSession(workerId);
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "saved-request")).toHaveLength(1);
+    expect(host.record(root.id).assignments).toHaveLength(assignments);
+    expect(calls).toBe(1);
+    broker.dispose();
+  } finally { await f.dispose(); }
+});
+
+it("reclaims an answer lost after inbox claim into the next explicit wake before inference", async () => {
+  const f = await fixture();
+  const signal = new AbortController().signal;
+  try {
+    const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("claim-answer-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
+    const host = f.ctx.projectMode as any;
+    const [worker] = await host.moa.task(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
+    const workerId = SessionId(worker.workerId);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    await root.whenIdle();
+    await host.access.update(root.id, (record: any) => ({ ...record, operations: { ...record.operations,
+      "moa:route:claimed-request": { rootId: root.id, senderId: workerId, targetId: root.id, requestId: "claimed-request", operationId: "claimed-request", state: "answered", answer: "answer survives claim" },
+    } }));
+    let stopped = false;
+    const off = f.ctx.on("agent/pre-step", async ({ agent }, next) => {
+      const decision = await next();
+      if (!stopped && agent.id === workerId && decision.kind === "enter" && decision.messages.some(message => message.source.kind === "moa-message" && message.source.replyTo === "claimed-request")) {
+        stopped = true;
+        agent.cancel({ kind: "parent" });
+      }
+      return decision;
+    });
+    const broker = createNativeMessageBroker(host.access, async () => false);
+    await broker.recover(root.id);
+    await expect.poll(() => stopped).toBe(true);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    off();
+    {
+      using observed = await f.ctx.sessionQuery.observeSession(workerId);
+      expect(observed.events.some(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "claimed-request")).toBe(false);
+    }
+    let calls = 0;
+    f.adapter.handler = options => {
+      if (options.sessionId === workerId) {
+        calls++;
+        expect(JSON.stringify(options.messages)).toContain("answer survives claim");
+        expect(JSON.stringify(options.messages)).toContain("resume explicitly");
+      }
+      return response("recovered");
+    };
+    await host.messages.send(root, sendMessageSchema.parse({ target: workerId, message: "resume explicitly" }), "resume", signal);
+    await expect.poll(() => calls).toBe(1);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    await broker.recover(root.id);
+    using observed = await f.ctx.sessionQuery.observeSession(workerId);
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "claimed-request")).toHaveLength(1);
+    expect(calls).toBe(1);
+    broker.dispose();
+  } finally { await f.dispose(); }
+});
+
+it("restores a saved answer through the actual Host restart path without repeating the Request", async () => {
+  let f = await fixture(undefined, { keepFiles: true });
+  const signal = new AbortController().signal;
+  try {
+    const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("restart-answer-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
+    const host = f.ctx.projectMode as any;
+    const [worker] = await host.moa.task(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
+    const workerId = SessionId(worker.workerId);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    await root.whenIdle();
+    await host.access.update(root.id, (record: any) => ({ ...record, operations: { ...record.operations,
+      "moa:route:restart-request": { rootId: root.id, senderId: workerId, targetId: root.id, requestId: "restart-request", operationId: "restart-request", state: "answered", answer: "answer survives restart" },
+      "moa:receipt:restart-request": { status: "answered", requestId: "restart-request", answer: "answer survives restart" },
+    } }));
+    const directory = f.root;
+    await f.dispose();
+    f = await fixture(undefined, { root: directory });
+    let calls = 0;
+    f.adapter.handler = options => {
+      if (options.sessionId === workerId) {
+        calls++;
+        expect(JSON.stringify(options.messages)).toContain("answer survives restart");
+      }
+      return response("resumed without asking again");
+    };
+    await f.ctx.agents.resume({ resumeSessionId: root.id, agentOptions: { provider: "test", model: "test" } });
+    await expect.poll(() => calls).toBe(1);
+    await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
+    using observed = await f.ctx.sessionQuery.observeSession(workerId);
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "restart-request")).toHaveLength(1);
+    expect(observed.events.filter(event => event.type === "tool/call" && event.data.name === "SendMessage")).toHaveLength(0);
+  } finally { await f.dispose(); }
 });
 
 import { response } from "./fixture.ts";

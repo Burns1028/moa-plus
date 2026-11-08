@@ -135,6 +135,10 @@ Workers and Coordinator share a knowledge base, while the Coordinator maintains 
 
 The Client contributes native slots and tabs; it does not replace the workspace browser, composer, permission engine, or file preview. Capsule keys remain `(Coordinator Session, native turn, human-message segment, Worker)`. Dispatch, accepted updates, and received results establish participation; reads and passive input do not. Deletion hides all seats and public membership while native history remains. Workers use Back and inherited permissions.
 
+A message-driven handoff closes a native turn without completing its work. Its historical capsule seats persist as continued outcomes, stay in their original segment, and show Worker progress until their original assignments really end. The outbox then freezes their actual result. Recovery follows the same rule, so reconnecting cannot lose a capsule or move it to a passive later reply.
+
+Worker addresses carry the actual native direct parent. For a visible nested Worker, the UI subscribes to `followWorkerParent`; its Host callback borrows that Worker and the true parent chain through the reviewed native residency seam. Native capacity, permissions and teardown still own those handles. Releasing the view does not stop ongoing work; ordinary top-level parent references remain unchanged.
+
 The Workers tab is read-only. It shows original input, final AI output, and artifacts with two-line expandable Markdown previews. It does not summarize via a model. Workers/notes defaults use native closable tab behavior. Native sidebar rows retain their alignment and controls.
 
 The historical `ProjectMode`, `ProjectClient`, storage, package, and Remote names remain compatibility identifiers. They are not separate product modes or a reason to migrate user data. See [contributing](../CONTRIBUTING.md) for checks and [verification](verification.md) for evidence still required before release.

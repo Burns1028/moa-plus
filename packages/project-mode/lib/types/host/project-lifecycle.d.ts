@@ -6,7 +6,7 @@ import { type RecordState } from "./state.ts";
 export declare function hasOwnTurn(events: readonly SessionEvent[], inheritedEventCount: number): boolean;
 interface LifecycleOptions {
     put(id: SessionId, record: RecordState): Promise<void>;
-    attach(agent: Agent): void;
+    attach(agent: Agent): void | Promise<void>;
     recover(id: SessionId): Promise<void>;
 }
 /** Owns Project identity and draft enable/disable through native Agent maintenance. */

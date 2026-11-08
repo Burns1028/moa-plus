@@ -118,14 +118,14 @@ it("injects full notes at every coordinator inference, even unchanged, and keeps
       expect(text).toContain(notes);
       expect(text).toContain("archiv");
       if (calls === 1) {
-        const args = '{"action":"list"}';
+        const args = '{}';
         return [
           { type: "block-start", index: 0, blockType: "tool-call" },
           {
             type: "tool-call-delta",
             index: 0,
             id: "list",
-            name: "control_workers",
+            name: "QueryAgent",
             argumentsDelta: args,
           },
           {
@@ -134,7 +134,7 @@ it("injects full notes at every coordinator inference, even unchanged, and keeps
             block: {
               type: "tool-call",
               id: "list",
-              name: "control_workers",
+              name: "QueryAgent",
               arguments: args,
             },
           },

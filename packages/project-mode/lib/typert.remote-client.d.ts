@@ -6,13 +6,14 @@ import type {
   TypertRemoteMethod,
 } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { ControlResult, ControlWorkersRequest, ProjectFrame, ProjectSnapshot, SessionModeView, WorkerHistoryPage, WorkerTimelinePage } from 'dsh-plugin-project-mode/shared'
+import type { ControlResult, ControlWorkersRequest, ProjectFrame, ProjectSnapshot, SessionModeView, WorkerHistoryPage, WorkerParentReady, WorkerTimelinePage } from 'dsh-plugin-project-mode/shared'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface TypertRemoteNamespace$70726f6a6563744d6f6465 {
     catalog: () => Promise<RemoteResult<ProjectSnapshot[]>>
     control: (sessionId: SessionId, request: ControlWorkersRequest, requestId: string, signal?: AbortSignal) => Promise<RemoteResult<ControlResult>>
     follow: (sessionId: SessionId, signal?: AbortSignal) => RemoteStreamHandle<ProjectFrame, never>
+    followWorkerParent: (sessionId: SessionId, workerId: SessionId, signal?: AbortSignal) => RemoteStreamHandle<WorkerParentReady, never>
     history: (sessionId: SessionId, workerId: SessionId, offset: number, limit: number, signal?: AbortSignal) => Promise<RemoteResult<WorkerHistoryPage>>
     mode: (sessionId: SessionId) => Promise<RemoteResult<SessionModeView>>
     setEnabled: (sessionId: SessionId, enabled: boolean, expectedRevision: number, requestId: string) => Promise<RemoteResult<SessionModeView>>
@@ -23,6 +24,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'projectMode/catalog': () => Promise<RemoteResult<ProjectSnapshot[]>>
     'projectMode/control': (sessionId: SessionId, request: ControlWorkersRequest, requestId: string, signal?: AbortSignal) => Promise<RemoteResult<ControlResult>>
     'projectMode/follow': (sessionId: SessionId, signal?: AbortSignal) => RemoteStreamHandle<ProjectFrame, never>
+    'projectMode/followWorkerParent': (sessionId: SessionId, workerId: SessionId, signal?: AbortSignal) => RemoteStreamHandle<WorkerParentReady, never>
     'projectMode/history': (sessionId: SessionId, workerId: SessionId, offset: number, limit: number, signal?: AbortSignal) => Promise<RemoteResult<WorkerHistoryPage>>
     'projectMode/mode': (sessionId: SessionId) => Promise<RemoteResult<SessionModeView>>
     'projectMode/setEnabled': (sessionId: SessionId, enabled: boolean, expectedRevision: number, requestId: string) => Promise<RemoteResult<SessionModeView>>
@@ -38,6 +40,7 @@ export declare const TYPERT_REMOTE: TypertRemoteInfo<{
   readonly 'projectMode/catalog': TypertRemoteMethod<{  }, ProjectSnapshot[]>
   readonly 'projectMode/control': TypertRemoteMethod<{ readonly 'sessionId': SessionId; readonly 'request': ControlWorkersRequest; readonly 'requestId': string }, ControlResult>
   readonly 'projectMode/follow': TypertRemoteMethod<{ readonly 'sessionId': SessionId }, ProjectFrame, 'stream'>
+  readonly 'projectMode/followWorkerParent': TypertRemoteMethod<{ readonly 'sessionId': SessionId; readonly 'workerId': SessionId }, WorkerParentReady, 'stream'>
   readonly 'projectMode/history': TypertRemoteMethod<{ readonly 'sessionId': SessionId; readonly 'workerId': SessionId; readonly 'offset': number; readonly 'limit': number }, WorkerHistoryPage>
   readonly 'projectMode/mode': TypertRemoteMethod<{ readonly 'sessionId': SessionId }, SessionModeView>
   readonly 'projectMode/setEnabled': TypertRemoteMethod<{ readonly 'sessionId': SessionId; readonly 'enabled': boolean; readonly 'expectedRevision': number; readonly 'requestId': string }, SessionModeView>

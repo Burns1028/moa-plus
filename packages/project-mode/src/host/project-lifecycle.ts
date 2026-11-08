@@ -20,7 +20,7 @@ export function hasOwnTurn(
 
 interface LifecycleOptions {
   put(id: SessionId, record: RecordState): Promise<void>;
-  attach(agent: Agent): void;
+  attach(agent: Agent): void | Promise<void>;
   recover(id: SessionId): Promise<void>;
 }
 /** Owns Project identity and draft enable/disable through native Agent maintenance. */
@@ -126,7 +126,7 @@ export class ProjectLifecycle {
         toggles: { ...r.toggles, [requestId]: r.project.revision + 1 },
       };
       await this.options.put(sessionId, recordSchema.parse(r));
-      this.options.attach(agent);
+      await this.options.attach(agent);
       if (this.host.record(agent.id))
         this.host.enqueue(agent.id, () => this.options.recover(agent.id));
       this.host.notify();

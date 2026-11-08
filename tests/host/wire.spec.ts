@@ -33,6 +33,7 @@ it("dispatches the compiled plugin through native Gateway with generated codecs 
         "catalog",
         "control",
         "follow",
+        "followWorkerParent",
         "history",
         "mode",
         "setEnabled",

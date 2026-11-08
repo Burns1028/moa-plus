@@ -38,7 +38,7 @@ export function ProjectBranch(p: BranchProps) {
   const workers = useSelected(p.client.store.subscribe, () =>
     (p.client.store.project(p.sessionId)?.workers ?? [])
       .filter((w) => isVisibleWorker(w) && !archived.includes(w.workerId))
-      .map(({ workerId, name, phase }) => ({ workerId, name, phase })),
+      .map(({ workerId, parentSessionId, name, phase }) => ({ workerId, parentSessionId, name, phase })),
   );
   const [expanded, setExpanded] = React.useState(() =>
     savedExpansion(p.sessionId),
@@ -124,7 +124,7 @@ export function ProjectBranch(p: BranchProps) {
                 icon: (
                   <span className="pm-worker-identity">
                     <WorkerIcon workerId={w.workerId} />
-                    {(w.phase === "working" || w.phase === "starting") && (
+                    {(w.phase === "working" || w.phase === "starting" || w.phase === "stopping") && (
                       <StateDot
                         state="ongoing"
                         size={22}
@@ -137,7 +137,7 @@ export function ProjectBranch(p: BranchProps) {
                 selected: p.currentSessionId === w.workerId,
                 onOpen: () =>
                   p.open({
-                    parentSessionId: p.sessionId,
+                    parentSessionId: w.parentSessionId ?? p.sessionId,
                     childSessionId: w.workerId,
                     mode: "continuable",
                   }),

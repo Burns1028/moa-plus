@@ -203,7 +203,8 @@ export class TurnCoordination {
                 a.admission !== "rejected" &&
                 !completed.some((c) => c.assignmentIds.includes(a.id)),
             );
-            const interrupted = parentReason !== "completed" || pending;
+            const continued = parentReason === "handoff" && (pending || !last);
+            const interrupted = parentReason !== "completed" && parentReason !== "handoff" || pending;
             return {
               coordinatorSessionId: parentId,
               coordinatorTurn: turn,
@@ -214,6 +215,8 @@ export class TurnCoordination {
               status:
                 worker.lifecycle === "deleted"
                   ? ("deleted" as const)
+                  : continued
+                    ? ("continued" as const)
                   : interrupted
                     ? ("stopped" as const)
                     : last?.outcome === "completed"
@@ -222,7 +225,7 @@ export class TurnCoordination {
                         ? ("stopped" as const)
                         : ("failed" as const),
               completionIds: completed.map((c) => c.id),
-              ...(interrupted
+              ...(interrupted && !continued
                 ? {
                     summary:
                       "Coordinator turn interrupted; worker work may continue.",

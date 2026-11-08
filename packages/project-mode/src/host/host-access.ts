@@ -3,7 +3,7 @@ import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import type { Config } from "./config.ts";
 import type { RecordState, Worker } from "./state.ts";
-import type { WorkerView, WorkerHistoryPage } from "../shared/index.ts";
+import type { WorkerView, WorkerHistoryPage, ControlWorkersRequest, ControlResult, ControlReceipt } from "../shared/index.ts";
 
 /** Dependencies shared by coordination components. Native Agent owns execution. */
 export interface HostAccess {
@@ -37,4 +37,17 @@ export interface HostAccess {
   ingest(id: SessionId): Promise<void>;
   settledJobs(parentId: SessionId): Promise<void>;
   pendingOperations(id: SessionId): number;
+  admitWorkerMessage(
+    agent: Agent,
+    request: ControlWorkersRequest,
+    operationId: string,
+    signal: AbortSignal,
+    admit: (signal: AbortSignal) => Promise<string>,
+  ): Promise<ControlResult>;
+  stopManagedWorker(
+    agent: Agent,
+    request: Extract<ControlWorkersRequest, { action: "delete" }>,
+    operationId: string,
+    signal: AbortSignal,
+  ): Promise<ControlReceipt>;
 }

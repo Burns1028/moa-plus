@@ -157,7 +157,7 @@ export function WorkersPanel({
           >
             <span className="pm-panel-worker-icon">
               <WorkerIcon workerId={w.workerId} />
-              {(w.phase === "working" || w.phase === "starting") && (
+              {(w.phase === "working" || w.phase === "starting" || w.phase === "stopping") && (
                 <StateDot
                   state="ongoing"
                   size={22}
@@ -185,7 +185,7 @@ export function WorkersPanel({
               type="button"
               onClick={() =>
                 open({
-                  parentSessionId: project!.project.coordinatorSessionId,
+                  parentSessionId: worker.parentSessionId ?? project!.project.coordinatorSessionId,
                   childSessionId: worker.workerId,
                   mode: "continuable",
                 })
@@ -220,7 +220,9 @@ export function WorkersPanel({
                 {t(
                   turn.outcome === null
                     ? "working"
-                    : turn.outcome === "completed"
+                    : turn.outcome === "handoff"
+                      ? "continued"
+                      : turn.outcome === "completed"
                       ? "completed"
                       : turn.outcome === "aborted"
                         ? "stopped"
@@ -236,6 +238,8 @@ export function WorkersPanel({
                   {t(
                     message.actor === "coordinator"
                       ? "fromCoordinator"
+                      : message.actor === "agent"
+                        ? "fromAgent"
                       : "fromUser",
                   )}
                   <MessagePreview text={message.text} labels={labels} />

@@ -9,7 +9,7 @@ export declare function workerReadOnly(projects: readonly ProjectSnapshot[], id:
 export interface ComposerMatch {
     id: SessionId;
     parent: SessionId;
-    reason: "deleted" | "disabled" | "pending" | "unavailable";
+    reason: "deleted" | "disabled";
 }
-/** A known continuation must establish ownership before enabling its input. */
+/** Override native input only for established, inactive Project membership. */
 export declare function composerMatch(owner: import("@deepseek-ai/dsh-client-ui-conversation/client").ComposerChainProps, client: import("./runtime.ts").ProjectClient): ComposerMatch | null;

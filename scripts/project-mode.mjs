@@ -303,7 +303,7 @@ function verifyNative(paths) {
   );
   if (!/Preflight passed for 0 native package patches;/.test(output))
     throw new Error(
-      "Runtime is unpatched or incomplete; setup must apply all three native compatibility patches.",
+      "Runtime is unpatched or incomplete; setup must apply all reviewed native compatibility extensions.",
     );
 }
 
@@ -463,7 +463,7 @@ function setup(paths) {
   if (existing?.status === "ready") {
     initializeProfile(paths);
     inspect(paths);
-    console.log(`Project Mode runtime is ready: ${paths.directory}`);
+    console.log(`MoA+ runtime is ready: ${paths.directory}`);
     return;
   }
   if (!existing && stat(paths.directory) && readdirSync(paths.directory).length)
@@ -559,7 +559,7 @@ function setup(paths) {
     verifyFiles(paths, ready, source);
     verifyNative(paths);
     writeMarker(paths, ready);
-    console.log(`Project Mode runtime is ready: ${paths.directory}`);
+    console.log(`MoA+ runtime is ready: ${paths.directory}`);
     console.log(
       "Run the start command with --dir set to the runtime directory shown above.",
     );
@@ -631,7 +631,7 @@ async function main(argv) {
     options.length === 0
   ) {
     console.log(
-      "Usage: node scripts/project-mode.mjs setup|start|doctor [--dir PATH] [-- WEB_ARGS]\n\nRequires Node 24.9+; setup also requires npm and Git. Default: ~/.dsh-project-mode/rc3\nsetup  Install the pinned Web runtime and the three audited compatibility patches.\nstart  Check and launch the isolated official DSH Web runtime.\ndoctor Check ownership, exact native versions, lock, archive and applied patch hashes.\n\nArguments after -- are forwarded to start; --host defaults to 127.0.0.1 and --port to 0.\nAll child processes use the isolated DSH_HOME; personal ~/.dsh and applications are untouched.",
+      "Usage: node scripts/project-mode.mjs setup|start|doctor [--dir PATH] [-- WEB_ARGS]\n\nRequires Node 24.9+; setup also requires npm and Git. Default: ~/.dsh-project-mode/rc3\nsetup  Install the pinned Web runtime and the reviewed compatibility extensions.\nstart  Check and launch the isolated official DSH Web runtime.\ndoctor Check ownership, exact native versions, lock, archive and applied patch hashes.\n\nArguments after -- are forwarded to start; --host defaults to 127.0.0.1 and --port to 0.\nAll child processes use the isolated DSH_HOME; personal ~/.dsh and applications are untouched.",
     );
     return 0;
   }
@@ -668,7 +668,7 @@ async function main(argv) {
   if (command === "doctor") {
     inspect(paths);
     console.log(
-      `Project Mode runtime is ready; all three native patches are applied: ${paths.directory}`,
+      `MoA+ runtime is ready; all reviewed native extensions are applied: ${paths.directory}`,
     );
   }
   return command === "start" ? start(paths, forwarded) : 0;

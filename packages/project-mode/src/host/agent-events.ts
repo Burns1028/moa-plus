@@ -91,8 +91,7 @@ export function bindAgentEvents(
     }
     if (
       host.record(session.id) &&
-      event.type === "turn/end" &&
-      event.data.reason.kind !== "handoff"
+      event.type === "turn/end"
     ) {
       outbox.claimed.delete(session.id);
       host.enqueue(session.id, () =>

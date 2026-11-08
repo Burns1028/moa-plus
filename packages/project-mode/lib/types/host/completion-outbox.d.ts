@@ -6,6 +6,7 @@ export declare class CompletionOutbox {
     readonly normalizing: Set<SessionId>;
     readonly workerCuts: Map<SessionId, {
         turn: number;
+        inheritedEventCount: number;
         segmentStartSeq: number;
         lastSeq: number;
         resultAnchors: Record<string, {
@@ -14,6 +15,7 @@ export declare class CompletionOutbox {
             participationSeq: number;
         }>;
         messageIds: string[];
+        handoffMessageIds: string[];
         finished: {
             turn: number;
             seq: number;
@@ -41,7 +43,8 @@ export declare class CompletionOutbox {
     dispose(): void;
     ingest(workerId: SessionId): Promise<void>;
     private ingestCompletion;
-    consume(parentId: SessionId, messageId: string): Promise<void>;
+    consume(targetId: SessionId, messageId: string): Promise<void>;
     deliver(parentId: SessionId): Promise<void>;
     private admitDeliveries;
+    private admitTarget;
 }

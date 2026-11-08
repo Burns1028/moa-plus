@@ -1,5 +1,8 @@
 import z from "@deepseek-ai/schemastery";
 export interface Config {
+    backgroundStrategy: "after-seconds" | "new-message" | "llm-judge";
+    backgroundAfterSeconds: number;
+    completionVerification: boolean;
     dataDirectory: string;
     coordinatorHiddenTools: string[];
     progressTextMaxChars: number;

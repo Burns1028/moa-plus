@@ -126,7 +126,7 @@
     "node": ">=24.9.0"
   },
   "version": "0.1.23",
-  "description": "Unofficial Project Mode for DeepSeek Harness: persistent Coordinator, reusable Workers and shared context. Preview; requires patched DSH 0.2.1-rc.3.",
+  "description": "MoA+ for DeepSeek Harness: advancing intelligence through native multi-agent collaboration. Developer preview; requires the reviewed rc.3 compatibility runtime.",
   "keywords": [
     "deepseek",
     "deepseek-harness",

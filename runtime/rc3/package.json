@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pinned standalone Web runtime for the Project Mode preview",
+  "description": "Pinned isolated Web runtime for the MoA+ developer preview",
   "engines": {
     "node": ">=24.9.0"
   },

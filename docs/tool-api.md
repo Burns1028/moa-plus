@@ -198,6 +198,8 @@ A real Worker turn returns its complete final committed AI message to `reportTo`
 
 The UI-only `projectMode/timeline(sessionId, workerId, limit, signal)` stream shows newest native turns with original input, final AI reply, and recorded artifacts. Its initial ten-turn UI window is independent of QueryAgent's explicit history indices. It renders a two-line preview expandable to original Markdown, and does not call a model. Artifacts come from native deliverables and successful persisted file mutations, not guessed shell side effects.
 
+The UI-only `projectMode/followWorkerParent(sessionId, workerId, signal)` stream keeps the selected nested Worker's native residency and true parent chain available while its conversation is visible. It checks the owning project's Remote access and current membership, adds no model input, and ends when the view closes or membership changes. Closing the view releases this hold; it does not cancel actual work. Top-level Workers retain the existing native Coordinator-reference path. A visible nested conversation uses native capacity for its target and cold ancestors.
+
 The Remote service/storage/package identifiers retain their historical `projectMode`/`project-mode` names for existing consumers. Legacy backend request schemas are not a second model-visible delegation path.
 
 ## Configuration

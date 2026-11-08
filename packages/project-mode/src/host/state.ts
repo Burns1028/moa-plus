@@ -147,7 +147,7 @@ export const outcomeSchema = z.object({
   coordinatorTurn: z.number().int(),
   segmentStartSeq: z.number().int().nonnegative().optional(),
   workerId: id,
-  status: z.enum(["completed", "failed", "stopped", "deleted"]),
+  status: z.enum(["completed", "failed", "stopped", "deleted", "continued"]),
   completionIds: z.array(id),
   lastResultMessageId: id.optional(),
   lastResultSeq: z.number().int().optional(),

@@ -58,12 +58,19 @@ export interface MessagePorts {
     signal: AbortSignal,
   ): Promise<boolean>;
   listeners: Set<() => void>;
+  recover?(rootId: string, signal: AbortSignal, step?: RecoveryStep): Promise<void>;
+  dispose?(): void;
+}
+interface RecoveryStep {
+  agent: Agent;
+  messages: UserMessage[];
+  signal: AbortSignal;
 }
 
 type Wait = {
   route: RequestRoute;
   settle: (result: RequestResult) => void;
-  replying?: Promise<RequestResult>;
+  signal: AbortSignal;
 };
 /** Request matching and wait graph; the native Agent retains execution and inbox ownership. */
 export class MoAMessageBroker {
@@ -74,9 +81,10 @@ export class MoAMessageBroker {
   constructor(private ports: MessagePorts) {}
   dispose() {
     this.disposed.abort();
+    this.ports.dispose?.();
   }
-  async recover(_rootId: string) {
-    /* Routes are loaded from the owning record on demand. */
+  async recover(rootId: string, step?: RecoveryStep) {
+    await this.ports.recover?.(rootId, this.disposed.signal, step);
   }
   send(
     actor: Agent,
@@ -89,7 +97,11 @@ export class MoAMessageBroker {
     const running = this.operations.get(key);
     if (running) return running;
     const existing = this.ports.receipt(rootId, operationId);
-    if (existing !== undefined) return Promise.resolve(existing);
+    if (existing !== undefined) {
+      return input.reply_to
+        ? this.recover(rootId).then(() => existing)
+        : Promise.resolve(existing);
+    }
     const work = this.run(
       actor,
       input,
@@ -168,6 +180,7 @@ export class MoAMessageBroker {
             JSON.stringify([rootId, route.requestId]),
           );
           if (current.state === "answered") {
+            await this.recover(rootId);
             const duplicate = { status: "delivered", replyTo: route.requestId };
             await this.ports.saveReceipt(rootId, operationId, duplicate);
             return duplicate;
@@ -183,9 +196,12 @@ export class MoAMessageBroker {
               requestId: route.requestId,
               answer: input.message,
             };
-            wait.replying = this.ports.saveRoute(answered).then(() => answer);
-            await wait.replying;
-            wait.settle(answer);
+            await this.ports.saveRoute(answered);
+            // Persistence may yield while the requester is cancelled. Do not
+            // settle a dead waiter: its answer now belongs in the inbox.
+            if (!wait.signal.aborted && this.waits.get(JSON.stringify([rootId, route.requestId])) === wait)
+              wait.settle(answer);
+            else await this.ports.deliver(envelope, signal);
             const result = { status: "delivered", replyTo: route.requestId };
             await this.ports.saveReceipt(rootId, operationId, result);
             return result;
@@ -234,7 +250,7 @@ export class MoAMessageBroker {
       settle = resolve;
     });
     const waitKey = JSON.stringify([rootId, requestId]);
-    this.waits.set(waitKey, { route, settle });
+    this.waits.set(waitKey, { route, settle, signal });
     try {
       await this.ports.saveRoute({ ...route, state: "waiting" });
       await this.ports.deliver(envelope, signal);
@@ -405,14 +421,14 @@ export function createSendMessageTool(broker: MoAMessageBroker) {
 
 import { createHash } from "node:crypto";
 import { freezeMessage, MessageId } from "@deepseek-ai/dsh-llm";
-import { SessionId } from "@deepseek-ai/dsh-session";
+import { SessionId, type SessionEvent } from "@deepseek-ai/dsh-session";
 import {
   observeForTurn,
-  queueHostSubagentPrompt,
-  resolveOrdinaryAgent,
-  steerHostSubagentPrompt,
 } from "../native.ts";
 import type { HostAccess } from "../host-access.ts";
+import { withManagedAgent } from "./residency.ts";
+import { nativeOperationSeq } from "../capsule-participation.ts";
+import { messageSchema } from "../state.ts";
 
 declare module "@deepseek-ai/dsh-llm" {
   interface MessageSourceMap {
@@ -429,14 +445,94 @@ declare module "@deepseek-ai/dsh-llm" {
 }
 const routeKey = (id: string) => `moa:route:${id}`;
 const receiptKey = (id: string) => `moa:receipt:${id}`;
+
+function nativeMessage(envelope: MoAMessageEnvelope): UserMessage {
+  const source = {
+    kind: "moa-message" as const,
+    form: "relay" as const,
+    rootId: envelope.rootId,
+    senderId: envelope.senderId,
+    operationId: envelope.operationId,
+    ...(envelope.requestId ? { requestId: envelope.requestId } : {}),
+    ...(envelope.replyTo ? { replyTo: envelope.replyTo } : {}),
+  };
+  const text = `${envelope.requestId ? `Request ID: ${envelope.requestId}\n` : ""}${envelope.replyTo ? `Reply to: ${envelope.replyTo}\n` : ""}From: ${envelope.senderId}\n${envelope.message}`;
+  return freezeMessage({
+    id: MessageId(`moa-${createHash("sha256").update(JSON.stringify([envelope.rootId, envelope.operationId])).digest("hex")}`),
+    role: "user" as const,
+    source,
+    content: [{ type: "text", text }],
+  });
+}
+
+function isAnswer(message: UserMessage, route: RequestRoute): boolean {
+  return message.source.kind === "moa-message" &&
+    message.source.rootId === route.rootId &&
+    message.source.senderId === route.targetId &&
+    message.source.replyTo === route.requestId;
+}
+
+/** A persisted receipt is acceptance; only native model history proves delivery. */
+function hasCommittedAnswer(events: readonly SessionEvent[], route: RequestRoute): boolean {
+  if (events.some(event => event.type === "user/message" && isAnswer(event.data, route))) return true;
+  const seq = nativeOperationSeq(route.operationId, route.senderId);
+  const call = events.find(event => event.type === "tool/call" && event.seq === seq);
+  if (call?.type !== "tool/call" || call.data.name !== "SendMessage") return false;
+  return events.some(event => {
+    if (event.type !== "tool/result" || event.data.turn !== call.data.turn || event.data.step !== call.data.step || event.data.message.toolCallId !== call.data.callId || event.data.message.isError) return false;
+    try {
+      const value: unknown = JSON.parse(event.data.message.content.filter(block => block.type === "text").map(block => block.text).join(""));
+      return !!value && typeof value === "object" && "status" in value && value.status === "answered" && "requestId" in value && value.requestId === route.requestId && "answer" in value && value.answer === route.answer;
+    } catch { return false; }
+  });
+}
 /** Bind the broker to native session inboxes and the Project's durable aggregate. */
 export function createNativeMessageBroker(
   host: HostAccess,
   judge: MessagePorts["judge"],
 ) {
-  return new MoAMessageBroker({
+  let detach = () => {};
+  const ports: MessagePorts = {
     listeners: host.listeners,
     judge,
+    dispose: () => detach(),
+    async recover(rootId, brokerSignal, step) {
+      const record = host.record(SessionId(rootId));
+      if (record?.project.mode !== "enabled") return;
+      const signal = AbortSignal.any([brokerSignal, host.closing.signal, ...(step ? [step.signal] : [])]);
+      const routes = Object.entries(record.operations).filter(([key]) => key.startsWith("moa:route:")).map(([, value]) => value as unknown as RequestRoute);
+      for (const route of routes) {
+        if (route.state !== "answered" || route.answer === undefined || (step && route.senderId !== step.agent.id)) continue;
+        const current = host.record(SessionId(rootId));
+        if (current?.project.mode !== "enabled" || (route.senderId !== rootId && !current.workers.some(worker => worker.id === route.senderId && (worker.lifecycle === "active" || worker.lifecycle === "provisioning")))) continue;
+        const senderId = SessionId(route.senderId);
+        const live = host.ctx.agents.get(senderId);
+        // An original live tool may still be returning its answer. Its next
+        // pre-step observes the committed Tool Message, or repairs the gap.
+        if (!step && live && (live.status === "running" || live.moaStopped)) continue;
+        using observed = await observeForTurn(host.ctx, senderId, signal);
+        const pending = live
+          ? [...live.inbox.nextStep, ...live.inbox.nextTurn]
+          : [...(observed.projections?.values.inbox?.["next-step"] ?? []), ...(observed.projections?.values.inbox?.["next-turn"] ?? [])].map(message => messageSchema.parse(message));
+        if (hasCommittedAnswer(observed.events, route) || step?.messages.some(message => isAnswer(message, route)) || pending.some(message => isAnswer(message, route))) continue;
+        const message = nativeMessage({ rootId, senderId: route.targetId, targetId: route.senderId, message: route.answer, operationId: `answer-recovery:${route.requestId}`, replyTo: route.requestId, delivery: "steer" });
+        if (step) {
+          signal.throwIfAborted();
+          // Log admission before claiming it into this inference. A crash in
+          // between remains recoverable from the same answered route.
+          step.agent.send(message, "next-step", false);
+          await host.ctx.sessions.flush(step.agent.session);
+          signal.throwIfAborted();
+          step.agent.inbox.remove(message.id);
+          step.messages.push(message);
+        } else {
+          await withManagedAgent(host, senderId, signal, async sender => {
+            if (hasCommittedAnswer(sender.session.snapshotEvents(), route) || [...sender.inbox.nextStep, ...sender.inbox.nextTurn].some(input => isAnswer(input, route))) return;
+            sender.send(message, "next-step", true);
+          });
+        }
+      }
+    },
     membership(actor, targetId) {
       const record = host.record(actor.id) ?? host.owner(actor.id);
       if (
@@ -485,16 +581,7 @@ export function createNativeMessageBroker(
     async deliver(envelope, signal) {
       signal.throwIfAborted();
       const targetId = SessionId(envelope.targetId);
-      const source = {
-        kind: "moa-message" as const,
-        form: "relay" as const,
-        rootId: envelope.rootId,
-        senderId: envelope.senderId,
-        operationId: envelope.operationId,
-        ...(envelope.requestId ? { requestId: envelope.requestId } : {}),
-        ...(envelope.replyTo ? { replyTo: envelope.replyTo } : {}),
-      };
-      const text = `${envelope.requestId ? `Request ID: ${envelope.requestId}\n` : ""}${envelope.replyTo ? `Reply to: ${envelope.replyTo}\n` : ""}From: ${envelope.senderId}\n${envelope.message}`;
+      const message = nativeMessage(envelope);
       // A retry after admission but before its receipt must not enqueue twice.
       using observed = await observeForTurn(host.ctx, targetId, signal);
       const prior = observed.events.findLast(
@@ -504,6 +591,7 @@ export function createNativeMessageBroker(
             JSON.stringify(envelope.operationId),
           ),
       );
+      let priorId: MessageId | undefined;
       if (prior && prior.type === "agent/inbox/spliced") {
         const inserted = prior.data.inserted.find(
           (m) =>
@@ -511,66 +599,38 @@ export function createNativeMessageBroker(
             m.source.operationId === envelope.operationId &&
             m.source.rootId === envelope.rootId,
         );
-        if (inserted) return inserted.id;
+        if (inserted) priorId = inserted.id;
       }
-      let target = host.ctx.agents.get(targetId);
-      if (!target && targetId === envelope.rootId)
-        target = await resolveOrdinaryAgent(host.ctx, targetId);
-      if (target) {
-        const id = MessageId(
-          `moa-${createHash("sha256")
-            .update(JSON.stringify([envelope.rootId, envelope.operationId]))
-            .digest("hex")}`,
-        );
-        const message = freezeMessage({
-          id,
-          role: "user" as const,
-          source,
-          content: [{ type: "text", text }],
-        });
-        target.send(
-          message,
-          envelope.delivery === "queue" ? "next-turn" : "next-step",
-          true,
-        );
-        return id;
-      }
-      // Native host continuation requires the true direct parent, not the sender.
-      const root =
-        host.ctx.agents.get(SessionId(envelope.rootId)) ??
-        (await resolveOrdinaryAgent(host.ctx, SessionId(envelope.rootId)));
-      if (!root) throw new Error("moa/root-unavailable");
-      const pending = [root.id];
-      let parent: Agent | undefined;
-      while (pending.length) {
-        const parentId = pending.shift()!;
-        const children = await host.ctx.subagents.listChildren(
-          parentId,
+      const admit = (signal: AbortSignal) => priorId
+        ? Promise.resolve(priorId)
+        : withManagedAgent(host, targetId, signal, async (target) => {
+        target.send(message, envelope.delivery === "queue" ? "next-turn" : "next-step", true);
+        return message.id;
+      });
+      if (envelope.senderId === envelope.rootId && targetId !== envelope.rootId) {
+        const sender = host.ctx.agents.get(SessionId(envelope.senderId));
+        if (!sender) throw new Error("moa/sender-unavailable");
+        const receipt = await host.admitWorkerMessage(
+          sender,
+          { action: "send", worker_id: targetId, message: envelope.message, delivery: envelope.delivery ?? "steer" },
+          envelope.operationId,
           signal,
+          admit,
         );
-        if (children.some((child) => child.id === targetId)) {
-          parent = host.ctx.agents.get(parentId);
-          break;
-        }
-        pending.push(
-          ...children
-            .filter((child) => child.mode === "continuable")
-            .map((child) => child.id),
-        );
+        if (!("messageId" in receipt) || !receipt.messageId) throw new Error("moa/message-admission-missing");
+        return MessageId(receipt.messageId);
       }
-      if (!parent) throw new Error("moa/direct-parent-unavailable");
-      const deliver =
-        envelope.delivery === "queue"
-          ? queueHostSubagentPrompt
-          : steerHostSubagentPrompt;
-      return deliver(
-        host.ctx.subagents,
-        parent,
-        targetId,
-        [{ type: "text", text }],
-        source,
-        signal,
-      );
+      return admit(signal);
     },
+  };
+  const broker = new MoAMessageBroker(ports);
+  detach = host.ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
+    const decision = await next();
+    const record = host.record(agent.id) ?? host.owner(agent.id);
+    if (decision.kind !== "enter" || !record) return decision;
+    const messages = [...decision.messages];
+    await broker.recover(record.project.coordinatorSessionId, { agent, signal, messages });
+    return { ...decision, messages };
   });
+  return broker;
 }

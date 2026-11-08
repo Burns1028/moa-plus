@@ -1,6 +1,6 @@
-import type { TypertClientRemote } from "@deepseek-ai/dsh-typert-protocol";
+import type { TypertClientRemote, RemoteStreamHandle } from "@deepseek-ai/dsh-typert-protocol";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
-import type { SessionModeView } from "../shared/index.ts";
+import type { SessionModeView, WorkerParentReady } from "../shared/index.ts";
 import { ProjectStore } from "./store.ts";
 export interface ModeState {
     value?: SessionModeView;
@@ -25,6 +25,7 @@ export declare class ProjectClient {
     modeVersion: number;
     connectionVersion: number;
     constructor(remote: TypertClientRemote["projectMode"]);
+    followWorkerParent(workerId: SessionId, signal: AbortSignal): RemoteStreamHandle<WorkerParentReady, never>;
     subscribeModes: (listener: () => void) => () => void;
     mode: (id: SessionId) => ModeState;
     private setMode;
