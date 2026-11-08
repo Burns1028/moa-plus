@@ -10,8 +10,9 @@
 - Refresh full Coordinator notes before inference and retain progressive shared context. Add exact completion promises, Builder rubric submission from original requirements, and independent verification with retained native execution tools.
 - Interpret later clarifications chronologically and clarify pre-end Builder/Verifier ownership, avoiding a circular requirement for their own future completion or the parent's subsequent turn end. Native closure, resource checks, and explicit artifact/test requirements remain enforced.
 - Keep canonical results unique across inbox claims/recovery and hold Coordinator closure while its final Worker result is queued for ingestion.
+- Show incoming Agent messages with their real sender and expandable two-line original Markdown inside existing Coordinator/Worker conversations. Preserve native ordinary messages, capsule seats, and synchronous Request Tool Results without adding a page or duplicate message.
 - Use the reviewed rc.3 compatibility manifest covering 13 native packages and 31 file paths. The existing package version remains 0.1.23; these changes are not a new published release.
-- Record 54 regression files / 296 passing tests, Host/Client typechecks, a production build, and 19 passing launcher checks with no skips. Fresh npm, forwarding-package, and Git consumers plus clean-checkout npm ci passed at `231663c`. The fresh Timer3 task passed independent artifact verification, normal Coordinator closure, and restart without replay; exact revisions and native UI evidence are recorded in [verification](docs/verification.md).
+- Record 55 regression files / 300 passing tests, Host/Client typechecks, a production build, and 19 passing launcher checks with no skips. Fresh npm, forwarding-package, and Git consumers plus clean-checkout npm ci passed at `231663c`. The fresh Timer3 task passed independent artifact verification, normal Coordinator closure, and restart without replay; exact revisions and native UI evidence are recorded in [verification](docs/verification.md).
 
 ## 0.1.23 — 2026-11-02
 

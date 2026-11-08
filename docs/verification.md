@@ -4,15 +4,15 @@
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **13 native packages / 31 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
-This is an unreleased branch; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`.
+This is an unreleased branch; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`, with its separate evidence below.
 
 ### Current automated evidence
 
 | Check | Verified revision and result |
 | --- | --- |
-| Combined Host, Client, integration, and native-contract regression | Source `e617f0f` / bundle `e982a59`: **54 files / 296 tests passed**. This total already includes native-contract tests. |
-| Production build and generated artifacts | Build passed; matching completion-role bundle committed as `e982a59`. |
-| Host and Client typechecks | Both passed with the Coordinator closure, current background-query, detached PTC logging, and completion-role fixes. |
+| Combined Host, Client, integration, and native-contract regression | Source `8546b3a` / bundle `ada2e01`: **55 files / 300 tests passed**. This total already includes native-contract tests. The previous completion-role run at source `e617f0f` / bundle `e982a59` passed 54 files / 296 tests. |
+| Production build and generated artifacts | Build passed for the message-display follow-up; matching bundle committed as `ada2e01`. The prior completion-role bundle is `e982a59`. |
+| Host and Client typechecks | Both passed for the message-display follow-up, retaining the Coordinator closure, background-query, detached PTC logging, and completion-role fixes. |
 | Isolated runtime launcher | **19 passed, zero skipped**, including unsupported-byte refusal, setup recovery, and child signal forwarding. |
 | Exact native compatibility | Fresh npm, published legacy-tool-isolation, and runtime-only variants passed application, target-hash, idempotence, unknown-byte refusal, and backup rollback probes for the current manifest. |
 | Fresh package consumers | At `231663c`, npm, forwarding-package, and committed-Git consumers passed stock-runtime refusal, explicit compatibility installation, declarations, Host/browser loading, nine native Loader endpoints, Client Gateway roundtrip, and disposal. Git clean-checkout `npm ci` also passed. Completed disposable consumer fixtures are released between stages; check assertions are unchanged. |
@@ -21,7 +21,7 @@ The closure regression holds a real final Worker ingestion while the guard await
 
 ### Requirement → code, tests and evidence
 
-Plugin source paths below are relative to `packages/project-mode/src/`; test paths are relative to the repository root. These are the delivered module boundaries, including the consolidation recorded in the [implementation plan](superpowers/plans/2026-11-08-moa-whitepaper.md). Automated coverage is included in the 296-test total above; observed real-model evidence is summarized below. Design goals are not a claim of measured intelligence or guaranteed delegation quality.
+Plugin source paths below are relative to `packages/project-mode/src/`; test paths are relative to the repository root. These are the delivered module boundaries, including the consolidation recorded in the [implementation plan](superpowers/plans/2026-11-08-moa-whitepaper.md). Automated coverage is included in the 300-test total above; observed real-model evidence is summarized below. Design goals are not a claim of measured intelligence or guaranteed delegation quality.
 
 | Whitepaper chapter and requirement | Actual code | Tests and evidence |
 | --- | --- | --- |
@@ -59,6 +59,16 @@ The isolated DSH Web runtime on macOS arm64 with Node 24.19.0 has exercised real
 - After the final runtime restart, the Timer3 Worker end was unchanged and the Coordinator retained its completed end with shutdown metadata only. No model turn reopened, the single consumed relay remained at one attempt, no background notice was duplicated, and the artifact hash was unchanged. Native UI inspection opened the cold Worker with Back and inherited permissions, returned to the idle MoA+ Coordinator, and confirmed the original compact capsule position, closable tabs and two-line Markdown previews.
 
 All implementation, automated, and real-runtime acceptance checks above have passed for the stated revisions. Timer3 and restart acceptance do not erase Timer2's Partial/rework history.
+
+### Message-display follow-up: bundle `ada2e01`
+
+The follow-up keeps the existing native conversation, Worker capsules, sidebar branches, and tabs. `tests/client/agent-messages.spec.tsx` uses the real native conversation assembler and DOM rendering to check one row per MoA input, unchanged ordinary native sources, stable earlier message anchors, result-only capsule seats, partial history, sender labels, Markdown, and compact expansion. Host regressions check actual sender metadata, full final-message bodies, and admission/recovery deduplication. The combined run passed **55 files / 300 tests**, with Host/Client typechecks and the production build also passing.
+
+A fresh real-model Writer/Reviewer task ran in the isolated native runtime on `ada2e01`. The Coordinator created exactly those two Workers, then sent their current peer IDs. Writer sent its Markdown draft directly to Reviewer. Reviewer sent a blocking Request to the Coordinator, whose explicit ReplyTo returned `answered` on the original Reviewer Tool Result within the same Worker turn. Reviewer then notified Writer directly. Receiving native records contain the actual sender Session ID and name; no additional answer inbox message was manufactured.
+
+Both committed final AI messages returned in full to the Coordinator. All five ended Worker turns, including legitimate standby/intermediate turns, had exactly one consumed delivery with one attempt and matching final content. The Coordinator completed normally at **2026-11-09 02:38:35 (+08:00)**. The model initially copied an old Coordinator ID from shared notes; the Coordinator corrected it before peer communication, and no Request was sent to the old ID.
+
+Coordinator UI inspection confirmed visible sender labels, two-line original-message previews, and the two Worker capsules in the existing conversation. Worker-side visual inspection and click-to-expand checks are still pending for this follow-up. This fixture sets `completionVerification=false` to focus on messaging and display; it is not a new independent completion-gate acceptance. The earlier Timer3 Pass and restart evidence above retain their own revision and scope.
 
 Use [manual verification](manual-verification.md) to repeat the scenarios on a new runtime. Credentials, profiles, private conversations, raw trajectories, and screenshots stay outside Git. Historical preview evidence below remains associated with its tagged version.
 
