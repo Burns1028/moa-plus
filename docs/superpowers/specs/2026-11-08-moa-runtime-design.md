@@ -1,6 +1,6 @@
 # MoA+：在现有 Project Mode 插件中实现 MOA 架构
 
-状态：落地设计，待审阅。部署边界已由用户确认：沿用原 Project Mode 代码和 DSH 插件形态。
+状态：用户已确认按整份六章白皮书完整实现。沿用原 Project Mode 代码和 DSH 插件形态；内部依赖顺序不缩减交付范围，不以完成部分能力作为目标完成。
 
 ## 1. 目标与实现起点
 
@@ -29,19 +29,21 @@ DSH 继续拥有 Agent Loop、模型调用、原生会话历史、工具执行�
 
 ## 3. 模块边界
 
-新增模块按职责加入当前 `host/`，完成相关能力时再创建相应文件：
+新增模块集中在当前 `host/moa/`，原 Host 继续负责装配，原生版本边界仍在 `host/native.ts`：
 
 ```text
-host/
-  agent-identity.ts       身份、角色、所属关系与汇报对象
-  agent-lifecycle.ts      原生执行事实到 MOA 五态的派生视图
-  agent-control.ts        Task / Fork / QueryAgent / KillAgent
-  message-broker.ts       SendMessage 投递、显式 ReplyTo 与唤醒路由
-  request-waits.ts        工具内 await、超时、来信中断与 Wait Cycle
-  message-state.ts        请求路由和投递状态的持久化 schema
-  memory-context.ts      notes 注入、软预算提醒与共享知识路径
-  workspace-lifecycle.ts Isolated / Shared 与资源清理
-  patterns/              协作方式与完成出口组件
+host/moa/
+  agents.ts             身份、所属关系、五态视图和原生控制适配
+  tools.ts              五个控制通信原语与 ProjectContext
+  roles.ts              角色执行工具与下级派生开关
+  messages.ts           SendMessage 投递、显式 ReplyTo 与唤醒路由
+  request-waits.ts      工具内 await、超时、来信中断与 Wait Cycle
+  message-state.ts      请求路由和投递状态的持久化 schema
+  memory.ts             notes 注入、软预算提醒与共享知识路径
+  workspaces.ts         Isolated / Shared 与资源保留和清理
+  background.ts         慢工具策略、原生后台控制与结果回流
+  completion.ts         完成承诺与正常出口门禁
+  verification.ts       独立出卷与实测判卷
 ```
 
 这些组件调用原生适配层和已有存储。只有同步等待需要的 Promise/订阅存在于进程内；请求标识与迟到回复路由需要持久化。Promise 不被当作可恢复的工作记录。
@@ -116,7 +118,7 @@ Request ID 关联提问和答复；原生 Message ID 标识投递；Tool Call ID
 
 等待同时观察自身收件箱。需要优先处理的来信使 Request 返回 interrupted；它不结束整个 Agent turn，也不取消接收方的工作。
 
-第一批就保留白皮书的优先来信判定：用户明确发送给当前执行的 next-step 输入可以交回控制权；其他 Agent 的普通 Notify 交给 `shouldInterruptRequest(activeRequest, unreadMessages, signal)` 判定。轻量裁判使用已配置模型路由，关闭思考，读取原问题、当前等待对象与全部未读来信，只回答能否继续等待。需要先回复、决策或调整指令时返回 true；普通进度知会可以返回 false。不使用任务关键词规则，也不把所有 Notify 一律当作紧急消息。
+保留白皮书的优先来信判定：用户明确发送给当前执行的 next-step 输入可以交回控制权；其他 Agent 的普通 Notify 交给 `shouldInterruptRequest(activeRequest, unreadMessages, signal)` 判定。轻量裁判使用已配置模型路由，关闭思考，读取原问题、当前等待对象与全部未读来信，只回答能否继续等待。需要先回复、决策或调整指令时返回 true；普通进度知会可以返回 false。不使用任务关键词规则，也不把所有 Notify 一律当作紧急消息。
 
 新增来信触发增量重审，先前 false 不消费消息。判定执行期间若原答复已经到达，以正常答复完成工具；若判定失败，提前交回执行 Agent，由它读取来信并判断，不伪造原答复。显式 next-turn 排队输入不打断当前 Request。
 
@@ -149,9 +151,9 @@ Request 返回后，由原生下一步接入全部当前待处理的 next-step �
 - 交接不触发任务已完成的判断或冻结最终完成状态。
 - 后续真实结束仍回传该轮最后完整 AI 消息，保留既有去重。
 
-该变化属于后续执行控制批次。拟定原生契约是 `requestTurnHandoff(agent, { cause: "background-message", toolCallIds, triggeringMessageIds })`：只有本批前台工具结果完整时才能提交交接，原生 turn/end 需要明确标识 handoff，随后由已接收来信开启新 turn。接口名称与事件形状作为后续核心契约提交审阅，当前分支不实施。
+拟定原生契约是 `requestTurnHandoff(agent, { cause: "background-message", toolCallIds, triggeringMessageIds })`：只有本批前台工具结果完整时才能提交交接，原生 turn/end 需要明确标识 handoff，随后由已接收来信开启新 turn。接口名称与事件形状先独立审查，再在本目标内实施并更新兼容清单。
 
-第一批通信不使用转后台来打断 Request，Request 提前返回后继续当前 turn。
+Request 的来信中断不使用慢工具转后台路径，提前返回后继续当前 turn。
 
 ## 7. 记忆、工作区与 UI 的演进
 
@@ -161,11 +163,11 @@ notes.md 和 archived.md 由 Orchestrator 维护；共享 Context 双方维护�
 
 代码 Worktree 隔离与共享知识空间分别管理。Isolated 的代码目录可以各自分支，但 Agent 应通过 MoA 的共享知识定位读取共同 Context。销毁时只清理该 Agent 拥有的独立 Worktree，Zombie 保留。
 
-第一批 UI 沿用现有布局。新的等待信息接入原状态展示，不重做侧栏、输入框或文件预览。被动读状态不产生胶囊；人工操作 Worker 后的状态同步和每轮结果回传继续分别工作。
+UI 沿用现有布局。新的等待信息接入原状态展示，不重做侧栏、输入框或文件预览。被动读状态不产生胶囊；人工操作 Worker 后的状态同步和每轮结果回传继续分别工作。
 
-## 8. 交付顺序与 PR 边界
+## 8. 完整目标的内部执行依赖
 
-| 批次 | 内容 | 交付验收 |
+| 内部依赖 | 内容 | 验收 |
 | --- | --- | --- |
 | A：角色和运行契约 | 身份与归属、五态映射、Task/Fork 快照边界、工具装配和原生接口缺口 | 验证创建、继承身份、原生取消与现有 UI；每个新增核心接口单独审阅。 |
 | B：通信闭环 | Notify/Request/ReplyTo、同伴路由、可中断等待、超时与迟到回复、等待环 | 用真实任务完成中途请示、优先消息处理与结果回传。 |
@@ -173,9 +175,9 @@ notes.md 和 archived.md 由 Orchestrator 维护；共享 Context 双方维护�
 | D：执行过程控制 | 慢工具三策略、并行批次、硬打断后继续、交接原因 | 在真实耗时工具与取消时序中验证 turn、工具消息和回流。 |
 | E：编排与交付门禁 | 独立探索/评审、分歧综合、Ralph 与 Outcome Verify | 对照单 Agent 结果，记录质量、成功率、耗时、token 与人工介入。 |
 
-每批按可独立审阅的行为拆 PR。先完成 A 的具体原生接口契约与 B 的投递时序审阅，再编写对应实现计划；不把此文档或某个工具单测称为整套 MOA 已落地。
+按可独立审阅的行为提交代码与 PR，持续执行直到全部能力和验收完成。A—E 是内部依赖，不是可缩减的交付范围；全部十项执行任务见 [完整实现计划](../plans/2026-11-08-moa-whitepaper.md)。
 
-## 9. 第一轮实机验收
+## 9. 通信实机验收（完整验收的一部分）
 
 用隔离 DSH 运行时中的新会话执行一个代码或调研任务，保留对话、trajectory 和实际产物作为本地证据：
 
@@ -189,13 +191,13 @@ notes.md 和 archived.md 由 Orchestrator 维护；共享 Context 双方维护�
 
 自动验证覆盖请求竞争、重复回复、取消、等待环、重启路由与跨会话隔离。真实模型验收另行记录，不用脚本模型代替自然任务结果。
 
-## 10. 第一批的审阅与实施边界
+## 10. 全目标的实施边界
 
-部署形态与现有代码复用已经确认。第一批的具体设计选择为：Request 等待可被当前执行的用户输入或经判定不能等的 Agent 来信中断，显式 queue 保持下一 turn；Broker 用真实成员身份和原生路径路由；Fork 复制明确事件水位以内的完整已提交历史；转后台换 turn 的核心接口放在后续 D 批次单独审阅。
+部署形态、现有代码复用与六章完整实现均已由用户确认。Request 等待可被当前执行的用户输入或经判定不能等的 Agent 来信中断，显式 queue 保持下一 turn；Broker 用真实成员身份和原生路径路由；Fork 复制明确事件水位以内的完整已提交历史；转后台换 turn 的核心接口先独立审查再实施。
 
-这些选择不改变白皮书已经确认的 Request/Notify、Running、五态、共享记忆或六条控制流目标。对应实现计划应按 A/B 的可独立审阅模块拆解；原生适配探针发现的接口缺口必须单独提交，不借此扩大兼容补丁范围。
+这些选择不改变白皮书已经确认的 Request/Notify、Running、五态、共享记忆或六条控制流目标。原生适配探针发现的接口缺口通过明确契约、独立审查和新增兼容清单落实；不静默扩大旧补丁范围。
 
-本分支当前只交付设计文档，不宣称上述新增能力已实现或验收。第一批范围为 A/B；后续实现以测试和实机证据交付。
+本分支持续开发完整实现。文档、单个组件或单次测试均不代表目标完成；只有全白皮书要求、回归、真实模型与 DSH 界面验收完成后才收口。
 
 ## 11. 对照依据
 
