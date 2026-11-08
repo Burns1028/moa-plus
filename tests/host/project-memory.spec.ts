@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, type StreamChunk } from "@deepseek-ai/dsh-llm";
@@ -13,10 +13,16 @@ it("bootstraps an index for new projects and legacy context before either role's
       meta: { cwd: f.root },
       agentOptions: { provider: "test", model: "test" },
     });
+    await mkdir(join(f.root, "context"));
+    await writeFile(
+      join(f.root, "context", "existing.md"),
+      "Existing reusable fact",
+    );
     const mode = await f.ctx.projectMode.setEnabled(agent.id, true, 0, "on");
     expect(mode.paths!.notes).toBe(join(f.root, "notes.md"));
     const index = join(mode.paths!.context, "index.md");
     expect(await readFile(index, "utf8")).toContain("# Project context");
+    expect(await readFile(index, "utf8")).toContain("existing.md");
     await rm(index);
     await writeFile(
       join(mode.paths!.context, "README.md"),

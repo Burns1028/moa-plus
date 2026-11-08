@@ -7,11 +7,7 @@ import type { SessionModeView } from "../shared/index.ts";
 import type { HostAccess } from "./host-access.ts";
 import { recordSchema, type RecordState } from "./state.ts";
 import { ordinarySessionResolver, resolveOrdinaryAgent } from "./native.ts";
-import {
-  contextIndexPath,
-  contextIndexTemplate,
-  memoryPaths,
-} from "./project-memory.ts";
+import { ensureContextIndex, memoryPaths } from "./project-memory.ts";
 
 export function hasOwnTurn(
   events: readonly SessionEvent[],
@@ -186,7 +182,6 @@ export class ProjectLifecycle {
     for (const [path, content] of [
       [paths.notes, "# Active tasks\n"],
       [paths.archived, "# Archived tasks\n"],
-      [contextIndexPath(paths), contextIndexTemplate],
     ] as const) {
       const target = await fs.resolve(path, { cwd, signal });
       if (!fs.contains(cwdTarget, target))
@@ -200,6 +195,12 @@ export class ProjectLifecycle {
           policy,
         );
     }
+    await ensureContextIndex(
+      this.host.ctx,
+      agent,
+      { workspacePath: cwd, paths },
+      signal,
+    );
     const now = Date.now();
     return {
       project: {
