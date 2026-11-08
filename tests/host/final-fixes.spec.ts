@@ -162,7 +162,7 @@ it("native Stop releases an unrelated queued job wait while its worker and nativ
           "queue",
           new AbortController().signal,
         );
-        host.enqueue(async () => {
+        host.enqueue(agent.id, async () => {
           entered.resolve();
           await jobGate.promise;
           await host.update(other.id, (r: any) => ({
@@ -525,7 +525,7 @@ it("native steer reaches the next step in the same turn before an unrelated job 
           "queued",
           signal,
         );
-        host.enqueue(async () => {
+        host.enqueue(agent.id, async () => {
           entered.resolve();
           await jobGate.promise;
           await host.update(other.id, (r: any) => ({

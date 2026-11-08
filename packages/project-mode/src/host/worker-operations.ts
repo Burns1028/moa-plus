@@ -172,7 +172,7 @@ export class WorkerOperations {
         turn,
         req.action === "spawn" ? undefined : req.delivery,
       );
-      this.host.enqueue(() => this.host.ingest(workerId));
+      this.host.enqueue(agent.id, () => this.host.ingest(workerId));
       return receipt;
     } catch (error) {
       const rejection = accepted ? undefined : nativeAdmissionRejection(error);
@@ -363,7 +363,9 @@ export class WorkerOperations {
     await this.host.update(agent.id, (r) => ({
       ...r,
       workers: r.workers.map((w) =>
-        w.id === workerId ? { ...w, lifecycle: "active" } : w,
+        w.id === workerId && w.lifecycle === "provisioning"
+          ? { ...w, lifecycle: "active" }
+          : w,
       ),
       assignments: r.assignments.map((a) =>
         a.id === assignmentId ? { ...a, messageId, admission: "accepted" } : a,

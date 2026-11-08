@@ -281,7 +281,7 @@ export class CompletionOutbox {
             setTimeout(
               () => {
                 this.retries.delete(parentId);
-                this.host.enqueue(() => this.deliver(parentId));
+                this.host.enqueue(parentId, () => this.deliver(parentId));
               },
               Math.min(
                 this.host.config.retryMaxDelayMs,

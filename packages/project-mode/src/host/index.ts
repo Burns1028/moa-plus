@@ -118,10 +118,10 @@ export default class ProjectMode extends TypertRemoteService {
       inspect: (worker, signal, details) =>
         this.inspect(worker, signal, details),
       readHistory: (...args) => this.readHistory(...args),
-      enqueue: (work) => this.enqueue(work),
+      enqueue: (id, work) => this.enqueue(id, work),
       notify: () => this.notify(),
       ingest: (id) => this.ingest(id),
-      settledJobs: () => this.jobs,
+      settledJobs: (id) => this.projectJobs.get(id) ?? Promise.resolve(),
       pendingOperations: (id) =>
         [...this.workers.operations.keys()].filter(
           (key) => JSON.parse(key)[0] === id,
@@ -133,7 +133,10 @@ export default class ProjectMode extends TypertRemoteService {
   private reconcilingTools = false;
   private toolsChangedDuringReconciliation = false;
   private controlTool!: ReturnType<typeof defineTool>;
-  private jobs: Promise<void> = Promise.resolve();
+  private projectJobs = new Map<SessionId, Promise<void>>();
+  private get jobs(): Promise<void> {
+    return Promise.all([...this.projectJobs.values()]).then(() => {});
+  }
   private listeners = new Set<() => void>();
   private progress = new Map<SessionId, string>();
   private workerInputSnapshots = new Map<SessionId, string>();
@@ -253,7 +256,7 @@ export default class ProjectMode extends TypertRemoteService {
               );
           }),
         );
-        await this.jobs;
+        while (this.projectJobs.size) await this.jobs;
         for (const value of this.mounted.values()) value.dispose();
         this.mounted.clear();
         await archives.dispose();
@@ -264,7 +267,7 @@ export default class ProjectMode extends TypertRemoteService {
     this.available = true;
     for (const agent of this.ctx.agents.list()) this.attach(agent);
     for (const [id] of this.domain.table("projects").entries())
-      this.enqueue(() => this.recover(SessionId(id)));
+      this.enqueue(SessionId(id), () => this.recover(SessionId(id)));
   }
   private async recover(parentId: SessionId) {
     {
@@ -394,13 +397,17 @@ export default class ProjectMode extends TypertRemoteService {
   private notify() {
     for (const fn of [...this.listeners]) fn();
   }
-  private enqueue(work: () => Promise<void>) {
-    this.jobs = this.jobs
+  private enqueue(id: SessionId, work: () => Promise<void>) {
+    const job = (this.projectJobs.get(id) ?? Promise.resolve())
       .then(work)
       .catch((error) => {
         this.ctx.logger.warn(String(error));
       })
-      .then(() => this.notify());
+      .then(() => {
+        if (this.projectJobs.get(id) === job) this.projectJobs.delete(id);
+        this.notify();
+      });
+    this.projectJobs.set(id, job);
   }
   private async update(id: SessionId, fn: (r: RecordState) => RecordState) {
     await this.domain.table("projects").update(id, (r) => {
@@ -583,7 +590,7 @@ export default class ProjectMode extends TypertRemoteService {
   @Remote("snapshot")
   async snapshot(sessionId: SessionId): Promise<ProjectSnapshot | null> {
     this.authorize(sessionId);
-    await this.jobs;
+    await (this.projectJobs.get(sessionId) ?? Promise.resolve());
     const r = this.record(sessionId);
     if (!r) return null;
     const members = r.workers.filter(isVisibleWorker),

@@ -1,8 +1,8 @@
 import type { Agent, PreStepDecision } from "@deepseek-ai/dsh-agent";
-import type { SessionId } from "@deepseek-ai/dsh-session";
+import { SessionId } from "@deepseek-ai/dsh-session";
 import { freezeMessage } from "@deepseek-ai/dsh-llm";
 import { projected, waitForTurn } from "./native.ts";
-import { ensureContextIndex } from "./project-memory.ts";
+import { bindProjectMemory } from "./project-memory.ts";
 import type { HostAccess } from "./host-access.ts";
 import type { CompletionOutbox } from "./completion-outbox.ts";
 import type { WorkerOperations } from "./worker-operations.ts";
@@ -30,38 +30,12 @@ export function bindAgentEvents(
   options: AgentEventOptions,
 ): void {
   const { outbox, workers, progress } = options;
-  host.ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
-    const decision = await next();
-    const project = host.record(agent.id) ?? host.owner(agent.id);
-    if (
-      decision.kind !== "enter" ||
-      project?.project.mode !== "enabled" ||
-      !decision.messages.some((m) =>
-        [
-          "user",
-          "project-mode-assignment",
-          "project-mode-result",
-          "subagent-settled",
-          "agent-message",
-        ].includes(m.source.kind),
-      )
-    )
-      return decision;
-    const control = AbortSignal.any([signal, host.closing.signal]);
-    try {
-      await ensureContextIndex(host.ctx, agent, project.project, control);
-    } catch (error) {
-      control.throwIfAborted();
-      // Context migration is best effort; a native permission denial must
-      // not prevent clarification or other otherwise-available work.
-      host.ctx.logger.warn(`project-mode: context index: ${String(error)}`);
-    }
-    return decision;
-  });
+  bindProjectMemory(host);
   host.ctx.on("tools/change", options.reconcileTools);
   host.ctx.on("agent/created", async ({ agent }) => {
     options.attach(agent);
-    if (host.record(agent.id)) host.enqueue(() => options.recover(agent.id));
+    if (host.record(agent.id))
+      host.enqueue(agent.id, () => options.recover(agent.id));
     host.notify();
     return undefined;
   });
@@ -84,7 +58,7 @@ export function bindAgentEvents(
       event.type === "turn/start" &&
       host.record(session.id)?.project.mode === "enabled"
     )
-      host.enqueue(async () => {
+      host.enqueue(session.id, async () => {
         const r = host.record(session.id);
         if (r?.project.mode === "enabled" && !r.project.modeLocked)
           await host.update(session.id, (current) => ({
@@ -96,15 +70,18 @@ export function bindAgentEvents(
       progress.delete(session.id);
     if (host.owner(session.id) && event.type === "turn/end") {
       outbox.workerCuts.set(session.id, projected(host.ctx, session));
-      host.enqueue(() => host.ingest(session.id));
+      host.enqueue(
+        SessionId(host.owner(session.id)!.project.coordinatorSessionId),
+        () => host.ingest(session.id),
+      );
     }
     if (host.record(session.id) && event.type === "user/message") {
       outbox.claimed.get(session.id)?.delete(event.data.id);
-      host.enqueue(() => outbox.consume(session.id, event.data.id));
+      host.enqueue(session.id, () => outbox.consume(session.id, event.data.id));
     }
     if (host.record(session.id) && event.type === "turn/end") {
       outbox.claimed.delete(session.id);
-      host.enqueue(() =>
+      host.enqueue(session.id, () =>
         options.freezeTurn(session.id, event.data.turn, event.data.reason.kind),
       );
     }

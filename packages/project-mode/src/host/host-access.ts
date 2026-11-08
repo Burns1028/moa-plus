@@ -32,9 +32,9 @@ export interface HostAccess {
     limit: number,
     signal: AbortSignal,
   ): Promise<WorkerHistoryPage>;
-  enqueue(work: () => Promise<void>): void;
+  enqueue(parentId: SessionId, work: () => Promise<void>): void;
   notify(): void;
   ingest(id: SessionId): Promise<void>;
-  settledJobs(): Promise<void>;
+  settledJobs(parentId: SessionId): Promise<void>;
   pendingOperations(id: SessionId): number;
 }

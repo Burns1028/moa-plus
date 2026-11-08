@@ -31,7 +31,7 @@ export class TurnCoordination {
         );
         try {
           void change.catch(() => {});
-          await waitForTurn(this.host.settledJobs(), control);
+          await waitForTurn(this.host.settledJobs(agent.id), control);
           control.throwIfAborted();
           if (agent.inbox.nextStep.length) return;
           const r = this.host.record(agent.id)!,
@@ -62,14 +62,15 @@ export class TurnCoordination {
                 (w) => w.id === a.workerId && w.lifecycle !== "deleted",
               ),
           );
-          const uncertain = r.assignments.find(
-            (a) => a.admission === "unknown",
-          );
+          const uncertain = pending.find((a) => a.admission === "unknown");
           if (uncertain)
             throw new Error(
               `project-mode/admission-uncertain: ${uncertain.operationId}`,
             );
-          const failed = r.deliveries.find(
+          const results = r.deliveries.filter(
+            (d) => d.state !== "consumed" && d.state !== "suppressed",
+          );
+          const failed = results.find(
             (d) =>
               d.lastError && d.attempts > this.host.config.retryMaxAttempts,
           );
@@ -77,9 +78,6 @@ export class TurnCoordination {
             throw new Error(
               `project-mode/result-admission-failed: ${failed.completionId}: ${failed.lastError}`,
             );
-          const results = r.deliveries.filter(
-            (d) => d.state !== "consumed" && d.state !== "suppressed",
-          );
           if (
             !pending.length &&
             !results.length &&
