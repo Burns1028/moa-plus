@@ -1146,6 +1146,8 @@ function bindCompletion(host) {
 			agentOptions: parent.session.requestHeader()?.config ?? parent.options,
 			signal,
 			setup(ctx, agent) {
+				ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
+				ctx.tools.presentAs("native");
 				if (role === "builder") {
 					const names = ctx.tools.schemas(agent).map((tool) => tool.name);
 					if (names.length) ctx.tools.suppress({ deny: names });
@@ -2564,14 +2566,14 @@ function createProjectContextTool(agents) {
 	});
 }
 // src/host/moa/roles.ts
-/** Restrict global native execution tools; scoped communication tools remain available. */
+/** Restrict inherited execution tools; own communication tools remain available. */
 function applyRoleRestrictions(ctx, agent, role) {
 	if (role === "General-purpose") return () => {};
 	const available = (role === "Deep Research" ? ["web_search", "web_fetch"] : [
 		"glob",
 		"grep",
 		"read"
-	]).filter((name) => !!ctx.tools.get(name));
+	]).filter((name) => !!ctx.tools.get(name, agent));
 	return agent.ctx.tools.restrict({ allow: available });
 }
 // src/host/worker-parent-retention.ts
