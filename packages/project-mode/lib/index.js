@@ -541,6 +541,12 @@ function bindAgentEvents(host, options) {
 		host.notify();
 	});
 	host.ctx.on("agent/inbox/inserted", () => host.notify());
+	host.ctx.on("agent/inbox/claimed", ({ agent, message }) => {
+		if (message.source.kind !== "project-mode-result" || !(host.record(agent.id) ?? host.owner(agent.id))) return;
+		const claimed = outbox.claimed.get(agent.id) ?? /* @__PURE__ */ new Set();
+		claimed.add(message.id);
+		outbox.claimed.set(agent.id, claimed);
+	});
 	host.ctx.on("session/event", (session, event) => {
 		if (event.type === "turn/start" && host.record(session.id)?.project.mode === "enabled") host.enqueue(session.id, async () => {
 			const r = host.record(session.id);
