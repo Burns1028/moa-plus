@@ -4744,6 +4744,8 @@ window.__ModuleLoader__.load({
 .pm-capsule .pm-worker-icon{width:16px;height:16px}
 .pm-agent-message{margin:12px 0;color:var(--dsw-alias-label-primary);font:inherit;min-width:0}
 .pm-agent-message>header{color:var(--dsw-alias-label-secondary);font-size:12px;margin-bottom:6px}
+.pm-agent-message .pm-axis-preview{margin-top:4px}.pm-agent-message .pm-axis-preview>summary{display:block;list-style:none;cursor:pointer}.pm-agent-message .pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-agent-message .pm-axis-preview>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;border-radius:3px}
+.pm-agent-message .pm-axis-preview:not([open])>summary{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--dsw-alias-label-secondary,#999)}
 .pm-agent-empty{color:var(--dsw-alias-label-tertiary)}
 `;
 		// src/client/components.tsx
@@ -5203,7 +5205,7 @@ window.__ModuleLoader__.load({
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("header", { children: sender }),
-					content.length ? content.map((block, index) => block.type === "text" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
+					content.length ? content.map((block, index) => block.type === "text" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
 						text: block.text,
 						labels
 					}, index) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.JsonBlock, {
