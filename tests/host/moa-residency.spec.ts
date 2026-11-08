@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { fixture, response } from "./fixture.ts";
 import { withManagedAgent } from "../../packages/project-mode/src/host/moa/residency.ts";
@@ -83,9 +83,12 @@ it("retains callback residency across awaits and releases it on failure", async 
   } finally { await f.dispose(); }
 });
 
-it("retains a sleeping worker and the coordinator obligation until a background result returns", async () => {
+it.each(["ordinary", "result queued during worker observation"])("retains a sleeping worker and the coordinator obligation until a background result returns (%s)", async (boundary) => {
   const f = await fixture();
   const release = Promise.withResolvers<void>();
+  const viewEntered = Promise.withResolvers<void>(), releaseView = Promise.withResolvers<void>(), viewReturned = Promise.withResolvers<void>();
+  const ingestEntered = Promise.withResolvers<void>(), releaseIngest = Promise.withResolvers<void>();
+  let viewSpy: ReturnType<typeof vi.spyOn> | undefined, ingestSpy: ReturnType<typeof vi.spyOn> | undefined;
   const signal = new AbortController().signal;
   try {
     Object.assign((f.ctx.projectMode as any).config, { backgroundStrategy: "after-seconds", backgroundAfterSeconds: 0 });
@@ -120,11 +123,54 @@ it("retains a sleeping worker and the coordinator obligation until a background 
     const snapshot = await f.ctx.projectMode.snapshot(root.id);
     expect(snapshot?.workers[0].status).toBe("busy");
     expect(root.session.snapshotEvents().some(event => event.type === "turn/end")).toBe(false);
+    const host = f.ctx.projectMode as any;
+    let endedBeforeIngestion = 0;
+    if (boundary !== "ordinary") {
+      await host.access.settledJobs(root.id);
+      // Let native turn/end enqueue its result while the guard awaits real views.
+      const view = host.view.bind(host), ingest = host.ingest.bind(host);
+      let heldView = false, heldIngest = false;
+      viewSpy = vi.spyOn(host, "view").mockImplementation(async (...args: any[]) => {
+        if (!heldView && args[0].id === childId) {
+          heldView = true;
+          viewEntered.resolve();
+          await releaseView.promise;
+          const actual = await view(...args);
+          viewReturned.resolve();
+          return actual;
+        }
+        return view(...args);
+      });
+      ingestSpy = vi.spyOn(host, "ingest").mockImplementation(async (id: any) => {
+        if (!heldIngest && id === childId && childCalls === 3) {
+          heldIngest = true;
+          ingestEntered.resolve();
+          await releaseIngest.promise;
+        }
+        return ingest(id);
+      });
+      host.notify();
+      await viewEntered.promise;
+    }
     release.resolve();
+    if (boundary !== "ordinary") {
+      await ingestEntered.promise;
+      await expect.poll(() => f.ctx.agents.get(childId!)?.status ?? "idle").toBe("idle");
+      releaseView.resolve();
+      await viewReturned.promise;
+      await new Promise<void>(resolve => setImmediate(resolve));
+      endedBeforeIngestion = root.session.snapshotEvents().filter(event => event.type === "turn/end").length;
+      releaseIngest.resolve();
+      await host.access.settledJobs(root.id);
+    }
     await root.whenIdle();
     await expect.poll(() => f.ctx.agents.get(childId!)).toBeUndefined();
     expect(childCalls).toBe(3);
     expect(JSON.stringify(root.session.snapshotEvents())).toContain("final actual result");
-    expect(root.session.snapshotEvents().filter(event => event.type === "turn/end")).toHaveLength(1);
-  } finally { release.resolve(); await f.dispose(); }
+    const rootEvents = root.session.snapshotEvents();
+    const timeline = rootEvents.filter(event => event.type === "turn/start" || event.type === "turn/end" || event.type === "user/message" && event.data.source.kind === "project-mode-result")
+      .map(event => ({ type: event.type, seq: event.seq, data: event.data }));
+    expect(rootEvents.filter(event => event.type === "turn/end"), JSON.stringify(timeline)).toHaveLength(1);
+    expect(endedBeforeIngestion).toBe(0);
+  } finally { release.resolve(); releaseView.resolve(); releaseIngest.resolve(); viewSpy?.mockRestore(); ingestSpy?.mockRestore(); await f.dispose(); }
 });

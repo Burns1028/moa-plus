@@ -154,10 +154,11 @@ export default class ProjectMode extends TypertRemoteService {
         this.workers.controlForAgent(agent, request, operationId, signal, admit),
       stopManagedWorker: (agent, request, operationId, signal) =>
         this.stopManagedWorker(agent, request, operationId, signal),
+      // Worker views can become idle after a new result was queued for ingestion.
       pendingOperations: (id) =>
         [...this.workers.operations.keys()].filter(
           (key) => JSON.parse(key)[0] === id,
-        ).length,
+        ).length + Number(this.projectJobs.has(id)),
     };
   }
 
