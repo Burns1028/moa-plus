@@ -228,34 +228,54 @@ export class MoAWorkspaceManager {
         ["worktree", "add", "-b", branch, target, commit],
         input.signal,
       );
+      const worktreeTarget = await fs.resolve(target, { signal: input.signal });
+      const cwdTarget = await fs.resolve(record.directory, {
+        signal: input.signal,
+      });
+      if (!fs.contains(worktreeTarget, cwdTarget))
+        throw new Error("project-mode/path-escape");
+      if (!(await fs.stat(cwdTarget, input.signal)))
+        await this.runCommand(
+          directory,
+          ["mkdir", "-p", "--", fs.processPath(cwdTarget)],
+          input.signal,
+        );
     } catch (error) {
       try {
+        await this.runRemove(directory, index);
         await this.destroy(record, new AbortController().signal);
       } catch (cleanupError) {
         throw new MoAWorkspacePrepareError(record, error, cleanupError);
       }
       throw error;
-    } finally {
-      // The index is an owned temporary file; remove it through the same confinement.
+    }
+    try {
       await this.runRemove(directory, index);
+    } catch (error) {
+      throw new MoAWorkspacePrepareError(record, error, error);
     }
     return record;
   }
 
-  private async runRemove(cwd: string, path: string) {
+  private async runCommand(cwd: string, argv: string[], signal?: AbortSignal) {
     const policy = this.capabilities.policy();
     if (policy.mode === "read-only")
       throw new Error("project-mode/workspace-read-only");
     const wrapped =
       policy.mode === "danger-full-access"
-        ? { argv: ["rm", "-f", "--", path] }
-        : await this.capabilities.sandbox.confine(["rm", "-f", "--", path], {
-            ...policy,
-            mode: "workspace-write",
-          });
+        ? { argv }
+        : await this.capabilities.sandbox.confine(
+            argv,
+            { ...policy, mode: "workspace-write" },
+            signal,
+          );
     if ("enforcement" in wrapped && wrapped.enforcement !== "full")
       throw new Error("project-mode/workspace-sandbox-partial");
-    await exec(wrapped.argv[0], wrapped.argv.slice(1), { cwd });
+    await exec(wrapped.argv[0], wrapped.argv.slice(1), { cwd, signal });
+  }
+
+  private async runRemove(cwd: string, path: string) {
+    await this.runCommand(cwd, ["rm", "-f", "--", path]);
   }
 
   restore(record: MoAWorkspaceRecord): MoAWorkspaceRecord {
@@ -293,7 +313,8 @@ export class MoAWorkspaceManager {
     const gitTarget = await fs.resolve(directory, { signal });
     if (
       directory !== record.gitDirectory ||
-      !fs.contains(policyRoot, gitTarget)
+      (this.capabilities.policy().mode !== "danger-full-access" &&
+        !fs.contains(policyRoot, gitTarget))
     )
       throw new Error("project-mode/invalid-workspace-record");
     const marker = await fs.resolve(
@@ -307,10 +328,16 @@ export class MoAWorkspaceManager {
       directory: record.worktreeRoot,
       branch: record.branch,
     });
-    if (
-      !(await fs.stat(marker, signal)) ||
-      (await fs.readText(marker, signal)) !== expectedMarker
-    )
+    if (!(await fs.stat(marker, signal)))
+      throw new Error("project-mode/workspace-not-owned");
+    const markerContent = await fs.readText(marker, signal);
+    const destroyedMarker = JSON.stringify({
+      ownerId: record.ownerId,
+      directory: record.worktreeRoot,
+      branch: record.branch,
+      destroyed: true,
+    });
+    if (markerContent !== expectedMarker && markerContent !== destroyedMarker)
       throw new Error("project-mode/workspace-not-owned");
     const listing = await this.git(
       directory,
@@ -327,19 +354,49 @@ export class MoAWorkspaceManager {
       !entry.split("\n").includes(`branch refs/heads/${record.branch}`)
     )
       throw new Error("project-mode/workspace-not-owned");
+    const branch = await this.git(
+      directory,
+      ["branch", "--list", record.branch],
+      signal,
+    );
+    if (markerContent === destroyedMarker) {
+      const rootTarget = await fs.resolve(record.worktreeRoot, { signal });
+      const indexTarget = await fs.resolve(
+        join(record.gitDirectory, `moa-index-${record.id}`),
+        { signal },
+      );
+      if (
+        entry ||
+        branch ||
+        (await fs.stat(rootTarget, signal)) ||
+        (await fs.stat(indexTarget, signal))
+      )
+        throw new Error("project-mode/workspace-not-owned");
+      return;
+    }
+    if (
+      !entry &&
+      (await fs.stat(await fs.resolve(record.worktreeRoot, { signal }), signal))
+    )
+      throw new Error("project-mode/workspace-not-owned");
     if (entry)
       await this.git(
         directory,
         ["worktree", "remove", "--force", record.worktreeRoot],
         signal,
       );
-    const branch = await this.git(
-      directory,
-      ["branch", "--list", record.branch],
-      signal,
-    );
     if (branch)
       await this.git(directory, ["branch", "-D", record.branch], signal);
-    await this.runRemove(directory, fs.processPath(marker));
+    await this.runRemove(
+      directory,
+      join(record.gitDirectory, `moa-index-${record.id}`),
+    );
+    await fs.writeText(
+      marker,
+      destroyedMarker,
+      undefined,
+      signal,
+      this.capabilities.policy(),
+    );
   }
 }

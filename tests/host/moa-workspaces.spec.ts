@@ -6,6 +6,7 @@ import {
   writeFile,
   rm,
   realpath,
+  stat,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,7 +33,7 @@ describe.each([
       git("config", "user.name", "Test");
       git("config", "user.email", "test@example.org");
       await writeFile(join(root, "tracked"), "initial");
-      await writeFile(join(root, ".gitignore"), "ignored\n");
+      await writeFile(join(root, ".gitignore"), "ignored\nignored-cwd/\n");
       git("add", ".");
       git("commit", "-m", "initial");
       await writeFile(join(root, "tracked"), "dirty");
@@ -44,12 +45,27 @@ describe.each([
         cwd: root,
         diffBasisMaxBytes: 1048576,
       });
-      const policy = { mode, workspaceRoot: root };
+      const policy = {
+        mode,
+        workspaceRoot:
+          mode === "danger-full-access"
+            ? tmpdir() + "/not-the-policy-root"
+            : root,
+      };
       let failBranchDeletion = false;
       let failPreparation = false;
       let failCleanup = false;
+      let failIndexRemoval = false;
       const sandbox = {
         confine: async (argv: readonly string[]) => {
+          if (
+            failIndexRemoval &&
+            argv[0] === "rm" &&
+            argv.some((arg) => arg.includes("moa-index-"))
+          ) {
+            failIndexRemoval = false;
+            throw new Error("injected index failure");
+          }
           if (
             failPreparation &&
             argv.includes("add") &&
@@ -89,6 +105,7 @@ describe.each([
         sandbox,
       });
       const signal = new AbortController().signal;
+      const originalIndex = await readFile(join(root, ".git", "index"));
       const a = await manager.prepare({
         ownerId: "a",
         sourceDirectory: root,
@@ -101,6 +118,9 @@ describe.each([
         mode: "isolated",
         signal,
       });
+      expect(await readFile(join(root, ".git", "index"))).toEqual(
+        originalIndex,
+      );
       expect(await readFile(join(a.directory, "tracked"), "utf8")).toBe(
         "dirty",
       );
@@ -131,6 +151,16 @@ describe.each([
         manager.destroy({ ...a, ownerId: "someone-else" }, signal),
       ).rejects.toThrow("workspace-not-owned");
       await manager.destroy(a, signal);
+      await manager.destroy(a, signal);
+      if (a.mode !== "isolated") throw new Error("expected isolated");
+      await mkdir(a.worktreeRoot, { recursive: true });
+      await writeFile(join(a.worktreeRoot, "user-file"), "preserve");
+      await expect(manager.destroy(a, signal)).rejects.toThrow(
+        "workspace-not-owned",
+      );
+      expect(await readFile(join(a.worktreeRoot, "user-file"), "utf8")).toBe(
+        "preserve",
+      );
       await expect(readFile(join(a.directory, "tracked"))).rejects.toThrow();
       expect(await readFile(join(b.directory, "tracked"), "utf8")).toBe("b");
       await mkdir(join(b.directory, "nested"));
@@ -149,6 +179,20 @@ describe.each([
         "from-parent",
       );
       await manager.destroy(child, signal);
+      for (const name of ["empty-cwd", "ignored-cwd"]) {
+        await mkdir(join(root, name));
+        if (name === "ignored-cwd") {
+          await writeFile(join(root, name, "ignored"), "ignored");
+        }
+        const emptyCwd = await manager.prepare({
+          ownerId: name,
+          sourceDirectory: join(root, name),
+          mode: "isolated",
+          signal,
+        });
+        expect((await stat(emptyCwd.directory)).isDirectory()).toBe(true);
+        await manager.destroy(emptyCwd, signal);
+      }
       if (mode === "workspace-write") {
         failBranchDeletion = true;
         await expect(manager.destroy(b, signal)).rejects.toThrow(
@@ -157,8 +201,26 @@ describe.each([
       }
       await manager.destroy(b, signal);
       if (mode === "workspace-write") {
+        failIndexRemoval = true;
+        let indexFailure: unknown;
+        try {
+          await manager.prepare({
+            ownerId: "index-failed",
+            sourceDirectory: root,
+            mode: "isolated",
+            signal,
+          });
+        } catch (error) {
+          indexFailure = error;
+        }
+        expect(indexFailure).toBeInstanceOf(MoAWorkspacePrepareError);
+        await manager.destroy(
+          (indexFailure as MoAWorkspacePrepareError).record,
+          signal,
+        );
         failPreparation = true;
         failCleanup = true;
+        failIndexRemoval = true;
         let failure: unknown;
         try {
           await manager.prepare({
@@ -171,6 +233,10 @@ describe.each([
           failure = error;
         }
         expect(failure).toBeInstanceOf(MoAWorkspacePrepareError);
+        expect(
+          (failure as MoAWorkspacePrepareError).preparationError,
+        ).toHaveProperty("message", "injected prepare failure");
+        failCleanup = false;
         await manager.destroy(
           (failure as MoAWorkspacePrepareError).record,
           signal,
