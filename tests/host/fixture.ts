@@ -10,6 +10,7 @@ import Storage from "@deepseek-ai/dsh-storage";
 import * as StorageJson from "@deepseek-ai/dsh-storage-json";
 import * as Persistence from "@deepseek-ai/dsh-session-persistence-jsonl";
 import * as StorageDomain from "@deepseek-ai/dsh-storage-domain";
+import JobsLocal from "@deepseek-ai/dsh-jobs-local";
 import Subagents from "@deepseek-ai/dsh-subagent";
 import * as Spawn from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import SessionQueryEngine from "@deepseek-ai/dsh-session-query";
@@ -59,6 +60,7 @@ export async function fixture(
     keepFiles?: boolean;
     maxActiveSubagents?: number;
     workspace?: boolean;
+    completionVerification?: boolean;
   } = {},
 ) {
   const root = options.root ?? (await mkdtemp(join(tmpdir(), "project-mode-")));
@@ -69,6 +71,7 @@ export async function fixture(
     compression: "none",
   });
   await ctx.plugin(AgentLoop, { agents: [] });
+  await ctx.plugin(JobsLocal);
   ctx.llm.registerAdapter(["test"], adapter);
   await ctx.plugin(Storage);
   await ctx.plugin(StorageJson, { root: join(root, "storage") });
@@ -87,7 +90,7 @@ export async function fixture(
       : { maxActiveSubagents: options.maxActiveSubagents },
   );
   await ctx.plugin(Spawn, { providerName: "spawn" });
-  const plugin = await ctx.plugin(ProjectMode, {});
+  const plugin = await ctx.plugin(ProjectMode, { completionVerification: options.completionVerification ?? false });
   return {
     ctx,
     root,
