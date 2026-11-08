@@ -79,6 +79,11 @@ export class MoAMessageBroker {
   private routeLocks = new Map<string, Promise<void>>();
   private disposed = new AbortController();
   constructor(private ports: MessagePorts) {}
+  hasPendingRequest(senderId: string, callSeq: number): boolean {
+    return [...this.waits.values()].some(({ route, signal }) =>
+      !signal.aborted && route.senderId === senderId && nativeOperationSeq(route.operationId, senderId) === callSeq,
+    );
+  }
   dispose() {
     this.disposed.abort();
     this.ports.dispose?.();

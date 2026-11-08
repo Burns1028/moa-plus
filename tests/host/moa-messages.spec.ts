@@ -23,7 +23,7 @@ it("exposes SendMessage only to MoA participants", async () => {
 });
 
 it("keeps a native tool call open until its explicit answer", async () => {
-  const f = await fixture();
+  const f = await fixture(undefined, { backgroundStrategy: "after-seconds", backgroundAfterSeconds: 0.01 });
   const received = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
   let workerCalls = 0;
@@ -70,6 +70,7 @@ it("keeps a native tool call open until its explicit answer", async () => {
       new AbortController().signal,
     );
     await received.promise;
+    await new Promise(resolve => setTimeout(resolve, 40));
     expect(f.ctx.agents.get(SessionId(workerId))?.status).toBe("running");
     expect(workerCalls).toBe(1);
     release.resolve();
@@ -79,6 +80,8 @@ it("keeps a native tool call open until its explicit answer", async () => {
     await recovered.recover(agent.id);
     await recovered.recover(agent.id);
     using observed = await f.ctx.sessionQuery.observeSession(SessionId(workerId));
+    expect(observed.events.filter(event => event.type === "turn/start")).toHaveLength(1);
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-background-result")).toHaveLength(0);
     expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo)).toHaveLength(0);
     expect(workerCalls).toBe(2);
     recovered.dispose();
@@ -303,6 +306,73 @@ it("hands control back for human input and delivers a late reply to the native i
     releaseReply.resolve();
     await f.dispose();
   }
+});
+
+it.each(["native", "ptc"])("keeps Request interruption in its original native turn when %s background policy is also enabled", async (presentation) => {
+  const f = await fixture(undefined, { backgroundStrategy: "new-message", backgroundAfterSeconds: 0.01 });
+  const parentSaw = Promise.withResolvers<void>();
+  const releaseReply = Promise.withResolvers<void>();
+  const interrupted = Promise.withResolvers<void>();
+  const late = Promise.withResolvers<void>();
+  let workerId = "", parentAnswered = false;
+  let workerCalls = 0;
+  try {
+    if (presentation === "ptc") {
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
+    }
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("protocol-parent"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    if (presentation === "ptc") f.ctx.on("agent/created", ({ agent: child }) => { if (child.id !== agent.id) child.ctx.tools.presentAs("ptc"); });
+    f.adapter.handler = async options => {
+      if (options.sessionId !== agent.id) {
+        workerId = options.sessionId;
+        workerCalls++;
+        const content = JSON.stringify(options.messages);
+        if (content.includes("the late protocol answer")) { late.resolve(); return response("used the late answer"); }
+        if (content.includes("interrupted")) { interrupted.resolve(); return response("handled urgent input"); }
+        const input = { target: agent.id, message: "Which direction?", mode: "request", timeout_ms: 10000 };
+        if (presentation === "native") return call("question", input);
+        const args = JSON.stringify({ description: "Wait for an explicit protocol reply", code: `return await tools.SendMessage(${JSON.stringify(input)});` });
+        return [
+          { type: "block-start", index: 0, blockType: "tool-call" },
+          { type: "block-end", index: 0, block: { type: "tool-call", id: "question", name: "run_code", arguments: args } },
+          { type: "finish", reason: { kind: "tool-calls" } },
+        ];
+      }
+      const request = options.messages.find(message => message.source.kind === "moa-message" && message.source.requestId);
+      if (!request || request.source.kind !== "moa-message" || parentAnswered) return response("waiting");
+      parentSaw.resolve();
+      await releaseReply.promise;
+      parentAnswered = true;
+      return call("answer", { target: request.source.senderId, message: "the late protocol answer", reply_to: request.source.requestId });
+    };
+    await f.ctx.projectMode.controlForAgent(agent, { action: "spawn", name: "requester", task: "Ask and wait for the answer" }, "spawn", new AbortController().signal);
+    await parentSaw.promise;
+    const worker = f.ctx.agents.get(SessionId(workerId))!;
+    // The timer must already have expired when the urgent message arrives.
+    await new Promise(resolve => setTimeout(resolve, 40));
+    worker.steer(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "urgent human instruction" }] }));
+    await interrupted.promise;
+    const events = worker.session.snapshotEvents();
+    expect(events.filter(event => event.type === "turn/start")).toHaveLength(1);
+    expect(events.filter(event => event.type === "turn/end" && event.data.reason.kind === "handoff")).toHaveLength(0);
+    const result = events.find(event => event.type === "tool/result" && event.data.message.toolCallId === "question");
+    expect(result?.type).toBe("tool/result");
+    if (result?.type === "tool/result") {
+      expect(JSON.stringify(result.data.message.content)).toContain("interrupted");
+      expect(result.data.meta ?? {}).not.toHaveProperty("moaBackground");
+    }
+    expect(workerCalls).toBe(2);
+    releaseReply.resolve();
+    await late.promise;
+    await agent.whenIdle();
+    using observed = await f.ctx.sessionQuery.observeSession(SessionId(workerId));
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo)).toHaveLength(1);
+    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-background-result")).toHaveLength(0);
+  } finally { releaseReply.resolve(); await f.dispose(); }
 });
 
 import {

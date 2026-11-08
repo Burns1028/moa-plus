@@ -61,6 +61,8 @@ export async function fixture(
     maxActiveSubagents?: number;
     workspace?: boolean;
     completionVerification?: boolean;
+    backgroundStrategy?: "after-seconds" | "new-message" | "llm-judge";
+    backgroundAfterSeconds?: number;
   } = {},
 ) {
   const root = options.root ?? (await mkdtemp(join(tmpdir(), "project-mode-")));
@@ -90,7 +92,11 @@ export async function fixture(
       : { maxActiveSubagents: options.maxActiveSubagents },
   );
   await ctx.plugin(Spawn, { providerName: "spawn" });
-  const plugin = await ctx.plugin(ProjectMode, { completionVerification: options.completionVerification ?? false });
+  const plugin = await ctx.plugin(ProjectMode, {
+    completionVerification: options.completionVerification ?? false,
+    ...(options.backgroundStrategy === undefined ? {} : { backgroundStrategy: options.backgroundStrategy }),
+    ...(options.backgroundAfterSeconds === undefined ? {} : { backgroundAfterSeconds: options.backgroundAfterSeconds }),
+  });
   return {
     ctx,
     root,

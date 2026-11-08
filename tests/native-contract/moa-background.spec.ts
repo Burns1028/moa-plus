@@ -133,6 +133,22 @@ it("keeps strict schema/finalizers authoritative and continues the same turn aft
   expect(await query()).toEqual(await query());
  } finally{gate.resolve("cleanup");await f.dispose();}
 });
+it("allows a slow SendMessage Notify and explicit reply to use ordinary tool backgrounding",async()=>{
+ const f=await setup();const gate=Promise.withResolvers<string>();
+ try{
+  f.ctx.tools.register({name:"SendMessage",description:"notify",parameters:{type:"object",properties:{mode:{type:"string"},reply_to:{type:"string"}}},output:{schema:{type:"string"},render:(_args,value)=>[{type:"text",text:String(value)}]},execute:()=>gate.promise});
+  const args=JSON.stringify({mode:"notify",reply_to:"an-explicit-request"});
+  f.adapter.handler=()=>f.adapter.requests.length===1?[
+   {type:"block-start",index:0,blockType:"tool-call"},
+   {type:"block-end",index:0,block:{type:"tool-call",id:"notification",name:"SendMessage",arguments:args}},
+   {type:"finish",reason:{kind:"tool-calls"}},
+  ]:response("done");
+  f.agent.followup(user("send notification"));await f.agent.whenIdle();
+  expect(receiptOf(f)).toMatchObject({callId:"notification",cause:{kind:"after-seconds"}});
+  gate.resolve("notification accepted");await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
+  expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("notification accepted");
+ }finally{gate.resolve("cleanup");await f.dispose();}
+});
 it("message handoff drains every foreground sibling and carries the complete next-step batch into a new turn",async()=>{
  const f=await setup("new-message",0);const held=Promise.withResolvers<string>();const sibling=Promise.withResolvers<string>();let started=0;
  try{

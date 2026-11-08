@@ -442,7 +442,7 @@ export default class ProjectMode extends TypertRemoteService {
     }
     let binding = this.backgroundBindings.get(agent);
     if (!binding) {
-      binding = bindBackground(this.ctx, agent, this.config);
+      binding = bindBackground(this.ctx, agent, this.config, (callSeq) => this.messages.hasPendingRequest(agent.id, callSeq));
       this.backgroundBindings.set(agent, binding);
     }
     try {
