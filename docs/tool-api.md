@@ -61,6 +61,8 @@ Fork accepts the same item fields as Task, plus required `source`. Its single re
 
 Point-to-point communication within the enabled MoA family:
 
+`SendMessage` is always a direct native tool call, including with a PTC Agent preset. Its schema appears beside `run_code`; it is absent from the program SDK. This keeps a Request's original result and turn intact through waiting, interruption, and persistence. Ordinary program tools retain PTC and background execution.
+
 ```json
 {"target":"<worker-id>","message":"Prioritize the error state.","delivery":"steer"}
 ```

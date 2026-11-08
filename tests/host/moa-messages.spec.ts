@@ -22,7 +22,7 @@ it("exposes SendMessage only to MoA participants", async () => {
   }
 });
 
-it("keeps a native tool call open until its explicit answer", async () => {
+it.each(["native", "ptc"])("keeps a %s-composed protocol call open until its explicit answer beyond the background timer", async (presentation) => {
   const f = await fixture(undefined, { backgroundStrategy: "after-seconds", backgroundAfterSeconds: 0.01 });
   const received = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
@@ -30,12 +30,19 @@ it("keeps a native tool call open until its explicit answer", async () => {
   let parentAnswered = false;
   let workerId = "";
   try {
+    if (presentation === "ptc") {
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
+    }
     const { agent } = await f.ctx.agents.create({
       sessionId: SessionId("parent"),
       meta: { cwd: f.root },
       agentOptions: { provider: "test", model: "test" },
     });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    if (presentation === "ptc") f.ctx.on("agent/created", ({ agent: child }) => { if (child.id !== agent.id) child.ctx.tools.presentAs("ptc"); });
     f.adapter.handler = async (options) => {
       if (options.sessionId !== agent.id) {
         workerId = options.sessionId;
@@ -73,6 +80,7 @@ it("keeps a native tool call open until its explicit answer", async () => {
     await new Promise(resolve => setTimeout(resolve, 40));
     expect(f.ctx.agents.get(SessionId(workerId))?.status).toBe("running");
     expect(workerCalls).toBe(1);
+    expect(f.adapter.requests.find(options => options.sessionId === workerId)?.tools?.map(tool => tool.name)).toContain("SendMessage");
     release.resolve();
     await f.ctx.agents.get(SessionId(workerId))!.whenIdle();
     expect(workerCalls).toBe(2);
@@ -81,6 +89,7 @@ it("keeps a native tool call open until its explicit answer", async () => {
     await recovered.recover(agent.id);
     using observed = await f.ctx.sessionQuery.observeSession(SessionId(workerId));
     expect(observed.events.filter(event => event.type === "turn/start")).toHaveLength(1);
+    expect(observed.events.filter(event => event.type === "tool/call" && event.data.name === "run_code")).toHaveLength(0);
     expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-background-result")).toHaveLength(0);
     expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo)).toHaveLength(0);
     expect(workerCalls).toBe(2);
@@ -314,8 +323,11 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
   const releaseReply = Promise.withResolvers<void>();
   const interrupted = Promise.withResolvers<void>();
   const late = Promise.withResolvers<void>();
+  const receiptHeld = Promise.withResolvers<void>();
+  const releaseReceipt = Promise.withResolvers<void>();
   let workerId = "", parentAnswered = false;
   let workerCalls = 0;
+  let receiptSpy: ReturnType<typeof vi.spyOn> | undefined;
   try {
     if (presentation === "ptc") {
       await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
@@ -325,6 +337,18 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
     }
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("protocol-parent"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const host = f.ctx.projectMode as any;
+    const originalUpdate = host.update.bind(host);
+    let held = false;
+    receiptSpy = vi.spyOn(host, "update").mockImplementation(async (id: any, update: any) => {
+      const result = await originalUpdate(id, update);
+      if (!held && Object.values(host.record(id)?.operations ?? {}).some((value: any) => value?.status === "interrupted")) {
+        held = true;
+        receiptHeld.resolve();
+        await releaseReceipt.promise;
+      }
+      return result;
+    });
     if (presentation === "ptc") f.ctx.on("agent/created", ({ agent: child }) => { if (child.id !== agent.id) child.ctx.tools.presentAs("ptc"); });
     f.adapter.handler = async options => {
       if (options.sessionId !== agent.id) {
@@ -334,13 +358,7 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
         if (content.includes("the late protocol answer")) { late.resolve(); return response("used the late answer"); }
         if (content.includes("interrupted")) { interrupted.resolve(); return response("handled urgent input"); }
         const input = { target: agent.id, message: "Which direction?", mode: "request", timeout_ms: 10000 };
-        if (presentation === "native") return call("question", input);
-        const args = JSON.stringify({ description: "Wait for an explicit protocol reply", code: `return await tools.SendMessage(${JSON.stringify(input)});` });
-        return [
-          { type: "block-start", index: 0, blockType: "tool-call" },
-          { type: "block-end", index: 0, block: { type: "tool-call", id: "question", name: "run_code", arguments: args } },
-          { type: "finish", reason: { kind: "tool-calls" } },
-        ];
+        return call("question", input);
       }
       const request = options.messages.find(message => message.source.kind === "moa-message" && message.source.requestId);
       if (!request || request.source.kind !== "moa-message" || parentAnswered) return response("waiting");
@@ -355,7 +373,12 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
     // The timer must already have expired when the urgent message arrives.
     await new Promise(resolve => setTimeout(resolve, 40));
     worker.steer(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "urgent human instruction" }] }));
+    await receiptHeld.promise;
+    expect(worker.session.snapshotEvents().filter(event => event.type === "tool/result" && event.data.message.toolCallId === "question")).toHaveLength(0);
+    worker.steer(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "second urgent direction during receipt persistence" }] }));
+    releaseReceipt.resolve();
     await interrupted.promise;
+    expect(JSON.stringify(f.adapter.requests.filter(options => options.sessionId === workerId).at(-1)?.messages)).toContain("second urgent direction during receipt persistence");
     const events = worker.session.snapshotEvents();
     expect(events.filter(event => event.type === "turn/start")).toHaveLength(1);
     expect(events.filter(event => event.type === "turn/end" && event.data.reason.kind === "handoff")).toHaveLength(0);
@@ -372,7 +395,7 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
     using observed = await f.ctx.sessionQuery.observeSession(SessionId(workerId));
     expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo)).toHaveLength(1);
     expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-background-result")).toHaveLength(0);
-  } finally { releaseReply.resolve(); await f.dispose(); }
+  } finally { releaseReceipt.resolve(); releaseReply.resolve(); receiptSpy?.mockRestore(); await f.dispose(); }
 });
 
 import {

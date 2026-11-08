@@ -79,11 +79,6 @@ export class MoAMessageBroker {
   private routeLocks = new Map<string, Promise<void>>();
   private disposed = new AbortController();
   constructor(private ports: MessagePorts) {}
-  hasPendingRequest(senderId: string, callSeq: number): boolean {
-    return [...this.waits.values()].some(({ route, signal }) =>
-      !signal.aborted && route.senderId === senderId && nativeOperationSeq(route.operationId, senderId) === callSeq,
-    );
-  }
   dispose() {
     this.disposed.abort();
     this.ports.dispose?.();
@@ -377,6 +372,7 @@ export class MoAMessageBroker {
 export function createSendMessageTool(broker: MoAMessageBroker) {
   return defineTool({
     name: "SendMessage",
+    nativeOnly: true,
     description:
       "Send a notification or ask another MoA agent a question. Reply to a request using reply_to. Requests wait for an explicit answer, timeout, or priority input.",
     parameters: {

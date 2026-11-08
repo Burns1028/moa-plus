@@ -70,7 +70,7 @@ function consumed(agent: Agent, message: UserMessage): boolean {
 }
 
 /** Install policy and receipts on one native owner; the loop retains all execution ownership. */
-export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">, requestPending: (callSeq: number) => boolean = () => false): Promise<() => Promise<void>> {
+export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">): Promise<() => Promise<void>> {
   const jobs = requireNativeBackground(ctx, agent);
   if (!Number.isFinite(config.backgroundAfterSeconds) || config.backgroundAfterSeconds < 0) throw new Error("backgroundAfterSeconds must be finite and nonnegative");
   const detachController = jobs.attachController("moa-background");
@@ -134,7 +134,7 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
   disposers.push(agent.ctx.on("agent/tool-activity-started", (activity) => {
     const key = backgroundHandle(activity.identity);
     live.set(key, activity.finished);
-    const stop = watchActivity(ctx, agent, activity, config, requestPending);
+    const stop = watchActivity(ctx, agent, activity, config);
     watchers.add(stop);
     const cleanup = () => { stop(); watchers.delete(stop); };
     void activity.finished.then(() => { live.delete(key); cleanup(); }, cleanup);
@@ -223,7 +223,7 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
   })();
 }
 
-function watchActivity(ctx: Context, agent: Agent, activity: ToolActivityStarted, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">, requestPending: (callSeq: number) => boolean): () => void {
+function watchActivity(ctx: Context, agent: Agent, activity: ToolActivityStarted, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">): () => void {
   // Request owns its timeout and interruptible wait, including its Tool Result.
   if (activity.execution.name === "SendMessage" && (activity.execution.arguments as { mode?: unknown } | undefined)?.mode === "request") return () => {};
   const started = Date.now();
@@ -235,8 +235,6 @@ function watchActivity(ctx: Context, agent: Agent, activity: ToolActivityStarted
   const eligible = () => agent.inbox.nextStep.filter(m => m.source.kind !== "moa-background-result");
   const inspect = async () => {
     if (judging || transferred || signal.aborted) return;
-    // A PTC root can contain the same protocol wait as a native SendMessage.
-    if (requestPending(activity.identity.callSeq)) return;
     if (!threshold && !activity.execution.backgroundOnMessage) return;
     if (!threshold && eligible().length === 0) return;
     if (threshold && config.backgroundStrategy === "after-seconds") {
@@ -253,7 +251,7 @@ function watchActivity(ctx: Context, agent: Agent, activity: ToolActivityStarted
         const decision = !judge || await judgeInterrupt(ctx, agent, unread, { kind: "background", description: "A foreground tool is still running.", elapsedSeconds: (Date.now() - started) / 1000, tool: { name: activity.execution.name, arguments: activity.execution.arguments } }, signal);
         const pending = new Set(eligible().map(m => m.id));
         const messageIds = unread.map(m => m.id).filter(id => pending.has(id));
-        if (decision && messageIds.length && !signal.aborted && !requestPending(activity.identity.callSeq))
+        if (decision && messageIds.length && !signal.aborted)
           transferred = (await activity.requestBackground({ kind: judge ? "llm-judge" : "new-message", messageIds })).kind === "background";
       }
     } finally { judging = false; }

@@ -1,15 +1,16 @@
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -861,6 +861,8 @@
+@@ -861,6 +861,9 @@
  				return userPresentationMeta(args, value);
  			} } : {}
  		},
++		...options.nativeOnly === true ? { nativeOnly: true } : {},
 +		...options.backgroundOnMessage === true ? { backgroundOnMessage: true } : {},
 +		...options.supportsBackgroundProducer === true ? { supportsBackgroundProducer: true } : {},
  		...options.deferLoading === true ? { deferLoading: options.deferLoading } : {},
  		...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
  		async execute(args, exec) {
-@@ -1372,6 +1374,7 @@
+@@ -1372,6 +1375,7 @@
  						schema,
  						arguments: normalized.dispatched,
  						...exec.agent ? { agent: exec.agent } : {},
@@ -17,7 +18,25 @@
  						parent: exec.token,
  						signal: runController.signal
  					};
-@@ -2720,6 +2723,7 @@
+@@ -1470,7 +1474,7 @@
+ 				};
+ 				const functions = Object.create(null);
+ 				for (const schema of registry.schemas(exec.agent)) {
+-					if (schema.name === "run_code") continue;
++					if (schema.name === "run_code" || registry.get(schema.name, exec.agent)?.nativeOnly === true) continue;
+ 					Object.defineProperty(functions, schema.name, {
+ 						enumerable: true,
+ 						value: binding(deepFreeze(schema))
+@@ -2611,7 +2615,7 @@
+ * (the call fails) and the route (inside the program), because a rule the
+ * model can only discover by being denied is one it corrects too late.
+ */
+-const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`;
++const PTC_ONLY_INSTRUCTION = `Use \`${RUN_CODE_NAME}\` for capabilities declared in the program SDK. Tools supplied as separate native schemas must be called directly and are not available inside the program.`;
+ const SDK_RENDERERS = {
+ 	typescript: renderToolsSdk,
+ 	python: renderToolsSdkPy
+@@ -2720,6 +2724,7 @@
  var ToolLayer = class {
  	tools;
  	restrictions = new AnonymousEntries();
@@ -25,7 +44,7 @@
  	guards = new AnonymousEntries();
  	/**
  	* Presentation this scope's agent declared for itself, shadowing the
-@@ -2732,7 +2736,7 @@
+@@ -2732,7 +2737,7 @@
  	}
  	/** Whether every contribution table in this aggregate layer is empty. */
  	isEmpty() {
@@ -34,7 +53,7 @@
  	}
  	/** Whether every compiled restriction in this layer admits a global tool name. */
  	admits(name) {
-@@ -2765,7 +2769,8 @@
+@@ -2765,7 +2770,8 @@
  	});
  	/** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
  	[TOOL_RUNTIME_SCHEDULER] = {
@@ -44,7 +63,18 @@
  		dispatch: (exec) => this.dispatchScheduledExecution(exec),
  		finalize: (exec, result) => this.finalizeScheduledExecution(exec, result),
  		finish: (exec, result) => this.finishScheduledExecution(exec, result)
-@@ -3014,6 +3019,15 @@
+@@ -2938,8 +2944,8 @@
+ 		};
+ 		this.requirePtcRuntime(mode);
+ 		return {
+-			schemas: [...view.visible.values()].map((definition) => this.schemaOf(definition, false)).filter((schema) => schema.name === RUN_CODE_NAME),
+-			knownNames: [RUN_CODE_NAME]
++			schemas: [...view.visible.values()].filter((definition) => definition.name === RUN_CODE_NAME || definition.nativeOnly === true).map((definition) => this.schemaOf(definition, false)),
++			knownNames: [RUN_CODE_NAME, ...view.nativeOnlyNames]
+ 		};
+ 	}
+ 	/**
+@@ -3014,6 +3020,15 @@
  	* @param guard - synchronous check; a returned string denies the execution.
  	* @returns the exact disposer that unregisters the guard.
  	*/
@@ -60,18 +90,55 @@
  	guard(guard) {
  		return this.layers.effect(this.ctx, (layer) => layer.guards.append(guard), {
  			label: "tools.guard()",
-@@ -3072,6 +3086,10 @@
+@@ -3063,20 +3078,29 @@
+ 		const visible = /* @__PURE__ */ new Map();
+ 		const knownNames = /* @__PURE__ */ new Set();
+ 		const restrictableNames = /* @__PURE__ */ new Set();
++		const nativeOnlyNames = /* @__PURE__ */ new Set();
+ 		for (const [name, definition] of inherited) {
++			if (definition.nativeOnly === true) nativeOnlyNames.add(name);
+ 			knownNames.add(name);
+ 			restrictableNames.add(name);
+ 			if (layers.every((layer) => layer.admits(name))) visible.set(name, definition);
+ 		}
+ 		if (own !== void 0) for (const [name, definition] of own.tools.entries()) {
++			if (definition.nativeOnly === true) nativeOnlyNames.add(name);
++			else nativeOnlyNames.delete(name);
  			knownNames.add(name);
  			visible.set(name, definition);
- 		}
++		}
 +		// Intentionally exact-scope: a coordinator's mask must not constrain workers.
 +		if (own !== void 0) for (const names of own.suppressions.values()) {
 +			for (const name of names) visible.delete(name);
-+		}
+ 		}
  		if (this.modeFor(scope) !== "native") visible.set(RUN_CODE_NAME, this.requirePtcTransport());
  		return {
  			visible,
-@@ -3224,7 +3242,7 @@
+ 			knownNames,
+-			restrictableNames
++			restrictableNames,
++			nativeOnlyNames
+ 		};
+ 	}
+ 	/**
+@@ -3121,7 +3145,7 @@
+ 	}
+ 	/** Project visible callable tools onto the generated PTC mode SDK contract. */
+ 	sdkSchemas(scope) {
+-		return [...this.view(scope).visible.values()].filter((definition) => definition.name !== RUN_CODE_NAME).map((definition) => {
++		return [...this.view(scope).visible.values()].filter((definition) => definition.name !== RUN_CODE_NAME && definition.nativeOnly !== true).map((definition) => {
+ 			const output = snapshotJsonValue(definition.output.schema);
+ 			/* v8 ignore next -- registration already validated and retained this schema as lossless JSON. */
+ 			if (output === void 0) throw new Error(`tool "${definition.name}" output schema must be lossless JSON before SDK projection`);
+@@ -3193,6 +3217,7 @@
+ 	* @param nested - whether the call is a transport sub-dispatch, not a model-direct call.
+ 	*/
+ 	collapses(name, scope, nested) {
++		if (this.get(name, scope)?.nativeOnly === true) return nested;
+ 		return !nested && this.modeFor(scope) === "ptc" && name !== "run_code";
+ 	}
+ 	/**
+@@ -3224,7 +3249,7 @@
  			default: return assertNever(prepared, "scheduled tool preparation");
  		}
  	}
@@ -80,7 +147,7 @@
  		const deferredContexts = [];
  		const token = createExecutionToken();
  		const callId = exec.callId;
-@@ -3232,7 +3250,14 @@
+@@ -3232,7 +3257,14 @@
  		const name = exec.name;
  		const agent = exec.agent;
  		const parent = exec.parent;
@@ -96,7 +163,7 @@
  		const visible = this.get(name, agent);
  		const collapsed = visible !== void 0 && this.collapses(name, agent, parent !== void 0);
  		const concludingExecutions = this.concludingExecutions;
-@@ -3240,6 +3265,8 @@
+@@ -3240,6 +3272,8 @@
  			token,
  			callId,
  			rootCallId,
@@ -105,7 +172,7 @@
  			name,
  			signal,
  			...agent !== void 0 ? { agent } : {},
-@@ -3266,6 +3293,7 @@
+@@ -3266,6 +3300,7 @@
  			this.contentFinalizers.set(execution, finalizerFor());
  			if (!collapsed) this.contentProjectors.set(execution, capturedProjector);
  			this.cancellationStates.set(execution, {
@@ -113,7 +180,16 @@
  				callerSignal: signal,
  				bodyInvoked: false
  			});
-@@ -3304,11 +3332,21 @@
+@@ -3278,7 +3313,7 @@
+ 				return {
+ 					kind: "final-result",
+ 					exec: execution,
+-					result: toolErrorResult(new ToolNotFoundError(name, `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`))
++					result: toolErrorResult(new ToolNotFoundError(name, visible.nativeOnly === true ? `\`${name}\` must be called directly; it is not available inside a \`${RUN_CODE_NAME}\` program` : `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`))
+ 				};
+ 			}
+ 			return {
+@@ -3304,11 +3339,21 @@
  	* @returns the prepared execution plus the next scheduler stage.
  	* @internal
  	*/
@@ -140,7 +216,7 @@
  		if (created.kind !== "ready") return next(created);
  		const exec = created.exec;
  		if (this.callerCancelled(exec)) return next({
-@@ -3488,6 +3526,7 @@
+@@ -3488,6 +3533,7 @@
  		} catch (error) {
  			finalResult = this.materializeFinalResult(toolErrorResult(error));
  		}
@@ -150,16 +226,18 @@
  	}
 --- a/lib/types/index.d.ts
 +++ b/lib/types/index.d.ts
-@@ -113,6 +113,8 @@
+@@ -113,6 +113,10 @@
  }
  /** A registered tool: its schema plus the execution function. */
  export interface ToolDefinition extends ToolSchema {
++    /** Expose as a direct native call even in PTC, excluding program SDK/nested dispatch. */
++    readonly nativeOnly?: boolean;
 +    readonly backgroundOnMessage?: boolean;
 +    readonly supportsBackgroundProducer?: true;
      /** Mandatory canonical output declaration. */
      readonly output: ToolOutputDefinition;
      /**
-@@ -214,6 +216,9 @@
+@@ -214,6 +218,9 @@
   * callers do not choose that token.
   */
  export interface ToolExecutionInput {
@@ -169,7 +247,7 @@
      readonly callId: ToolCallId;
      /**
       * Root model-requested call owning this execution tree. Callers omit it for
-@@ -357,7 +362,8 @@
+@@ -357,7 +364,8 @@
   */
  export interface ToolRuntimeScheduler {
      /** Materialize input, run the ordered pre-execute/guard gate, and decide what stage follows. */
@@ -179,7 +257,7 @@
      /** Run only the around-dispatch/body stage. */
      dispatch(exec: ToolRunContext): Promise<ScheduledToolDispatch>;
      /** Run post-execute and definition-owned content finalization, then materialize and notify. */
-@@ -643,6 +649,8 @@
+@@ -643,6 +651,8 @@
       * @returns the exact disposer that lifts this restriction.
       */
      restrict(filter: ToolRestriction): () => void;
@@ -188,7 +266,7 @@
      /**
       * Register a monotonic guard after the extensible `tools/pre-execute`
       * waterfall. A plain-context guard applies globally; one registered through
-@@ -850,4 +858,21 @@
+@@ -850,4 +860,21 @@
      private materializeFinalResult;
  }
  export default ToolRuntime;
@@ -214,10 +292,12 @@
 +}
 --- a/lib/types/schema.d.ts
 +++ b/lib/types/schema.d.ts
-@@ -176,6 +176,8 @@
+@@ -176,6 +176,10 @@
  export declare function validateArgs(spec: ParameterSchemaSpec, args: unknown): string[];
  /** Options for {@link defineTool}. */
  export interface DefineToolOptions<S extends ParameterSchemaSpec, O extends ValueSchemaSpec> {
++    /** Expose as a direct native call even in PTC, excluding program SDK/nested dispatch. */
++    readonly nativeOnly?: boolean;
 +    readonly backgroundOnMessage?: boolean;
 +    readonly supportsBackgroundProducer?: true;
      /** Tool name (must be unique). */

@@ -110,6 +110,8 @@ interface Agent {
 
 `ToolExecutionResult` remains the existing success/failure union. `RootCallOutcome` is used only by the native logged-root scheduler. Direct `tools.execute(...)` and program sub-dispatches continue returning canonical results. A root `run_code` may transfer as a whole; individual PTC subcalls must not return placeholder values into a running program. Its nested calls retain the existing PTC policy and cancellation chain. Their canonical values and native concurrency classification are unchanged.
 
+`SendMessage` is a direct native protocol tool even for PTC presets: the narrow `nativeOnly` metadata exposes its native schema beside `run_code` and excludes it from program bindings. Request retains its own original Tool Result through interruption and durable receipt writes. The [protocol presentation contract](native-moa-protocol-presentation-contract.md) defines schema, SDK, execution and ordering parity; ordinary program tools keep the behavior above.
+
 The new event is emitted only after root admission and actual dispatch start, not while approval is pending. The plugin installs timers and inbox observers, calls the provided capability, and removes observers when `finished` settles or its context disposes. It never receives a raw promise it can abandon, a mutable native phase, or permission to replace the cancellation signal. Native scope teardown must cancel and drain admitted work even if the plugin unloads.
 
 ## Transfer, lifetime and output policy

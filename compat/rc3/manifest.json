@@ -201,17 +201,17 @@
       {
         "file": "lib/index.js",
         "before": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
-        "after": "1bfbfeb18014b117406704b0c225237726e755e79aba2e0d4ef958ad284432b9"
+        "after": "334361bf4522c7d566878cf5ac9bb7e9747128868b49d492e7c798be460c1931"
       },
       {
         "file": "lib/types/index.d.ts",
         "before": "049df0624956583b8ca05badfd6e9115c6933481571dc17965f36f407bdf95f0",
-        "after": "8d18c7294f58b1a1821bdcc334918a9e1ed7a6ad9c59f0d65757cfc6dada7362"
+        "after": "1ac667aae64eb2177141215be939c626c24d4cfe968cdd09b3d90feacbe21a9a"
       },
       {
         "file": "lib/types/schema.d.ts",
         "before": "ecb08a02eec791f3c8cec6209a27893f7b1ff58f9269abca77cfa5c173f96d14",
-        "after": "9c7022e6e13b37c04f2f919b4c32c138b98159be4966010c57411f6f0c68f5cd"
+        "after": "20dc75f4f8c90c7c6caeaa97d132c1179adfa509b5c0dcab0c54462274b074f1"
       }
     ]
   },
@@ -310,17 +310,17 @@
       {
         "file": "lib/index.js",
         "before": "9bcecd8eba724e4b3b11d6e8535bbadc7d2d1a6293dcd6b5af3195745abd488a",
-        "after": "1bfbfeb18014b117406704b0c225237726e755e79aba2e0d4ef958ad284432b9"
+        "after": "334361bf4522c7d566878cf5ac9bb7e9747128868b49d492e7c798be460c1931"
       },
       {
         "file": "lib/types/index.d.ts",
         "before": "db86a9df8c99257e2d82baa7b2540debdd816b821553eb308261faf97eed2f67",
-        "after": "8d18c7294f58b1a1821bdcc334918a9e1ed7a6ad9c59f0d65757cfc6dada7362"
+        "after": "1ac667aae64eb2177141215be939c626c24d4cfe968cdd09b3d90feacbe21a9a"
       },
       {
         "file": "lib/types/schema.d.ts",
         "before": "ecb08a02eec791f3c8cec6209a27893f7b1ff58f9269abca77cfa5c173f96d14",
-        "after": "9c7022e6e13b37c04f2f919b4c32c138b98159be4966010c57411f6f0c68f5cd"
+        "after": "20dc75f4f8c90c7c6caeaa97d132c1179adfa509b5c0dcab0c54462274b074f1"
       }
     ]
   },

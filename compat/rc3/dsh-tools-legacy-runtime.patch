@@ -1,15 +1,16 @@
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -861,6 +861,8 @@
+@@ -861,6 +861,9 @@
  				return userPresentationMeta(args, value);
  			} } : {}
  		},
++		...options.nativeOnly === true ? { nativeOnly: true } : {},
 +		...options.backgroundOnMessage === true ? { backgroundOnMessage: true } : {},
 +		...options.supportsBackgroundProducer === true ? { supportsBackgroundProducer: true } : {},
  		...options.deferLoading === true ? { deferLoading: options.deferLoading } : {},
  		...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
  		async execute(args, exec) {
-@@ -1372,6 +1374,7 @@
+@@ -1372,6 +1375,7 @@
  						schema,
  						arguments: normalized.dispatched,
  						...exec.agent ? { agent: exec.agent } : {},
@@ -17,7 +18,25 @@
  						parent: exec.token,
  						signal: runController.signal
  					};
-@@ -2766,7 +2769,8 @@
+@@ -1470,7 +1474,7 @@
+ 				};
+ 				const functions = Object.create(null);
+ 				for (const schema of registry.schemas(exec.agent)) {
+-					if (schema.name === "run_code") continue;
++					if (schema.name === "run_code" || registry.get(schema.name, exec.agent)?.nativeOnly === true) continue;
+ 					Object.defineProperty(functions, schema.name, {
+ 						enumerable: true,
+ 						value: binding(deepFreeze(schema))
+@@ -2611,7 +2615,7 @@
+ * (the call fails) and the route (inside the program), because a rule the
+ * model can only discover by being denied is one it corrects too late.
+ */
+-const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`;
++const PTC_ONLY_INSTRUCTION = `Use \`${RUN_CODE_NAME}\` for capabilities declared in the program SDK. Tools supplied as separate native schemas must be called directly and are not available inside the program.`;
+ const SDK_RENDERERS = {
+ 	typescript: renderToolsSdk,
+ 	python: renderToolsSdkPy
+@@ -2766,7 +2770,8 @@
  	});
  	/** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
  	[TOOL_RUNTIME_SCHEDULER] = {
@@ -27,7 +46,62 @@
  		dispatch: (exec) => this.dispatchScheduledExecution(exec),
  		finalize: (exec, result) => this.finalizeScheduledExecution(exec, result),
  		finish: (exec, result) => this.finishScheduledExecution(exec, result)
-@@ -3238,7 +3242,7 @@
+@@ -2939,8 +2944,8 @@
+ 		};
+ 		this.requirePtcRuntime(mode);
+ 		return {
+-			schemas: [...view.visible.values()].map((definition) => this.schemaOf(definition, false)).filter((schema) => schema.name === RUN_CODE_NAME),
+-			knownNames: [RUN_CODE_NAME]
++			schemas: [...view.visible.values()].filter((definition) => definition.name === RUN_CODE_NAME || definition.nativeOnly === true).map((definition) => this.schemaOf(definition, false)),
++			knownNames: [RUN_CODE_NAME, ...view.nativeOnlyNames]
+ 		};
+ 	}
+ 	/**
+@@ -3073,12 +3078,16 @@
+ 		const visible = /* @__PURE__ */ new Map();
+ 		const knownNames = /* @__PURE__ */ new Set();
+ 		const restrictableNames = /* @__PURE__ */ new Set();
++		const nativeOnlyNames = /* @__PURE__ */ new Set();
+ 		for (const [name, definition] of inherited) {
++			if (definition.nativeOnly === true) nativeOnlyNames.add(name);
+ 			knownNames.add(name);
+ 			restrictableNames.add(name);
+ 			if (layers.every((layer) => layer.admits(name))) visible.set(name, definition);
+ 		}
+ 		if (own !== void 0) for (const [name, definition] of own.tools.entries()) {
++			if (definition.nativeOnly === true) nativeOnlyNames.add(name);
++			else nativeOnlyNames.delete(name);
+ 			knownNames.add(name);
+ 			visible.set(name, definition);
+ 		}
+@@ -3090,7 +3099,8 @@
+ 		return {
+ 			visible,
+ 			knownNames,
+-			restrictableNames
++			restrictableNames,
++			nativeOnlyNames
+ 		};
+ 	}
+ 	/**
+@@ -3135,7 +3145,7 @@
+ 	}
+ 	/** Project visible callable tools onto the generated PTC mode SDK contract. */
+ 	sdkSchemas(scope) {
+-		return [...this.view(scope).visible.values()].filter((definition) => definition.name !== RUN_CODE_NAME).map((definition) => {
++		return [...this.view(scope).visible.values()].filter((definition) => definition.name !== RUN_CODE_NAME && definition.nativeOnly !== true).map((definition) => {
+ 			const output = snapshotJsonValue(definition.output.schema);
+ 			/* v8 ignore next -- registration already validated and retained this schema as lossless JSON. */
+ 			if (output === void 0) throw new Error(`tool "${definition.name}" output schema must be lossless JSON before SDK projection`);
+@@ -3207,6 +3217,7 @@
+ 	* @param nested - whether the call is a transport sub-dispatch, not a model-direct call.
+ 	*/
+ 	collapses(name, scope, nested) {
++		if (this.get(name, scope)?.nativeOnly === true) return nested;
+ 		return !nested && this.modeFor(scope) === "ptc" && name !== "run_code";
+ 	}
+ 	/**
+@@ -3238,7 +3249,7 @@
  			default: return assertNever(prepared, "scheduled tool preparation");
  		}
  	}
@@ -36,7 +110,7 @@
  		const deferredContexts = [];
  		const token = createExecutionToken();
  		const callId = exec.callId;
-@@ -3246,7 +3250,14 @@
+@@ -3246,7 +3257,14 @@
  		const name = exec.name;
  		const agent = exec.agent;
  		const parent = exec.parent;
@@ -52,7 +126,7 @@
  		const visible = this.get(name, agent);
  		const collapsed = visible !== void 0 && this.collapses(name, agent, parent !== void 0);
  		const concludingExecutions = this.concludingExecutions;
-@@ -3254,6 +3265,8 @@
+@@ -3254,6 +3272,8 @@
  			token,
  			callId,
  			rootCallId,
@@ -61,7 +135,7 @@
  			name,
  			signal,
  			...agent !== void 0 ? { agent } : {},
-@@ -3280,6 +3293,7 @@
+@@ -3280,6 +3300,7 @@
  			this.contentFinalizers.set(execution, finalizerFor());
  			if (!collapsed) this.contentProjectors.set(execution, capturedProjector);
  			this.cancellationStates.set(execution, {
@@ -69,7 +143,16 @@
  				callerSignal: signal,
  				bodyInvoked: false
  			});
-@@ -3318,11 +3332,21 @@
+@@ -3292,7 +3313,7 @@
+ 				return {
+ 					kind: "final-result",
+ 					exec: execution,
+-					result: toolErrorResult(new ToolNotFoundError(name, `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`))
++					result: toolErrorResult(new ToolNotFoundError(name, visible.nativeOnly === true ? `\`${name}\` must be called directly; it is not available inside a \`${RUN_CODE_NAME}\` program` : `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`))
+ 				};
+ 			}
+ 			return {
+@@ -3318,11 +3339,21 @@
  	* @returns the prepared execution plus the next scheduler stage.
  	* @internal
  	*/
@@ -96,7 +179,7 @@
  		if (created.kind !== "ready") return next(created);
  		const exec = created.exec;
  		if (this.callerCancelled(exec)) return next({
-@@ -3502,6 +3526,7 @@
+@@ -3502,6 +3533,7 @@
  		} catch (error) {
  			finalResult = this.materializeFinalResult(toolErrorResult(error));
  		}
