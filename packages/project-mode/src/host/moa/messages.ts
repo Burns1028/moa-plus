@@ -438,6 +438,8 @@ declare module "@deepseek-ai/dsh-llm" {
       form: "relay";
       rootId: string;
       senderId: string;
+      senderSessionId?: string;
+      senderName?: string;
       operationId: string;
       requestId?: string;
       replyTo?: string;
@@ -447,12 +449,14 @@ declare module "@deepseek-ai/dsh-llm" {
 const routeKey = (id: string) => `moa:route:${id}`;
 const receiptKey = (id: string) => `moa:receipt:${id}`;
 
-function nativeMessage(envelope: MoAMessageEnvelope): UserMessage {
+function nativeMessage(envelope: MoAMessageEnvelope, senderName?: string): UserMessage {
   const source = {
     kind: "moa-message" as const,
     form: "relay" as const,
     rootId: envelope.rootId,
     senderId: envelope.senderId,
+    senderSessionId: envelope.senderId,
+    ...(senderName ? { senderName } : {}),
     operationId: envelope.operationId,
     ...(envelope.requestId ? { requestId: envelope.requestId } : {}),
     ...(envelope.replyTo ? { replyTo: envelope.replyTo } : {}),
@@ -493,6 +497,10 @@ export function createNativeMessageBroker(
   judge: MessagePorts["judge"],
 ) {
   let detach = () => {};
+  const senderName = (rootId: string, senderId: string) =>
+    senderId === rootId
+      ? "Coordinator"
+      : host.record(SessionId(rootId))?.workers.find(worker => worker.id === senderId)?.name;
   const ports: MessagePorts = {
     listeners: host.listeners,
     judge,
@@ -516,7 +524,7 @@ export function createNativeMessageBroker(
           ? [...live.inbox.nextStep, ...live.inbox.nextTurn]
           : [...(observed.projections?.values.inbox?.["next-step"] ?? []), ...(observed.projections?.values.inbox?.["next-turn"] ?? [])].map(message => messageSchema.parse(message));
         if (hasCommittedAnswer(observed.events, route) || step?.messages.some(message => isAnswer(message, route)) || pending.some(message => isAnswer(message, route))) continue;
-        const message = nativeMessage({ rootId, senderId: route.targetId, targetId: route.senderId, message: route.answer, operationId: `answer-recovery:${route.requestId}`, replyTo: route.requestId, delivery: "steer" });
+        const message = nativeMessage({ rootId, senderId: route.targetId, targetId: route.senderId, message: route.answer, operationId: `answer-recovery:${route.requestId}`, replyTo: route.requestId, delivery: "steer" }, senderName(rootId, route.targetId));
         if (step) {
           signal.throwIfAborted();
           // Log admission before claiming it into this inference. A crash in
@@ -582,7 +590,7 @@ export function createNativeMessageBroker(
     async deliver(envelope, signal) {
       signal.throwIfAborted();
       const targetId = SessionId(envelope.targetId);
-      const message = nativeMessage(envelope);
+      const message = nativeMessage(envelope, senderName(envelope.rootId, envelope.senderId));
       // A retry after admission but before its receipt must not enqueue twice.
       using observed = await observeForTurn(host.ctx, targetId, signal);
       const prior = observed.events.findLast(

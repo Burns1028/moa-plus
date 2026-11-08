@@ -84,6 +84,8 @@ export class CompletionOutbox {
           completionId: id,
           workerId,
           workerTurn: finished.turn,
+          senderSessionId: workerId,
+          senderName: this.host.worker(r, workerId).name,
         },
         content: [
           {

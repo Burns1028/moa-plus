@@ -130,7 +130,9 @@ it("wakes a cold sender for a saved but uncommitted answer once without inventin
     await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
     await broker.recover(root.id);
     using observed = await f.ctx.sessionQuery.observeSession(workerId);
-    expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "saved-request")).toHaveLength(1);
+    const replies = observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "saved-request");
+    expect(replies).toHaveLength(1);
+    expect(replies[0].data.source).toMatchObject({ senderSessionId: root.id, senderName: "Coordinator" });
     expect(host.record(root.id).assignments).toHaveLength(assignments);
     expect(calls).toBe(1);
     broker.dispose();
@@ -659,13 +661,14 @@ it("reconciles a native inbox admission after a missing operation receipt", asyn
       await recovered.send(agent, input, "stable-operation", signal),
     ).toEqual(receipt);
     const inbox = f.ctx.agents.get(SessionId(childId))!.inbox.nextStep;
-    expect(
-      inbox.filter(
-        (message) =>
-          message.source.kind === "moa-message" &&
-          message.source.operationId === "stable-operation",
-      ),
-    ).toHaveLength(1);
+    const delivered = inbox.filter(
+      (message) =>
+        message.source.kind === "moa-message" &&
+        message.source.operationId === "stable-operation",
+    );
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0].source).toMatchObject({ senderSessionId: agent.id, senderName: "Coordinator" });
+    expect(delivered[0].content).toEqual([{ type: "text", text: `From: ${agent.id}\nonce` }]);
   } finally {
     release.resolve();
     await f.dispose();
@@ -871,6 +874,9 @@ it("routes a native request and reply directly between two owned peers", async (
     bId = (two as { workerId: string }).workerId;
     release.resolve();
     await answered.promise;
+    using observed = await f.ctx.sessionQuery.observeSession(SessionId(bId));
+    const request = observed.events.find(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.requestId);
+    expect(request?.data.source).toMatchObject({ senderId: aId, senderSessionId: aId, senderName: "a" });
   } finally {
     release.resolve();
     await f.dispose();

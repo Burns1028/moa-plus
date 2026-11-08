@@ -449,6 +449,7 @@ export class WorkerOperations {
         req.delivery === "queue"
           ? queueHostSubagentPrompt
           : steerHostSubagentPrompt;
+      const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
       return deliver(
         this.host.ctx.subagents,
         agent,
@@ -459,6 +460,11 @@ export class WorkerOperations {
           form: "relay",
           operationId,
           coordinatorSessionId: agent.id,
+          senderSessionId: agent.id,
+          senderName:
+            agent.id === record?.project.coordinatorSessionId
+              ? "Coordinator"
+              : record?.workers.find(worker => worker.id === agent.id)?.name,
         },
         signal,
       );

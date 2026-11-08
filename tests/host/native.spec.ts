@@ -176,6 +176,16 @@ it("returns both queued turn finals in full and consumes results inside one coor
     );
     expect(results).toHaveLength(2);
     expect(JSON.stringify(results)).toContain(full);
+    for (const result of results)
+      expect(result.data.source).toMatchObject({ senderSessionId: childId, senderName: "worker" });
+    expect(results.map(result => result.data.content.slice(1))).toEqual([
+      [{ type: "text", text: full }],
+      [{ type: "text", text: "second final" }],
+    ]);
+    using child = await f.ctx.sessionQuery.observeSession(childId!);
+    const assignment = child.events.find(event => event.type === "user/message" && event.data.source.kind === "project-mode-assignment");
+    expect(assignment?.data.source).toMatchObject({ senderSessionId: agent.id, senderName: "Coordinator" });
+    expect(assignment?.data.content).toEqual([{ type: "text", text: "second" }]);
     expect(
       (await f.ctx.projectMode.snapshot(agent.id))?.closedTurnOutcomes,
     ).toHaveLength(1);
