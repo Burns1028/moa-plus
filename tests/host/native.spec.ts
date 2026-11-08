@@ -261,9 +261,14 @@ it("keeps preset tools on workers and restores coordinator tools on draft disabl
     expect(f.ctx.agentPresets.composedPreset(child.ctx)).toBe("standard");
     for (const name of nativeNames) {
       expect(f.ctx.tools.get(name, agent), name).toBeUndefined();
-      expect(f.ctx.tools.get(name, child), name).toBeDefined();
+      if (name === "send_message")
+        expect(f.ctx.tools.get(name, child), name).toBeUndefined();
+      else expect(f.ctx.tools.get(name, child), name).toBeDefined();
       expect(f.ctx.tools.get(name, ordinary), name).toBeDefined();
     }
+    expect(f.ctx.tools.get("SendMessage", agent)).toBeDefined();
+    expect(f.ctx.tools.get("SendMessage", child)).toBeDefined();
+    expect(f.ctx.tools.get("SendMessage", ordinary)).toBeUndefined();
     expect(f.ctx.tools.get("control_workers", child)).toBeUndefined();
     release();
     await child.whenIdle();
