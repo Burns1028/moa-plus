@@ -6,7 +6,7 @@ import type {
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { basename, dirname, join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 
 const exec = promisify(execFile);
 
@@ -23,9 +23,23 @@ export type MoAWorkspaceRecord =
       sourceDirectory: string;
       directory: string;
       gitDirectory: string;
+      worktreeRoot: string;
       branch: string;
       id: string;
     };
+
+/** Persist the record and retry destroy when preparation cleanup itself fails. */
+export class MoAWorkspacePrepareError extends Error {
+  constructor(
+    public readonly record: MoAWorkspaceRecord,
+    public readonly preparationError: unknown,
+    public readonly cleanupError: unknown,
+  ) {
+    super("project-mode/workspace-prepare-cleanup-failed", {
+      cause: preparationError,
+    });
+  }
+}
 
 /** The caller resolves the acting session's policy at every operation. */
 export interface MoAWorkspaceCapabilities {
@@ -46,12 +60,15 @@ export class MoAWorkspaceManager {
     const policy = this.capabilities.policy();
     if (policy.mode === "read-only")
       throw new Error("project-mode/workspace-read-only");
-    const wrapped = await this.capabilities.sandbox.confine(
-      ["git", ...args],
-      { ...policy, mode: "workspace-write" },
-      signal,
-    );
-    if (wrapped.enforcement !== "full")
+    const wrapped =
+      policy.mode === "danger-full-access"
+        ? { argv: ["git", ...args] }
+        : await this.capabilities.sandbox.confine(
+            ["git", ...args],
+            { ...policy, mode: "workspace-write" },
+            signal,
+          );
+    if ("enforcement" in wrapped && wrapped.enforcement !== "full")
       throw new Error("project-mode/workspace-sandbox-partial");
     const env = { ...process.env };
     for (const key of Object.keys(env))
@@ -77,7 +94,10 @@ export class MoAWorkspaceManager {
       this.capabilities.policy().workspaceRoot,
       { signal },
     );
-    if (!fs.contains(policyRoot, source))
+    if (
+      this.capabilities.policy().mode !== "danger-full-access" &&
+      !fs.contains(policyRoot, source)
+    )
       throw new Error("project-mode/workspace-outside-policy");
     const directory = fs.processPath(source);
     const info = await fs.stat(source, signal);
@@ -104,7 +124,7 @@ export class MoAWorkspaceManager {
         sourceDirectory: directory,
         directory,
       };
-    let top: string, gitDirectory: string;
+    let top: string, gitDirectory: string, commonDirectory: string;
     try {
       top = await this.git(
         directory,
@@ -114,6 +134,11 @@ export class MoAWorkspaceManager {
       gitDirectory = await this.git(
         directory,
         ["rev-parse", "--absolute-git-dir"],
+        input.signal,
+      );
+      commonDirectory = await this.git(
+        directory,
+        ["rev-parse", "--path-format=absolute", "--git-common-dir"],
         input.signal,
       );
       await this.git(
@@ -128,22 +153,53 @@ export class MoAWorkspaceManager {
       );
     }
     const topTarget = await fs.resolve(top, { signal: input.signal });
-    const gitTarget = await fs.resolve(gitDirectory, { signal: input.signal });
+    const perWorktreeTarget = await fs.resolve(gitDirectory, {
+      signal: input.signal,
+    });
+    const gitTarget = await fs.resolve(commonDirectory, {
+      signal: input.signal,
+    });
     if (
-      fs.processPath(topTarget) !== fs.processPath(source) ||
-      !fs.contains(policyRoot, gitTarget) ||
-      !fs.contains(source, gitTarget)
+      !fs.contains(topTarget, source) ||
+      (this.capabilities.policy().mode !== "danger-full-access" &&
+        (!fs.contains(policyRoot, topTarget) ||
+          !fs.contains(policyRoot, perWorktreeTarget) ||
+          !fs.contains(policyRoot, gitTarget)))
     )
       throw new Error("project-mode/isolated-requires-contained-git-root");
+    const sourceRoot = fs.processPath(topTarget);
     gitDirectory = fs.processPath(gitTarget);
+    const subdirectory = relative(sourceRoot, directory);
     const id = randomUUID();
     const branch = `moa/${id}`;
     const target = join(gitDirectory, "moa-workspaces", id);
     const index = join(gitDirectory, `moa-index-${id}`);
     const env = { GIT_INDEX_FILE: index };
+    const record: MoAWorkspaceRecord = {
+      mode: "isolated",
+      ownerId: input.ownerId,
+      sourceDirectory: directory,
+      directory: join(target, subdirectory),
+      worktreeRoot: target,
+      gitDirectory,
+      branch,
+      id,
+    };
+    const marker = await fs.resolve(join(gitDirectory, "moa-owners", id), {
+      signal: input.signal,
+    });
+    if (!fs.contains(gitTarget, marker))
+      throw new Error("project-mode/path-escape");
+    await fs.writeText(
+      marker,
+      JSON.stringify({ ownerId: input.ownerId, directory: target, branch }),
+      { kind: "createIfAbsent" },
+      input.signal,
+      this.capabilities.policy(),
+    );
     try {
-      await this.git(directory, ["read-tree", "HEAD"], input.signal, env);
-      await this.git(directory, ["add", "-A", "--", "."], input.signal, env);
+      await this.git(sourceRoot, ["read-tree", "HEAD"], input.signal, env);
+      await this.git(sourceRoot, ["add", "-A", "--", "."], input.signal, env);
       const tree = await this.git(directory, ["write-tree"], input.signal, env);
       const head = await this.git(
         directory,
@@ -172,48 +228,32 @@ export class MoAWorkspaceManager {
         ["worktree", "add", "-b", branch, target, commit],
         input.signal,
       );
+    } catch (error) {
       try {
-        const marker = await fs.resolve(join(gitDirectory, "moa-owners", id), {
-          signal: input.signal,
-        });
-        if (!fs.contains(gitTarget, marker))
-          throw new Error("project-mode/path-escape");
-        await fs.writeText(
-          marker,
-          JSON.stringify({ ownerId: input.ownerId, directory: target, branch }),
-          { kind: "createIfAbsent" },
-          input.signal,
-          this.capabilities.policy(),
-        );
-      } catch (error) {
-        await this.git(directory, ["worktree", "remove", "--force", target]);
-        await this.git(directory, ["branch", "-D", branch]);
-        throw error;
+        await this.destroy(record, new AbortController().signal);
+      } catch (cleanupError) {
+        throw new MoAWorkspacePrepareError(record, error, cleanupError);
       }
+      throw error;
     } finally {
       // The index is an owned temporary file; remove it through the same confinement.
       await this.runRemove(directory, index);
     }
-    return {
-      mode: "isolated",
-      ownerId: input.ownerId,
-      sourceDirectory: directory,
-      directory: target,
-      gitDirectory,
-      branch,
-      id,
-    };
+    return record;
   }
 
   private async runRemove(cwd: string, path: string) {
     const policy = this.capabilities.policy();
     if (policy.mode === "read-only")
       throw new Error("project-mode/workspace-read-only");
-    const wrapped = await this.capabilities.sandbox.confine(
-      ["rm", "-f", "--", path],
-      { ...policy, mode: "workspace-write" },
-    );
-    if (wrapped.enforcement !== "full")
+    const wrapped =
+      policy.mode === "danger-full-access"
+        ? { argv: ["rm", "-f", "--", path] }
+        : await this.capabilities.sandbox.confine(["rm", "-f", "--", path], {
+            ...policy,
+            mode: "workspace-write",
+          });
+    if ("enforcement" in wrapped && wrapped.enforcement !== "full")
       throw new Error("project-mode/workspace-sandbox-partial");
     await exec(wrapped.argv[0], wrapped.argv.slice(1), { cwd });
   }
@@ -227,9 +267,12 @@ export class MoAWorkspaceManager {
         record.id,
       ) ||
       record.branch !== `moa/${record.id}` ||
-      record.directory !==
+      record.worktreeRoot !==
         join(record.gitDirectory, "moa-workspaces", record.id) ||
-      basename(dirname(record.directory)) !== "moa-workspaces"
+      isAbsolute(relative(record.worktreeRoot, record.directory)) ||
+      relative(record.worktreeRoot, record.directory)
+        .split(/[\\/]/)
+        .includes("..")
     ) {
       throw new Error("project-mode/invalid-workspace-record");
     }
@@ -242,20 +285,14 @@ export class MoAWorkspaceManager {
   ): Promise<void> {
     this.restore(record);
     if (record.mode === "shared") return;
-    const { source, directory, policyRoot } = await this.paths(
-      record.sourceDirectory,
-      signal,
-    );
     const { fs } = this.capabilities;
-    const gitDirectory = await this.git(
-      directory,
-      ["rev-parse", "--absolute-git-dir"],
+    const { directory, policyRoot } = await this.paths(
+      record.gitDirectory,
       signal,
     );
-    const gitTarget = await fs.resolve(gitDirectory, { signal });
+    const gitTarget = await fs.resolve(directory, { signal });
     if (
-      fs.processPath(gitTarget) !== record.gitDirectory ||
-      !fs.contains(source, gitTarget) ||
+      directory !== record.gitDirectory ||
       !fs.contains(policyRoot, gitTarget)
     )
       throw new Error("project-mode/invalid-workspace-record");
@@ -267,7 +304,7 @@ export class MoAWorkspaceManager {
       throw new Error("project-mode/path-escape");
     const expectedMarker = JSON.stringify({
       ownerId: record.ownerId,
-      directory: record.directory,
+      directory: record.worktreeRoot,
       branch: record.branch,
     });
     if (
@@ -280,22 +317,29 @@ export class MoAWorkspaceManager {
       ["worktree", "list", "--porcelain"],
       signal,
     );
+    const entry = listing
+      .split("\n\n")
+      .find((item) =>
+        item.split("\n").includes(`worktree ${record.worktreeRoot}`),
+      );
     if (
-      !listing
-        .split("\n\n")
-        .some(
-          (entry) =>
-            entry.split("\n").includes(`worktree ${record.directory}`) &&
-            entry.split("\n").includes(`branch refs/heads/${record.branch}`),
-        )
+      entry &&
+      !entry.split("\n").includes(`branch refs/heads/${record.branch}`)
     )
       throw new Error("project-mode/workspace-not-owned");
-    await this.git(
+    if (entry)
+      await this.git(
+        directory,
+        ["worktree", "remove", "--force", record.worktreeRoot],
+        signal,
+      );
+    const branch = await this.git(
       directory,
-      ["worktree", "remove", "--force", record.directory],
+      ["branch", "--list", record.branch],
       signal,
     );
-    await this.git(directory, ["branch", "-D", record.branch], signal);
+    if (branch)
+      await this.git(directory, ["branch", "-D", record.branch], signal);
     await this.runRemove(directory, fs.processPath(marker));
   }
 }

@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile, rm, realpath } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  writeFile,
+  rm,
+  realpath,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { Context } from "@deepseek-ai/cordis";
 import { LocalFileSystem } from "@deepseek-ai/dsh-fs-local";
-import { MoAWorkspaceManager } from "../../packages/project-mode/src/host/moa/workspaces";
+import {
+  MoAWorkspaceManager,
+  MoAWorkspacePrepareError,
+} from "../../packages/project-mode/src/host/moa/workspaces";
 
-describe.skipIf(process.platform !== "darwin")("MoA workspaces", () => {
+describe.each([
+  "danger-full-access",
+  ...(process.platform === "darwin" ? ["workspace-write"] : []),
+] as const)("MoA workspaces (%s)", (mode) => {
   it("snapshots current content, isolates writes, retains zombies, and removes only owned worktrees", async () => {
     const root = await realpath(
       await mkdtemp(join(tmpdir(), "moa-workspaces-")),
@@ -31,19 +44,44 @@ describe.skipIf(process.platform !== "darwin")("MoA workspaces", () => {
         cwd: root,
         diffBasisMaxBytes: 1048576,
       });
-      const policy = { mode: "workspace-write" as const, workspaceRoot: root };
+      const policy = { mode, workspaceRoot: root };
+      let failBranchDeletion = false;
+      let failPreparation = false;
+      let failCleanup = false;
       const sandbox = {
-        confine: async (argv: readonly string[]) => ({
-          argv: [
-            "/usr/bin/sandbox-exec",
-            "-p",
-            `(version 1)(allow default)(deny file-write*)(allow file-write* (literal "/dev/null"))(allow file-write* (subpath "${root}"))`,
-            ...argv,
-          ],
-          enforcement: "full" as const,
-          denialSignatures: [],
-          runnerFailureRules: [],
-        }),
+        confine: async (argv: readonly string[]) => {
+          if (
+            failPreparation &&
+            argv.includes("add") &&
+            argv.includes("worktree")
+          ) {
+            failPreparation = false;
+            throw new Error("injected prepare failure");
+          }
+          if (
+            failCleanup &&
+            argv.includes("list") &&
+            argv.includes("worktree")
+          ) {
+            failCleanup = false;
+            throw new Error("injected cleanup failure");
+          }
+          if (failBranchDeletion && argv.includes("-D")) {
+            failBranchDeletion = false;
+            throw new Error("injected branch failure");
+          }
+          return {
+            argv: [
+              "/usr/bin/sandbox-exec",
+              "-p",
+              `(version 1)(allow default)(deny file-write*)(allow file-write* (literal "/dev/null"))(allow file-write* (subpath "${root}"))`,
+              ...argv,
+            ],
+            enforcement: "full" as const,
+            denialSignatures: [],
+            runnerFailureRules: [],
+          };
+        },
       };
       const manager = new MoAWorkspaceManager({
         fs,
@@ -95,7 +133,49 @@ describe.skipIf(process.platform !== "darwin")("MoA workspaces", () => {
       await manager.destroy(a, signal);
       await expect(readFile(join(a.directory, "tracked"))).rejects.toThrow();
       expect(await readFile(join(b.directory, "tracked"), "utf8")).toBe("b");
+      await mkdir(join(b.directory, "nested"));
+      await writeFile(join(b.directory, "nested", "child"), "from-parent");
+      const child = await manager.prepare({
+        ownerId: "child",
+        sourceDirectory: join(b.directory, "nested"),
+        mode: "isolated",
+        signal,
+      });
+      expect(await readFile(join(child.directory, "child"), "utf8")).toBe(
+        "from-parent",
+      );
+      await writeFile(join(child.directory, "child"), "child-write");
+      expect(await readFile(join(b.directory, "nested", "child"), "utf8")).toBe(
+        "from-parent",
+      );
+      await manager.destroy(child, signal);
+      if (mode === "workspace-write") {
+        failBranchDeletion = true;
+        await expect(manager.destroy(b, signal)).rejects.toThrow(
+          "injected branch failure",
+        );
+      }
       await manager.destroy(b, signal);
+      if (mode === "workspace-write") {
+        failPreparation = true;
+        failCleanup = true;
+        let failure: unknown;
+        try {
+          await manager.prepare({
+            ownerId: "failed",
+            sourceDirectory: root,
+            mode: "isolated",
+            signal,
+          });
+        } catch (error) {
+          failure = error;
+        }
+        expect(failure).toBeInstanceOf(MoAWorkspacePrepareError);
+        await manager.destroy(
+          (failure as MoAWorkspacePrepareError).record,
+          signal,
+        );
+      }
       const empty = await mkdtemp(join(root, "empty-"));
       execFileSync("git", ["init"], { cwd: empty, stdio: "pipe" });
       await expect(
