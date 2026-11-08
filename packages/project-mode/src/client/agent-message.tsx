@@ -1,10 +1,11 @@
 import * as React from "react";
-import { JsonBlock, MarkdownText } from "@deepseek-ai/dsh-client-ui-primitives";
+import { JsonBlock } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ContentBlock } from "@deepseek-ai/dsh-llm/types";
 import type { SharedProps } from "./components.tsx";
 import type { IncomingAgentMessage } from "./tail.ts";
 import { useSelected } from "./hooks.ts";
 import { styles } from "./styles.ts";
+import { MessagePreview } from "./worker-timeline.tsx";
 
 /** Remove only the transport wrapper we authored; the delivered message stays unchanged. */
 function messageBody(message: IncomingAgentMessage): readonly ContentBlock[] {
@@ -52,7 +53,7 @@ export function AgentMessage({ message, client, t }: Pick<SharedProps, "client" 
       <style>{styles}</style>
       <header>{sender}</header>
       {content.length ? content.map((block, index) => block.type === "text"
-        ? <MarkdownText key={index} text={block.text} labels={labels} />
+        ? <MessagePreview key={index} text={block.text} labels={labels} />
         : <JsonBlock key={index} label={t("messageContent")} payload={block} truncatedLabel={(count) => t("truncatedContent", { count })} />)
         : <p className="pm-agent-empty">{t("emptyReply")}</p>}
     </section>

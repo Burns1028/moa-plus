@@ -37,7 +37,7 @@ function Timestamp({ time }: { time: number }) {
     </time>
   );
 }
-function MessagePreview({
+export function MessagePreview({
   text,
   labels,
 }: Pick<React.ComponentProps<typeof MarkdownText>, "text" | "labels">) {

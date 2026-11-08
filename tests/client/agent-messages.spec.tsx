@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, expect, it } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { Context } from "@deepseek-ai/cordis";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type * as Renderer from "@deepseek-ai/dsh-client-ui-renderer/client";
@@ -67,11 +67,12 @@ async function bench() {
   return { assembler, read, draw, client };
 }
 
-it("shows each MoA input once with its sender and original Markdown, preserving ordinary native contexts", async () => {
+it("shows each MoA input once as a compact preview that opens its original Markdown, preserving ordinary native contexts", async () => {
   const b = await bench();
+  const body = "**Ready**\n\n- evidence\n\n" + "Complete reusable evidence. ".repeat(30) + "\n\n### Final evidence\n\nOriginal final paragraph.";
   b.assembler.replaceWindow([
     event("turn/start", 1, { turn: 1 }), event("step/start", 2, { turn: 1, step: 1 }),
-    input(3, { kind: "moa-message", form: "relay", senderId: "child", rootId: "parent", operationId: "peer-1" }, "From: child\n**Ready**\n\n- evidence"),
+    input(3, { kind: "moa-message", form: "relay", senderId: "child", rootId: "parent", operationId: "peer-1" }, `From: child\n${body}`),
     input(4, { kind: "agent-message", form: "relay", senderSessionId: "ordinary-agent" }, "ordinary native message"),
   ], false);
   const nodes = [...b.read().nodes.values()];
@@ -80,8 +81,18 @@ it("shows each MoA input once with its sender and original Markdown, preserving 
   expect(incoming).toBeDefined();
   const ui = b.draw(incoming, "another-worker");
   expect(screen.getByText("From Builder")).toBeDefined();
+  const disclosure = ui.container.querySelector("details")!;
+  expect(disclosure).not.toBeNull();
+  expect(disclosure.open).toBe(false);
+  expect(disclosure.querySelector("summary")?.textContent?.replace(/\s+/g, " ")).toContain("Ready evidence");
+  expect(ui.container.querySelector("strong")).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Final evidence" })).toBeNull();
+  fireEvent.click(disclosure.querySelector("summary")!);
+  expect(await screen.findByRole("heading", { name: "Final evidence" })).toBeDefined();
+  expect(disclosure.open).toBe(true);
   expect(ui.container.querySelector("strong")?.textContent).toBe("Ready");
   expect(screen.getByText("evidence")).toBeDefined();
+  expect(screen.getByText("Original final paragraph.")).toBeDefined();
   expect(ui.container.textContent).not.toContain("From: child");
   expect(nodes.some(n => (n.data as any).source?.senderSessionId === "ordinary-agent" && n.kind !== "project-mode-workers-tail")).toBe(true);
 });
@@ -126,7 +137,10 @@ it("retains a result-only capsule seat and original final content without its ro
   expect(segmentTail(b.read(), result)?.segmentStartSeq).toBe(3);
   const ui = b.draw(result);
   expect(screen.getByText("From Builder")).toBeDefined();
-  expect(screen.getByRole("heading", { name: "Exact result" })).toBeDefined();
+  const disclosure = ui.container.querySelector("details")!;
+  expect(disclosure.open).toBe(false);
+  fireEvent.click(disclosure.querySelector("summary")!);
+  expect(await screen.findByRole("heading", { name: "Exact result" })).toBeDefined();
   expect(ui.container.textContent).not.toContain("Completion done");
   expect(ui.container.querySelectorAll(".pm-capsule")).toHaveLength(1);
 });
