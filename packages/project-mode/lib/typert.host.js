@@ -1225,10 +1225,6 @@ export const TYPERT = {
             "declaration": "export interface BackgroundReceipt extends ToolActivityIdentity {\n    readonly jobId: import('@deepseek-ai/dsh-jobs/brand').JobId;\n    readonly cause: BackgroundCause;\n}"
           },
           {
-            "name": "BackgroundResultData",
-            "declaration": "export interface BackgroundResultData {\n    readonly receipt: BackgroundReceipt;\n    readonly job?: JobView;\n    readonly result: Pick<ToolExecutionResult, \"content\" | \"isError\" | \"error\" | \"meta\">;\n    readonly additionalContexts: readonly UserMessage[];\n    readonly delivery: UserMessage;\n}"
-          },
-          {
             "name": "Branded",
             "declaration": "export type Branded<B extends string> = string & { readonly [BRAND]: B; };"
           },
@@ -1345,16 +1341,8 @@ export const TYPERT = {
             "declaration": "export interface JobSettledData extends JobRegisteredData {\n    readonly finishedAt: number;\n    readonly status: JobOutcome['status'];\n    readonly cause: JobSettleCause;\n    readonly producerReported: boolean;\n    readonly detail?: string;\n}"
           },
           {
-            "name": "JobStatus",
-            "declaration": "export type JobStatus = 'running' | 'stopping' | 'completed' | 'killed' | 'failed';"
-          },
-          {
             "name": "JobToolCall",
             "declaration": "export interface JobToolCall {\n    readonly callId: SessionEventMap['tool/call']['callId'];\n    readonly rootCallId: SessionEventMap['tool/call']['callId'];\n}"
-          },
-          {
-            "name": "JobView",
-            "declaration": "export interface JobView {\n    readonly completionNotice?: \"producer\";\n    readonly id: JobId;\n    readonly kind: string;\n    readonly label: string;\n    readonly owner?: SessionId;\n    readonly outputLimitBytes?: number;\n    readonly status: JobStatus;\n    readonly progress?: string;\n    readonly detail?: string;\n    readonly startedAt: number;\n    readonly finishedAt?: number;\n    readonly output: { readonly total: number; readonly earliest: number; readonly spillPaths?: readonly string[]; };\n}"
           },
           {
             "name": "JsonValue",
@@ -1490,7 +1478,7 @@ export const TYPERT = {
           },
           {
             "name": "SessionEventMap",
-            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'session/title': SessionTitleEventData;\n    'model/selection': ModelSelection;\n    'subagent/catalog': SubagentCatalogEvent;\n    'subagent/descriptor': SubagentDescriptorData;\n    'moa/background-result': BackgroundResultData;\n    'agent-preset/selected': { agentPreset: string; };\n    'deliverables/presented': { turn: number; callId: ToolCallId; files: PresentedFile[]; };\n    'working-directory/change': { cwd: string; };\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n}"
+            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'session/title': SessionTitleEventData;\n    'model/selection': ModelSelection;\n    'subagent/catalog': SubagentCatalogEvent;\n    'subagent/descriptor': SubagentDescriptorData;\n    'agent-preset/selected': { agentPreset: string; };\n    'deliverables/presented': { turn: number; callId: ToolCallId; files: PresentedFile[]; };\n    'working-directory/change': { cwd: string; };\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n}"
           },
           {
             "name": "SessionEventType",
@@ -1607,26 +1595,6 @@ export const TYPERT = {
           {
             "name": "ToolCallId",
             "declaration": "export type ToolCallId = Branded<'ToolCallId'>;"
-          },
-          {
-            "name": "ToolErrorInfo",
-            "declaration": "export interface ToolErrorInfo {\n    name: string;\n    code: string;\n    reason?: string;\n}"
-          },
-          {
-            "name": "ToolExecutionFailure",
-            "declaration": "export interface ToolExecutionFailure {\n    readonly isError: true;\n    readonly error: ToolFailure;\n    readonly value?: never;\n    readonly content: ContentBlock[];\n    readonly meta?: JsonValue;\n    readonly additionalContexts?: UserMessage[];\n    readonly concludesTurn?: never;\n}"
-          },
-          {
-            "name": "ToolExecutionResult",
-            "declaration": "export type ToolExecutionResult = ToolExecutionSuccess | ToolExecutionFailure;"
-          },
-          {
-            "name": "ToolExecutionSuccess",
-            "declaration": "export interface ToolExecutionSuccess {\n    readonly isError: false;\n    readonly value: JsonValue;\n    readonly content: ContentBlock[];\n    readonly error?: never;\n    readonly meta?: JsonValue;\n    readonly additionalContexts?: UserMessage[];\n    readonly concludesTurn?: true;\n}"
-          },
-          {
-            "name": "ToolFailure",
-            "declaration": "export interface ToolFailure {\n    message: string;\n    info?: ToolErrorInfo;\n}"
           },
           {
             "name": "ToolHistory",

@@ -12,8 +12,8 @@ export interface BackgroundResultData {
     readonly delivery: UserMessage;
 }
 declare module "@deepseek-ai/dsh-session/types" {
-    interface SessionEventMap {
-        "moa/background-result": BackgroundResultData;
+    interface PluginRecordMap {
+        "plugin:moa/background-result": BackgroundResultData;
     }
 }
 declare module "@deepseek-ai/dsh-llm" {

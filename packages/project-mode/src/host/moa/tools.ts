@@ -158,7 +158,10 @@ export function createTaskTool(agents: MoAAgents) {
               enum: ["Explorer", "Planner", "Deep Research", "General-purpose"],
             },
             workspace: { type: "string", enum: ["shared", "isolated"] },
-            reportTo: { type: "string" },
+            reportTo: {
+              type: "string",
+              description: "Existing MoA session ID; omit to report to the creating Agent",
+            },
             nested: { type: "boolean" },
           },
           additionalProperties: false,
@@ -199,7 +202,10 @@ export function createForkTool(agents: MoAAgents) {
         enum: ["Explorer", "Planner", "Deep Research", "General-purpose"],
       },
       workspace: { type: "string", enum: ["shared", "isolated"] },
-      reportTo: { type: "string" },
+      reportTo: {
+        type: "string",
+        description: "Existing MoA session ID; omit to report to the creating Agent",
+      },
       nested: { type: "boolean" },
     },
     output,
