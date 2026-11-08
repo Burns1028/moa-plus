@@ -53,6 +53,18 @@ export function bindAgentEvents(
     host.notify();
   });
   host.ctx.on("agent/inbox/inserted", () => host.notify());
+  host.ctx.on("agent/inbox/claimed", ({ agent, message }) => {
+    if (
+      message.source.kind !== "project-mode-result" ||
+      !(host.record(agent.id) ?? host.owner(agent.id))
+    )
+      return;
+    // Native claim precedes asynchronous prompt assembly and pre-step hooks.
+    // The result is already in flight even though user/message is not logged.
+    const claimed = outbox.claimed.get(agent.id) ?? new Set<string>();
+    claimed.add(message.id);
+    outbox.claimed.set(agent.id, claimed);
+  });
   host.ctx.on("session/event", (session, event) => {
     if (
       event.type === "turn/start" &&
