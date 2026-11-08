@@ -121,17 +121,20 @@ export class MoAAgents {
   ): "Idle" | "Waiting" | "Running" | "Aborting" | "Zombie" {
     if (agent.moaAborting) return "Aborting";
     if (this.waiting.has(agent.id)) return "Waiting";
+    const events = agent.session
+      .snapshotEvents()
+      .filter((event) => event.seq >= agent.session.inheritedEventCount);
     if (agent.status === "running") {
       const pending = new Set<string>();
-      for (const event of agent.session.snapshotEvents()) {
+      for (const event of events) {
+        if (event.type === "turn/start" || event.type === "turn/end")
+          pending.clear();
         if (event.type === "approval/asked") pending.add(event.data.id);
         if (event.type === "approval/decided") pending.delete(event.data.id);
       }
       return pending.size ? "Waiting" : "Running";
     }
-    return agent.session.snapshotEvents().some((e) => e.type === "turn/start")
-      ? "Zombie"
-      : "Idle";
+    return events.some((e) => e.type === "turn/start") ? "Zombie" : "Idle";
   }
   private workspaceManager(agent: Agent): MoAWorkspaceManager {
     const presets = this.host.ctx.get("agentPresets");
