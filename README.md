@@ -8,9 +8,9 @@ English | [简体中文](README.zh.md)
 
 [Watch the workflow](docs/media/project-workflow.mp4) · [Architecture](docs/architecture.md) · [Tool API](docs/tool-api.md) · [Install](#quick-start)
 
-**This branch contains the unreleased MoA runtime work.** It extends the published v0.1.23 preview with the five Agent primitives, isolated workspaces, request/reply messaging, background tools, and completion gates described below. Integration and real-model/UI acceptance are being completed; [verification](docs/verification.md) separates that work from published evidence. No new release is implied by the existing package version.
+**This branch implements the unreleased MoA runtime.** It extends the published v0.1.23 preview with the five Agent primitives, isolated workspaces, request/reply messaging, background tools, and independent completion gates described below. The production build, Host/Client typechecks, 54 regression files / 293 tests, and 19 launcher checks have passed. [Verification](docs/verification.md) records the tested revisions, observed real-model tasks, and remaining package/UI acceptance. The existing package version does not announce a new release.
 
-The plugin targets DSH **0.2.1-rc.3 with explicit compatibility extensions**. Stock rc.3 cannot enable this runtime directly. The current manifest covers 13 native packages; v0.1.23 used three earlier extensions. See [compatibility](docs/compatibility.md) before mixing versions.
+The plugin targets DSH **0.2.1-rc.3 with explicit compatibility extensions**. Stock rc.3 cannot enable this runtime directly. The current manifest covers 13 native packages and 31 file paths, with exact hashes for supported variants; v0.1.23 used three earlier extensions. See [compatibility](docs/compatibility.md) before mixing versions.
 
 ## Collaboration that persists
 
@@ -82,6 +82,8 @@ The launcher prepares a separate native Web runtime, home, Agent configuration, 
 `QueryAgent` reads an explicit newest-relative human/AI history window. It does not silently load the last 100 messages. The Coordinator can inspect user activity inside Workers when the user returns; there is no separate human read/ack protocol.
 
 In PTC mode, call `SendMessage` as a native tool beside `run_code`; it is excluded from the script SDK so a blocking Request keeps its original tool result and turn. Other PTC tools retain their normal behavior.
+
+The completion Builder receives original human requirements and captured source references. Its only tool, `submit_rubric`, submits validated criteria without reading implementation outputs. The independent Verifier reads the authoritative rubric and uses its retained native preset tools to inspect artifacts and run required checks. Ralph keeps a turn open until its bound exact completion promise is present.
 
 ## Project memory
 

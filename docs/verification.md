@@ -2,7 +2,22 @@
 
 ## Current branch: unreleased MoA runtime
 
-The current checkout contains the six-chapter MoA runtime work. Its new capabilities and wider native compatibility manifest must be verified together. **Whole-branch acceptance is still in progress; the historical results below do not prove the new runtime.** The existing package version is not a release announcement.
+The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **13 native packages / 31 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
+
+This is an unreleased branch; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Final package verification and the remaining real-app scenarios are still in progress.
+
+### Current automated evidence
+
+| Check | Verified revision and result |
+| --- | --- |
+| Combined Host, Client, integration, and native-contract regression | Source `178592c`: **54 files / 293 tests passed**. This total already includes native-contract tests. |
+| Production build and generated artifacts | Build passed; matching generated artifacts committed as `5609ff8`. |
+| Host and Client typechecks | Both passed with the Coordinator closure and current background-query fixes. |
+| Isolated runtime launcher | **19 passed**, including unsupported-byte refusal, setup recovery, and child signal forwarding. Latest completed run used `a21aacb`; launcher source is unchanged by the subsequent fixes. |
+| Exact native compatibility | Fresh npm, published legacy-tool-isolation, and runtime-only variants passed application, target-hash, idempotence, unknown-byte refusal, and backup rollback probes for the current manifest. |
+| Fresh package consumers | At `a21aacb`, npm, forwarding-package, and committed-Git consumers passed stock-runtime refusal, explicit compatibility installation, declarations, Host/browser loading, nine native Loader endpoints, Client Gateway roundtrip, and disposal. Git clean-checkout `npm ci` also passed. **The final consumer rerun after the query/closure fixes remains pending.** |
+
+The closure regression holds a real final Worker ingestion while the guard awaits Worker state. It proves the Coordinator stays in the original turn until that canonical result is admitted and consumed. Background-query coverage checks current native job status instead of repeating a historical running/stopping snapshot. These are scripted native regressions, distinct from the observed real-model tasks below.
 
 The regression sources exercise these separate boundaries:
 
@@ -11,6 +26,7 @@ The regression sources exercise these separate boundaries:
 | Task/Fork, role identity, actual reporting target, nested permission, and explicit shared/isolated workspaces | `tests/host/moa-agents.spec.ts`, `moa-controls-integration.spec.ts`, `moa-workspace-integration.spec.ts` |
 | Dirty-state Git snapshots, scoped management, and owned cleanup | `tests/host/moa-workspaces.spec.ts` |
 | Request/ReplyTo, waiting interruption, cycles, late results, and durable receipt recovery | `tests/host/moa-messages.spec.ts` |
+| Direct native SendMessage in PTC, SDK/runtime-binding exclusion, execution authority, and scoped tool ordering | `tests/native-contract/moa-protocol-presentation.spec.ts` |
 | True cold parent-chain hydration without synthetic intermediate input/task events | `tests/host/moa-residency.spec.ts` |
 | Full per-inference notes, progressive context, and common short native judge | `tests/host/moa-memory.spec.ts`, `project-memory.spec.ts`, `moa-judge.spec.ts` |
 | Timer/message/judge transfer, sibling barriers, real Bash producer/exit, canonical results, cancellation, and recovery | `tests/native-contract/moa-background.spec.ts` |
@@ -19,16 +35,19 @@ The regression sources exercise these separate boundaries:
 
 Most model requests in these tests use scripted adapters over the actual native loop. Some cases execute the locked native Bash/subprocess/jobs implementation. Those executions prove the corresponding tool/resource behavior; they do not constitute real-model task ownership or visible application acceptance.
 
-Before this branch is described as fully accepted, record:
+### Observed real-model and native-interface evidence
 
-- Production build and Host/Client typechecks against the final native manifest.
-- Whole Host/Client/integration, native-contract, and launcher results.
-- Fresh npm/forwarding/committed-Git consumers plus clean-checkout `npm ci`.
-- A fresh isolated DSH runtime and real configured model tasks, with actual artifacts and independently rerun checks.
-- Native UI/trajectory inspection of turn closure, message timing, capsule provenance, scoped tools, input previews, status, and existing layout.
-- Independent final branch review and any unresolved limitations.
+The isolated DSH Web runtime on macOS arm64 with Node 24.19.0 has exercised real configured model tasks through the native interface:
 
-Use [manual verification](manual-verification.md) for the full runtime scenarios. Keep credentials, profiles, conversations, raw trajectories, and private screenshots outside Git; publish a factual version/task/result summary. Component tests are useful evidence, not a substitute for these final checks.
+- A collaboration task exercised Task/Fork, specialist roles, nested reporting, queue input, direct human intervention, full final-message return, Request/ReplyTo, and late replies. An urgent human input returned `interrupted` on the original Request Tool Call and continued the same native turn; a later explicit answer was admitted once after that turn had ended.
+- The Builder successfully called its sole `submit_rubric` tool. The independent Verifier inspected the rubric, artifacts, and actual native tool evidence, returned Pass after recorded rework, and the Coordinator closed normally after that verdict.
+- A PTC task exposed exactly SendMessage and run_code as native schemas, with SendMessage absent from the program SDK. Its direct Request received the explicit answer on its original Tool Result in the same Worker turn; ordinary PTC tools continued to execute.
+- A real foreground Bash probe transferred on incoming messages and delivered its complete output. Separate PTC cancellation and hard KillAgent/continuation tasks verified native killed/SIGTERM settlement, paired abort Tool Results, actual process exit, and fresh continuation after cleanup. The observed timer promotion came from the Bash producer; it is not evidence of the configured AfterSeconds policy.
+- A PTC Worker first omitted its bound completion promise. Ralph returned a reminder in the same turn, and only the corrected final reply produced the single canonical completion and delivery.
+
+The configured **20-second AfterSeconds** run, final Worker deletion/family archival, and final restart/recovery scenario remain pending in this snapshot. They are not marked passed by the earlier restart observations or scripted persistence tests. Final npm/forwarding/Git consumer verification must also record the final commit after the current query/closure fixes.
+
+Use [manual verification](manual-verification.md) for the remaining runtime scenarios. Credentials, profiles, private conversations, raw trajectories, and screenshots stay outside Git. Historical preview evidence below remains associated with its tagged version.
 
 ## Published preview evidence
 

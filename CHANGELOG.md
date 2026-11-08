@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — MoA runtime
+
+- Implement Task, Fork, SendMessage, QueryAgent, and KillAgent over the native Agent Loop, with specialist tool scopes, explicit nested delegation, reporting targets, shared workspaces, and owned isolated worktrees.
+- Preserve current Git state when preparing isolated worktrees, hydrate the true cold parent chain for delivery, and retain existing memory paths, turn/message capsule ownership, and native UI controls.
+- Add explicit Request/ReplyTo matching, same-turn interruption, late-answer recovery, and native slow-tool transfer. SendMessage remains a direct native tool beside run_code under PTC; it is excluded from program SDKs and nested dispatch.
+- Persist full background outcomes through native ignorable plugin records and expose current native job state. Cancellation remains stopping until resource exit; hard continuation waits for the old execution's cleanup.
+- Refresh full Coordinator notes before inference and retain progressive shared context. Add exact completion promises, Builder rubric submission from original requirements, and independent verification with retained native execution tools.
+- Keep canonical results unique across inbox claims/recovery and hold Coordinator closure while its final Worker result is queued for ingestion.
+- Use the reviewed rc.3 compatibility manifest covering 13 native packages and 31 file paths. The existing package version remains 0.1.23; these changes are not a new published release.
+- Record 54 regression files / 293 passing tests, Host/Client typechecks, a production build, and 19 passing launcher checks. Package consumers passed at a21aacb; final package and remaining real-app checks are tracked in [verification](docs/verification.md).
+
 ## 0.1.23 — 2026-11-02
 
 - Add an explicit isolated Web setup, start and read-only doctor CLI with a pinned native runtime lock, audited compatibility backup and recoverable owned setup.
