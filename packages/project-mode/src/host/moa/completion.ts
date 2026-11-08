@@ -15,6 +15,7 @@ declare module "@deepseek-ai/dsh-llm" {
 }
 
 const criteriaSchema = z.object({ criteria: z.string().min(1), promise: z.string().min(1) });
+const rubricSchema = z.object({ rubric: z.string().min(1), tests_required: z.boolean() });
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
 const inputSchema = z.object({ taskId: z.string(), turn: z.number(), finished: z.boolean().default(false), requirements: z.array(z.string()), sources: z.record(z.string(), z.string().nullable()), attachments: z.array(z.custom<ContentBlock>()).default([]) });
@@ -94,6 +95,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const generation = randomUUID();
     generations.set(parent, generation);
     let rubric: string | undefined;
+    let submitted: z.infer<typeof rubricSchema> | undefined;
     const read = async (signal: AbortSignal) => {
       const fs = filesystem(parent);
       const actual = await fs.readText(await fs.resolve(rubricPath, { cwd: root, signal }), signal);
@@ -123,7 +125,21 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         ctx.tools.presentAs("native");
         if (role === "builder") {
           ctx.tools.restrict({ allow: [] });
-          ctx.tools.guard(() => "Rubric Builder cannot access tools or outputs");
+          ctx.tools.register(defineTool({
+            name: "submit_rubric",
+            description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots. This completes rubric building without reading implementation outputs.",
+            parameters: {
+              rubric: { type: "string", required: true, description: "Markdown acceptance criteria with original requirement/source anchors" },
+              tests_required: { type: "boolean", required: true, description: "True whenever the original requirements or specifications require build or test execution" },
+            },
+            output,
+            async execute(args, exec) {
+              submitted = rubricSchema.parse(args);
+              exec.concludeTurn();
+              return "Rubric submitted.";
+            },
+          }));
+          ctx.tools.guard(exec => exec.name === "submit_rubric" ? undefined : "Rubric Builder cannot access execution tools or implementation outputs");
         } else {
           ctx.tools.register(defineTool({ name: "read_rubric", description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
         }
@@ -134,13 +150,12 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const builder = await make("builder");
     let verifier: AgentHandle;
     try { verifier = await make("verifier"); } catch (error) { await builder.dispose(); throw error; }
-    builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation. Return JSON only: {"rubric":"Markdown with source anchors", "tests_required":true|false}. Set tests_required true whenever the human requirements or specs require build or test execution.\n${JSON.stringify({ ...input, attachments: undefined })}` }, ...input.attachments] }));
+    builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation. Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${JSON.stringify({ ...input, attachments: undefined })}` }, ...input.attachments] }));
     const build = builder.agent.whenIdle().then(async () => {
-      const built: unknown = JSON.parse(lastText(builder.agent).replace(/^```(?:json)?\s*|\s*```$/g, ""));
-      const parsed = z.object({ rubric: z.string().min(1), tests_required: z.boolean() }).parse(built);
-      rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${parsed.rubric}`;
+      if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
+      rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
       await publish(signal);
-      return parsed.tests_required;
+      return submitted.tests_required;
     });
     void build.catch(() => {});
     return { builder, verifier, build, rubricPath, publish, read };

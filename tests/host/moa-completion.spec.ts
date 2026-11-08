@@ -16,7 +16,7 @@ function call(name: string, args: object): StreamChunk[] {
   ];
 }
 
-it.each(["native", "ptc"])("inherits preset execution tools for the Verifier while keeping the Builder tool-free (parent=%s)", async (mode) => {
+it.each(["native", "ptc"])("inherits preset execution tools for the Verifier while limiting the Builder to rubric submission (parent=%s)", async (mode) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
@@ -51,7 +51,7 @@ it.each(["native", "ptc"])("inherits preset execution tools for the Verifier whi
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
         builderTools = (options.tools ?? []).map(tool => tool.name);
-        return response(JSON.stringify({ rubric: "- Run the requested command [human]", tests_required: true }));
+        return call("submit_rubric", { rubric: "- Run the requested command [human]", tests_required: true });
       }
       if (id.startsWith("moa-verifier-")) {
         verifierTools = (options.tools ?? []).map(tool => tool.name);
@@ -64,7 +64,7 @@ it.each(["native", "ptc"])("inherits preset execution tools for the Verifier whi
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the requested command" }] }));
     await agent.whenIdle();
-    expect(builderTools).toEqual([]);
+    expect(builderTools).toEqual(["submit_rubric"]);
     expect(verifierTools).toEqual(expect.arrayContaining(["bash", "read_rubric"]));
     expect(verifierTools).not.toContain("Task");
     expect(main).toBe(1);
@@ -87,7 +87,7 @@ it("withdraws an answer missing its bound promise and verifies with an independe
         const source = JSON.stringify(options.messages);
         expect(source).toContain("ORIGINAL SPECIFICATION");
         expect(source).not.toContain("MAIN OUTPUT SECRET");
-        return response(JSON.stringify({ rubric: "- Original requirement: deliver report [spec.md: ORIGINAL SPECIFICATION]", tests_required: false }));
+        return call("submit_rubric", { rubric: "- Original requirement: deliver report [spec.md: ORIGINAL SPECIFICATION]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("read_rubric", {});
@@ -116,7 +116,7 @@ it("reworks a Partial verdict in the same native turn before a tool-backed Pass"
     let main = 0, verify = 0, built = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) { built++; expect(JSON.stringify(options.messages)).not.toContain("Missing conclusion"); return response(JSON.stringify({ rubric: "- Deliver a report [human request]", tests_required: false })); }
+      if (id.startsWith("moa-builder-")) { built++; expect(JSON.stringify(options.messages)).not.toContain("Missing conclusion"); return call("submit_rubric", { rubric: "- Deliver a report [human request]", tests_required: false }); }
       if (id.startsWith("moa-verifier-")) {
         verify++;
         if (verify % 3 === 1) return call("read_rubric", {});
@@ -149,7 +149,7 @@ it("lets incoming human steering escape a waiting verifier before any final turn
     const counts = new Map<string, number>();
     f.adapter.handler = async (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Original request [human]", tests_required: false }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Original request [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) { entered.resolve(); await release.promise; }
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
@@ -182,7 +182,7 @@ it("rejects a self-declared Pass without actual tool work", async () => {
     let main = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Deliver report [human]", tests_required: false }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) return response('{"status":"Pass","issues":[],"tests_required":false}');
       if (++main === 2) {
         expect(JSON.stringify(options.messages)).toContain("Outcome verification did not pass");
@@ -206,7 +206,7 @@ it("allows Stop while the verifier is waiting without committing completion", as
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     f.adapter.handler = async (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Deliver report [human]", tests_required: false }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) { entered.resolve(); await release.promise; return response("late"); }
       return response("candidate");
     };
@@ -227,7 +227,7 @@ it("uses the independent rubric to reject a claimed Pass after a failed Bash tes
     let main = 0, verifier = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Run the test [human request]", tests_required: true }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run the test [human request]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("read_rubric", {});
         if (verifier === 2) return call("Bash", {});
@@ -255,7 +255,7 @@ it("verifies the current task while explicit next-turn input stays queued", asyn
     const counts = new Map<string, number>();
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Requested deliverable [human]", tests_required: false }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Requested deliverable [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
         if (count === 1) { verifications++; expect(agent.session.snapshotEvents().filter((e) => e.type === "turn/end")).toHaveLength(verifications - 1); return call("read_rubric", {}); }
@@ -281,7 +281,7 @@ it("keeps original source snapshots and the bound promise across a stopped runti
     await writeFile(join(f.root, "original spec.md"), "ORIGINAL REQUIREMENT SNAPSHOT");
     let main = 0;
     f.adapter.handler = (options) => {
-      if (String(options.sessionId).startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Original requirement [source]", tests_required: false }));
+      if (String(options.sessionId).startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Original requirement [source]", tests_required: false });
       if (++main === 1) return call("set_completion_criteria", { criteria: "meet original requirement", promise: "PERSISTED PROMISE" });
       agent.cancel({ kind: "user" });
       return response("unfinished");
@@ -301,7 +301,7 @@ it("keeps original source snapshots and the bound promise across a stopped runti
         const input = JSON.stringify(options.messages);
         expect(input).toContain("ORIGINAL REQUIREMENT SNAPSHOT");
         expect(input).not.toContain("REPLACED ARTIFACT MUST NOT");
-        return response(JSON.stringify({ rubric: "- Original requirement [source]", tests_required: false }));
+        return call("submit_rubric", { rubric: "- Original requirement [source]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
         if (++verified === 1) return call("read_rubric", {});
@@ -329,7 +329,7 @@ it("clears a delivered task's promise before the next unrelated user task", asyn
     const counts = new Map<string, number>();
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Deliver task [human]", tests_required: false }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver task [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
         if (count === 1) return call("read_rubric", {});
@@ -389,7 +389,7 @@ it.each([false, true])("accepts actual native Bash success from canonical exit f
     let main = 0, verifier = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Run the specified command [human]", tests_required: true }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run the specified command [human]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("read_rubric", {});
         if (verifier === 2) return call("bash", { command: `${promote ? "sleep 0.12; " : ""}printf 'background capability is tested\\n'`, description: "Run verification", timeoutMs: promote ? 20 : 2000 });
@@ -427,7 +427,7 @@ it("preserves original file-attachment specifications through native file projec
         built++;
         expect(JSON.stringify(options.messages)).toContain(source);
         expect(JSON.stringify(options.messages)).toContain("uploaded original.md");
-        return response(JSON.stringify({ rubric: "- Implement attached original spec [attachment]", tests_required: false }));
+        return call("submit_rubric", { rubric: "- Implement attached original spec [attachment]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("read_rubric", {});
@@ -454,7 +454,7 @@ it("rebuilds invalid Builder output from saved original requirements on the next
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
         expect(JSON.stringify(options.messages)).toContain("ORIGINAL HUMAN REQUIREMENT");
-        return response(++built === 1 ? "invalid JSON" : JSON.stringify({ rubric: "- Deliver original requirement [human]", tests_required: false }));
+        return ++built === 1 ? response("invalid JSON") : call("submit_rubric", { rubric: "- Deliver original requirement [human]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("read_rubric", {});
@@ -484,7 +484,7 @@ it("does not accept another task's rubric after inspection and republishes its o
     const counts = new Map<string, number>();
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return response(JSON.stringify({ rubric: "- Original task requirement [human]", tests_required: false }));
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Original task requirement [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
         if (count === 1) return call("read_rubric", {});
@@ -499,5 +499,94 @@ it("does not accept another task's rubric after inspection and republishes its o
     await agent.whenIdle();
     expect(main).toBe(2);
     expect(inspected).toBe(2);
+  } finally { await f.dispose(); }
+});
+
+it("accepts a rubric through the Builder's sole native submission capability", async () => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    f.ctx.tools.register(defineTool({ name: "inspect_artifact", description: "Inspect", parameters: {}, output: { schema: { type: "string" }, render: (_, value: string) => [{ type: "text", text: value }] }, execute: async () => "inspected" }));
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-submission"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let builder = 0, main = 0, verifier = 0;
+    let builderTools: string[] = [];
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) {
+        builderTools = (options.tools ?? []).map(tool => tool.name);
+        return ++builder === 1 ? call("submit_rubric", { rubric: "- Deliver report [human: Deliver a report]", tests_required: false }) : response("No submission capability");
+      }
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("inspect_artifact", {});
+        return response('{"status":"Pass","issues":[]}');
+      }
+      if (++main > 1) agent.cancel({ kind: "user" });
+      return response("Completed report");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver a report" }] }));
+    await agent.whenIdle();
+    expect(builderTools).toEqual(["submit_rubric"]);
+    expect(builder).toBe(1);
+    expect(main).toBe(1);
+    expect(verifier).toBe(3);
+  } finally { await f.dispose(); }
+});
+
+it.each([
+  ["DSML tool-looking text", "\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"bash\">python3 -c 'import json'</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>"],
+  ["unsubmitted JSON", '{"rubric":"unvalidated text","tests_required":false}'],
+])("does not accept %s as an authoritative rubric", async (_label, body) => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-no-submission"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return response(body);
+      if (id.startsWith("moa-verifier-")) { verifier++; return response('{"status":"Pass","issues":[]}'); }
+      if (++main === 2) {
+        expect(JSON.stringify(options.messages)).toContain("without a validated submit_rubric call");
+        agent.cancel({ kind: "user" });
+      }
+      return response("candidate");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
+    await agent.whenIdle();
+    expect(main).toBe(2);
+    expect(verifier).toBe(0);
+    expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
+  } finally { await f.dispose(); }
+});
+
+it("returns invalid rubric arguments as a native tool error before accepting a corrected submission", async () => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    f.ctx.tools.register(defineTool({ name: "inspect_artifact", description: "Inspect", parameters: {}, output: { schema: { type: "string" }, render: (_, value: string) => [{ type: "text", text: value }] }, execute: async () => "inspected" }));
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-validated-submission"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let builder = 0, main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) {
+        if (++builder === 1) return call("submit_rubric", { rubric: "", tests_required: "false" });
+        const result = options.messages.findLast(message => message.role === "tool");
+        expect(result?.role === "tool" && result.isError).toBe(true);
+        return call("submit_rubric", { rubric: "- Deliver report [human: Deliver report]", tests_required: false });
+      }
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("inspect_artifact", {});
+        return response('{"status":"Pass","issues":[]}');
+      }
+      if (++main > 1) agent.cancel({ kind: "user" });
+      return response("delivered");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
+    await agent.whenIdle();
+    expect(builder).toBe(2);
+    expect(main).toBe(1);
+    expect(verifier).toBe(3);
   } finally { await f.dispose(); }
 });
