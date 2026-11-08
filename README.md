@@ -1,72 +1,51 @@
 # MoA+
 
-**Advancing intelligence through multi-agent collaboration.** MoA+ aims to build a Mixture of Agents system, exploring how agents working together can take the capabilities of the whole system to the next level.
+**Advancing intelligence through multi-agent collaboration.** MoA+ builds a Mixture of Agents system inside DeepSeek Harness: persistent agents share knowledge, exchange messages, explore different approaches, and review results together.
 
 English | [简体中文](README.zh.md)
 
-[![Project Mode actual result: two Workers, a generated note bundle and nine passing tests](docs/media/workflow-result.png)](docs/media/project-workflow.mp4)
+[![Real v0.1.23 workflow: two Workers, shared notes, and nine passing tests](docs/media/workflow-result.png)](docs/media/project-workflow.mp4)
 
-The current preview runs as an unofficial DeepSeek Harness plugin, with a Coordinator, persistent Worker conversations, shared context and result review. These are the starting point for the system's development.
+[Watch the workflow](docs/media/project-workflow.mp4) · [Architecture](docs/architecture.md) · [Tool API](docs/tool-api.md) · [Install](#quick-start)
 
-[Watch the 60-second workflow](docs/media/project-workflow.mp4) · [Explore the screenshots](#see-it-in-action) · [Install](#quick-start)
+**This branch contains the unreleased MoA runtime work.** It extends the published v0.1.23 preview with the five Agent primitives, isolated workspaces, request/reply messaging, background tools, and completion gates described below. Integration and real-model/UI acceptance are being completed; [verification](docs/verification.md) separates that work from published evidence. No new release is implied by the existing package version.
 
-**Unofficial developer preview: v0.1.23.** Requires DSH **0.2.1-rc.3 with the three compatibility extensions documented in this repository**. The isolated setup below prepares these extensions for you; stock rc.3 cannot enable the plugin directly. See [Compatibility](docs/compatibility.md).
+The plugin targets DSH **0.2.1-rc.3 with explicit compatibility extensions**. Stock rc.3 cannot enable this runtime directly. The current manifest covers 13 native packages; v0.1.23 used three earlier extensions. See [compatibility](docs/compatibility.md) before mixing versions.
 
-MoA+ was previously named Project Mode. The v0.1.23 runtime and demos still use the **Project** label; the original package identity remains compatible.
+## Collaboration that persists
 
-## Contents
+The Coordinator owns the goal, direction, shared work records, result review, and final delivery. Workers retain their conversation and working directory between assignments. Both run the same native DSH Agent Loop; roles, tool sets, and delegated permissions distinguish them.
 
-- [Current implementation](#current-implementation)
-- [See it in action](#see-it-in-action)
-- [Quick start](#quick-start)
-- [User guide](#user-guide)
-- [Project memory](#project-memory)
-- [Features in DSH](#features-in-dsh)
-- [Project structure](#project-structure)
-- [Development](#development)
-- [API and documentation](#api-and-documentation)
-- [Current limits](#current-limits)
-- [License](#license)
-
-## Current implementation
-
-In the current implementation, you describe a goal to the Coordinator. It creates or reuses Workers, guides their work, reviews results and maintains shared context. The sections below describe the capabilities available today; further collaboration mechanisms will evolve through design and validation.
-
-| Capability | What it gives you |
+| Capability | What it provides |
 | --- | --- |
-| Persistent coordination | One Coordinator conversation owns the project's work records and next steps. |
-| Full Worker control | Create or reuse Workers, steer current work, queue later instructions, inspect status and history, interrupt or delete. |
-| Shared project knowledge | Coordinator and Workers maintain an index and load relevant context progressively. |
-| Automatic result return | Each ended Worker turn returns its full final AI message for Coordinator review. |
-| Direct human participation | Open a Worker, guide it yourself, then return to the Coordinator. |
-| Native DSH execution | Sessions, Agent Loop, tools, permissions, message delivery and Stop stay with DSH. |
+| `Task` and `Fork` | Start fresh specialists or branch from a selected Agent's committed history. |
+| `SendMessage` | Notify a teammate, guide current work, queue later input, or ask a question and await its explicit reply. |
+| `QueryAgent` and `KillAgent` | Inspect status/history, wait interruptibly, stop and join current execution, or explicitly remove a Worker. |
+| Isolated or shared workspaces | Snapshot the source's current Git state into an owned worktree by default; choose shared execution when appropriate. |
+| Shared knowledge | Read a progressive context index, contribute reusable facts, and carry accepted knowledge into later tasks. |
+| Background execution | Let slow tools run as native jobs while an Agent handles new input; query, cancel, and receive their real results. |
+| Completion review | Bind an exact completion promise and independently derive/check source-anchored acceptance criteria. |
+| Human participation | Open a Worker, guide it directly, and return to a Coordinator that can inspect the change. |
+
+The Coordinator keeps its ordinary execution tools. It chooses how to divide work; no task keywords or command-count rules force delegation. MoA's controls replace the alternative native delegation tools only for participating Agents. Workers cannot create another team unless nested delegation is explicitly enabled. Ordinary DSH conversations retain native composition.
 
 ## See it in action
 
-A small CLI change makes the handoffs visible: Exporter implements title sorting and tests, Docs maintains the usage guide, and the Coordinator reviews their results. A human changes the ordering inside Exporter's conversation; a later task adds another note using the accepted contract.
+[![Published v0.1.23 task: dispatch, human intervention, result review, and context reuse](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
 
-[![Real workflow: dispatch Workers, update one directly, review the result and reuse shared context](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
+The **published v0.1.23** recording follows a real CLI task: Exporter implements title sorting, a human changes the ordering inside its conversation, Docs aligns the guide, and the Coordinator reviews the result. A later task reuses the same Workers and accepted context. The [actual output](docs/demo-result) passed nine tests.
 
-The edited recording shows a real CLI task: **dispatch Workers → human changes title sorting inside Exporter → Coordinator catches up → next turn reuses the same Workers and shared context**. Waiting is cut and labeled throughout; it is not a 60-second completion claim. The finished sample passed 9 real tests. [Try the task](docs/demo-workflow.md) or [inspect its actual result](docs/demo-result). [Open the MP4](docs/media/project-workflow.mp4) for playback controls, or [view the workspace screenshot](docs/media/project-workspace.png) at full size.
-[![Actual result: the later task preserves the accepted order and passes nine tests](docs/media/workflow-result.png)](docs/media/workflow-result.png)
+This is a 60-second edit with waits omitted and labeled, not a completion-time benchmark. It demonstrates the earlier coordination chain; it does not validate every unreleased runtime mechanism. [Reproduce the task](docs/demo-workflow.md) or read the [capture details](docs/media/README.md).
 
-### Follow each Worker's work
+| Worker work axis | Project notes |
+| --- | --- |
+| ![Original input, final AI reply, and recorded artifacts](docs/media/worker-timeline.png) | ![Notes beside the native conversation](docs/media/project-notes.png) |
 
-Choose a Worker to see its turns from newest to oldest. Expand the original instruction and final AI response when you need the detail; open recorded artifacts or jump into the conversation to guide it yourself.
-
-[![Worker timeline with two turns, expanded input and output, and links to recorded artifacts](docs/media/worker-timeline.png)](docs/media/worker-timeline.png)
-
-### Keep the project ready for the next task
-
-`notes.md` stays beside the conversation: goal, delivered work, current status and next steps. The Coordinator maintains it while reusable knowledge accumulates under the shared context index.
-
-[![Project notes rendered in DSH with the goal, delivered files, current status and follow-up work](docs/media/project-notes.png)](docs/media/project-notes.png)
-
-The workflow video uses the v0.1.23 isolated runtime and the public Note Bundle fixture. The earlier detail screenshots show the fictional **Project Atlas** workspace on v0.1.22. These are real DSH captures, not product mockups or speed benchmarks. [Capture details and reuse](docs/media/README.md).
+The detail screenshots use v0.1.22 and the fictional Project Atlas workspace. Existing media retains its original **Project** label; the current UI identifies the mode as **MoA+**.
 
 ## Quick start
 
-The easiest first run is a separate **compatible DSH Web environment**. Requires Node **24.9+**, npm and Git:
+For the **published v0.1.23 preview**, use a separate compatible DSH Web environment. Requires Node **24.9+**, npm, and Git:
 
 ```sh
 git clone --branch v0.1.23 https://github.com/Burns1028/moa-plus.git
@@ -75,111 +54,85 @@ node scripts/project-mode.mjs setup
 node scripts/project-mode.mjs start
 ```
 
-Setup installs the locked rc.3 runtime and applies exactly the three reviewed extensions inside `~/.dsh-project-mode/rc3`. Your ordinary Desktop app, `~/.dsh`, global Agent configuration and workspaces are not reused. The native Web UI opens locally; configure your model, create a conversation and select **Project** before its first message.
+That tag installs the earlier preview and its three compatibility extensions. It does not contain this branch's new runtime. Select **Project** before the first message in that version.
 
-Use `node scripts/project-mode.mjs doctor` to check the prepared environment. See the [first-run guide](docs/quickstart.md) for locations, restart and recovery, and try the [reproducible project task](docs/demo-workflow.md).
-
-For an already prepared compatible Desktop/runtime, the plugin can still be installed through its native CLI:
+To test **this branch**, build the checked-out source and prepare a new empty runtime directory using its matching launcher, lockfile, and manifest:
 
 ```sh
-dsh plugin --profile desktop add "git+https://github.com/Burns1028/moa-plus.git#v0.1.23"
-```
-
-Stock rc.3 remains incompatible. The setup script is explicit, not an npm installation hook, and does not patch an existing Desktop app. [Compatibility](docs/compatibility.md) documents the three native extensions and manual route; tagged bundles are on [Releases](https://github.com/Burns1028/moa-plus/releases).
-
-## User guide
-
-| Role | Responsibility |
-| --- | --- |
-| You | Set goals, make decisions and talk to the Coordinator. You can also open a Worker and guide it directly. |
-| Coordinator | Choose and guide Workers, supply context, review results, maintain work records, organize shared knowledge and report progress. It can handle clarification, synthesis and small self-contained actions itself. |
-| Worker | Carry an assigned investigation or execution through to a result, contribute reusable findings and return a self-contained final AI message. |
-
-A usual workflow:
-
-1. You bring a goal to the Coordinator. It checks Workers and relevant project memory, including direct user activity in child conversations.
-2. It chooses an existing Worker or creates one, supplies the goal and context, then updates `notes.md`.
-3. As work changes, it uses **steer** to guide the current work or **queue** to leave an instruction for after the current turn. Interrupt and delete remain separate actions.
-4. Each Worker turn automatically returns its complete last committed AI message. A turn without an AI message still reports its identity and outcome with an empty AI result.
-5. The Coordinator reviews the result, follows up or concludes, and updates work records and reusable context. Normal closure waits for relevant work and result consumption within the same native Coordinator turn.
-
-When you operate a Worker directly, the Coordinator can inspect its current state and read the conversation as needed when you return.
-
-## Project memory
-
-```text
-.dsh/project-mode/<project-id>/
-├── notes.md                 Todos, assignments, progress, blockers, next steps
-├── archived.md              Concluded work and its results
-└── context/
-    ├── context.md           Shared index: file paths and short descriptions
-    ├── decisions.md         Reusable decisions and their reasons, created as needed
-    └── ...                  Other reusable project knowledge
-```
-
-In the current implementation, the Coordinator maintains `notes.md` and `archived.md` so it knows where the project stands and what needs attention.
-
-Both the Coordinator and Workers maintain context. They read `context/context.md` first, then open the files needed for the current task. Workers contribute valuable reusable findings and update the index. The Coordinator primarily organizes, consolidates and prunes that knowledge. Routine progress stays in the work records.
-
-These documents persist with the project; they are loaded progressively rather than copied into every request. See [goals and current role responsibilities](docs/moa-architecture.md) for more detail.
-
-## Features in DSH
-
-- Select **Project** for a new conversation before its first message. Its Project identity stays fixed after the first turn starts.
-- Expand the Coordinator in the original workspace sidebar to open its Workers. Each has a stable identity icon and current status.
-- Click a Worker capsule in the main conversation to open that child. Capsules stay with the conversation segment where work was dispatched, updated or received; later passive replies do not move them.
-- Use the default **Workers** and **notes.md** tabs on the right. Workers shows a newest-first timeline of original input, final AI output and recorded artifacts. Each message shows up to two lines of text with an ellipsis for overflow; click the message to expand its original Markdown or collapse it. Both tabs are closable.
-- Worker composers provide **Back** to the Coordinator and use native delegated permissions without an independent permission picker. Archiving the Project brings its managed Workers along.
-
-Coordinator delegation/control tools are replaced only in that Agent's scope. Workers and ordinary conversations retain native composition. Native Stop remains available and does not automatically stop every Worker.
-
-## Project structure
-
-```text
-packages/project-mode/
-├── src/host/       Project lifecycle, Worker operations and result delivery
-├── src/client/     Sidebar, capsules and project tabs
-├── src/shared/     Shared types and contracts
-└── lib/            Built plugin artifacts
-compat/rc3/         Audited runtime compatibility patches
-scripts/            Build, compatibility and verification helpers
-tests/              Regression and native contract checks
-docs/               Model, architecture, API and verification guides
-```
-
-## Development
-
-Requires Node **24.9+**, npm and Git.
-
-```sh
-git clone https://github.com/Burns1028/moa-plus.git
-cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
-npm test -- --maxWorkers=1
+npm run build
+node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
 
-`npm test` builds the plugin first. Edit `packages/project-mode/src`; regenerate the committed `lib` artifacts through the build. See [Contributing](CONTRIBUTING.md) for typechecks, native contracts, package consumer verification and the test map.
+Select **MoA+** before sending a new conversation's first message. Its identity remains fixed after starting. Use a new Git workspace for isolated Workers; explicitly choose `shared` for assignments that should use the parent's directory.
 
-## API and documentation
+The launcher prepares a separate native Web runtime, home, Agent configuration, and documents directory. Configure your model through native settings. It does not reuse your personal DSH profile or modify an installed Desktop app. Use `doctor` with the same `--dir` to verify it. See the [first-run guide](docs/quickstart.md).
 
-The Coordinator uses `control_workers` with `spawn`, `list`, `get`, `send`, `history`, `interrupt` and `delete`. `send` distinguishes current-work **steer** from next-turn **queue**. See the tool API for arguments, examples and result semantics.
+## A usual working flow
 
-| Read this | To understand |
-| --- | --- |
-| [Goals and current roles](docs/moa-architecture.md) | System goal, current role responsibilities and progressive shared context |
-| [Code architecture](docs/architecture.md) | Modules, functions, data structures and execution paths |
-| [Tool API](docs/tool-api.md) | Worker control, message delivery and history windows |
-| [Compatibility](docs/compatibility.md) | The explicit rc.3 runtime extensions |
-| [Verification](docs/verification.md) / [Manual checks](docs/manual-verification.md) | What was tested and how to check a real application |
+1. Bring a goal to the Coordinator. It checks Workers and reads the work records and relevant context.
+2. It creates a specialist with `Task`, branches useful history with `Fork`, or continues an existing Worker with `SendMessage`.
+3. It updates `notes.md`, responds to new user input, and adjusts directions while work proceeds. A request waits within its Tool Call; a notification returns after acceptance.
+4. An ended Worker turn returns its **complete last committed AI message** to `reportTo`, normally its creator. If no AI message was committed, the result is empty; an old reply is never substituted. A background handoff is not a completion.
+5. The Coordinator reviews evidence and artifacts, follows up on gaps, updates reusable knowledge, and delivers the outcome. Normal closure waits for relevant work and result consumption. New input and native Stop remain responsive.
 
-## Current limits
+`QueryAgent` reads an explicit newest-relative human/AI history window. It does not silently load the last 100 messages. The Coordinator can inspect user activity inside Workers when the user returns; there is no separate human read/ack protocol.
 
-Delegation remains a model judgment. This preview does not guarantee ideal task ownership on every request, and does not use task keywords or command/time thresholds to force it.
+## Project memory
 
-Try MoA+ on a small project and share your workflow or installation feedback in [trial feedback](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml). If you would like to follow its development, a star helps others discover it.
+New workspaces use:
 
-## License
+```text
+workspace/
+├── notes.md                 Coordinator: stage, todos, assignments, progress, blockers
+├── archived.md              Coordinator: concluded work and its results
+├── rubrics.md               Independently authored acceptance criteria
+└── context/
+    ├── index.md             Shared file paths and short descriptions
+    └── ...                  Reusable facts, decisions, and methods
+```
+
+The Host refreshes the Coordinator's **full `notes.md` before each inference**. Above 8,000 characters it adds a reminder to organize/archive; it does not truncate the file or archive work itself. Context stays progressive: read the index, then load relevant files. Workers contribute reusable findings; the Coordinator primarily organizes, consolidates, and prunes them. `ProjectContext` reaches the actual shared knowledge base from isolated worktrees too.
+
+Existing saved paths and legacy `context/context.md` indexes remain usable. Conversations using the same workspace share its memory files; use separate workspaces for independent projects.
+
+## Native DSH interface
+
+- Expand the Coordinator in the original sidebar to open its Workers, with stable identity icons and current activity.
+- Worker capsules remain at the bottom of their participating turn/message segment. Passive replies do not move or copy them; accepted updates and received results establish participation.
+- The default **Workers** and **notes.md** right-side tabs use native tab behavior and can be closed. The work axis shows original input, final AI output, and recorded artifacts, newest first.
+- Input and output show a one- or two-line text preview with an ellipsis; click the text to expand the original Markdown.
+- Worker composers provide **Back** and inherited permissions, with no independent permission picker. Deletion hides a Worker from active lists and all capsule seats; native history remains. Archival follows the managed family.
+
+## Code and documentation
+
+```text
+packages/project-mode/src/
+├── host/                    Native composition, durable admissions, results, and MoA controls
+│   └── moa/                 Agents, roles, messaging, workspaces, background, and completion
+├── client/                  Native sidebar, capsules, controls, and tabs
+└── shared/                  Transport views and common membership rules
+compat/rc3/                  Reviewed native extensions and exact file hashes
+runtime/rc3/                 Locked isolated runtime template
+scripts/                     Build, explicit setup, and package-consumer checks
+tests/                       Native fixtures, Client contracts, and launcher checks
+```
+
+The historical package name `dsh-plugin-project-mode`, storage domain, and Remote service identity remain stable for existing installations. Product naming does not require moving saved sessions or renaming the wire protocol.
+
+See [architecture](docs/architecture.md), [roles and design](docs/moa-architecture.md), [Tool API](docs/tool-api.md), [compatibility](docs/compatibility.md), and [contributing](CONTRIBUTING.md). For a complete check:
+
+```sh
+npm test -- --maxWorkers=1
+npm run typecheck
+npm run test:native-contract
+npm run test:launcher
+npm run verify:package
+```
+
+Model judgment still matters: the architecture supports independent work and review, but does not guarantee ideal delegation or infallible acceptance criteria. Share concrete workflows or installation failures through [trial feedback](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml).
 
 MIT. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).

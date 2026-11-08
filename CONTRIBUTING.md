@@ -4,7 +4,7 @@ Start with [MOA responsibilities](docs/moa-architecture.md), the [code architect
 
 ## Local setup
 
-Use Node 24.9+, npm and Git. This plugin targets DSH 0.2.1-rc.3 with the three explicit compatibility extensions in this repository.
+Use Node 24.9+, npm and Git. This plugin targets DSH 0.2.1-rc.3 with the explicit native compatibility manifest in this checkout. The current unreleased runtime extends 13 native packages; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
 
 ```sh
 npm ci
@@ -12,7 +12,7 @@ node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 ```
 
-These commands modify only this checkout's native dependencies. They do not modify your installed DSH application. Read [compatibility](docs/compatibility.md) before preparing a separate runtime. Do not broaden or silently apply core patches.
+These commands modify only this checkout's native dependencies. They do not modify your installed DSH application. Read [compatibility](docs/compatibility.md) before preparing a separate runtime. Do not broaden or silently apply core patches. Additional native changes need a separately reviewed contract and exact runtime/declaration hashes in the manifest; see `docs/native-moa-contract.md` and `docs/native-moa-residency-contract.md`.
 
 ## Make a focused change
 
@@ -36,7 +36,12 @@ The single-worker command is useful on a busy machine because several native int
 
 | Concern | Relevant tests |
 | --- | --- |
-| Coordinator tool replacement and native UI row contract | `tests/native-contract/standard-tool-isolation.spec.ts`, `sidebar-branch.spec.tsx` |
+| Scoped MoA controls, specialist roles, and native UI row contract | `tests/native-contract/standard-tool-isolation.spec.ts`, `sidebar-branch.spec.tsx` |
+| Five primitives, role/identity/workspace/reporting integration | `tests/host/moa-agents.spec.ts`, `moa-controls-integration.spec.ts`, `moa-residency.spec.ts` |
+| Request/ReplyTo, timeout, interruption, cycles, and recovery | `tests/host/moa-messages.spec.ts` |
+| Native background transfer, canonical results, real Bash exit, and hard continuation | `tests/native-contract/moa-background.spec.ts` |
+| Ralph and independent source/tool-backed completion gates | `tests/host/moa-completion.spec.ts` |
+| Current-state Git snapshots and owned cleanup | `tests/host/moa-workspaces.spec.ts` |
 | Background failure isolation and Worker membership | `tests/host/fault-isolation.spec.ts`, `review.spec.ts` |
 | Same-turn closure, Stop and continuation | `tests/host/native.spec.ts`, `native-tool-continuation.spec.ts` |
 | Result identity and recovery deduplication | `tests/host/native-receipt.spec.ts`, `native-receipt-recovery.spec.ts` |
@@ -54,7 +59,7 @@ Use [manual verification](docs/manual-verification.md) for real application chan
 
 ## Documentation and releases
 
-Keep README installation claims consistent with the compatibility helper. Update Tool API for transport changes and the architecture guide for ownership changes. Preserve published tags/assets; prepare a new release for runtime changes.
+Keep README installation claims consistent with the compatibility helper. Separate unreleased branch capabilities from tagged v0.1.23 media and installation instructions; the existing package version does not announce a release. Update Tool API for transport changes and the architecture guide for ownership changes. Preserve published tags/assets; prepare a new release for runtime changes.
 
 The optional first-run launcher lives in `scripts/project-mode.mjs`; its exact native dependency template and lockfile live in `runtime/rc3`. Keep preparation explicit, reuse the existing compatibility manifest, and verify setup in a new directory. Never use an existing personal profile as an installation fixture. The launcher CI exercises macOS and Linux; a full Windows installation has not been verified.
 

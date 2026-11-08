@@ -1,49 +1,215 @@
-# control_workers
+# MoA tool API
 
-Available only to the enabled Project coordinator. DSH still owns permission checks, tools, prompts and native child activity. The actual execution Agent determines ownership; a worker ID alone never grants control.
+This describes the unreleased runtime in this checkout. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
 
-| Action | Required arguments | Result |
+The Coordinator receives `Task`, `Fork`, `SendMessage`, `QueryAgent`, and `KillAgent`. Every managed participant receives `SendMessage` and `ProjectContext`. A Worker gets the creation/query/kill controls only when its creator explicitly enabled `nested`. Alternative native delegation entries are suppressed in the participating scope; ordinary conversations are unaffected.
+
+## Task
+
+Start one to twenty clean-history native continuable Agents. A successful result is an array of accepted message/Worker receipts, not completed work.
+
+```json
+{
+  "tasks": [
+    {
+      "name": "implementation",
+      "task": "Implement the requested feature, run its checks, and report the evidence.",
+      "role": "General-purpose",
+      "workspace": "isolated"
+    },
+    {
+      "name": "review",
+      "task": "Review the specification independently and identify acceptance criteria.",
+      "role": "Planner",
+      "workspace": "shared"
+    }
+  ]
+}
+```
+
+| Task item | Meaning |
+| --- | --- |
+| `name`, `task`, `role` | Required label, complete assignment, and role. |
+| `workspace` | `isolated` by default; `shared` explicitly uses the creator's cwd. |
+| `reportTo` | Optional active member ID; defaults to the creator. |
+| `nested` | Defaults to `false`; explicitly permits this child to create/manage a further team. |
+
+Role names are exactly `Explorer`, `Planner`, `Deep Research`, and `General-purpose`. Explorer and Planner expose the native `glob`, `grep`, and `read` execution tools. Deep Research exposes `web_search` and `web_fetch` when installed. General-purpose retains native execution tools. Communication and shared-context tools remain available in each role; role selection does not grant extra filesystem authority.
+
+The twenty-item limit is a tool batch limit. Native runtime capacity is a separate limit and can reject additional resident Agents. Isolated execution needs a Git worktree-capable source and permitted Git resources. It snapshots staged, unstaged, and untracked current content without changing the source index. Shared execution is the explicit alternative when isolation is unsuitable.
+
+Identity is injected into conversation history before the Task assignment. It states the child's real ID, cwd/isolation, reporting target, and reporting/shared-memory instructions. It is not a per-child System Prompt rewrite.
+
+## Fork
+
+Fork a selected member's committed native history into a fresh child identity. The source, native creator, and reporting target are separate facts.
+
+```json
+{
+  "source": "<source-session-id>",
+  "name": "alternative-approach",
+  "task": "Try the alternate implementation and compare its evidence.",
+  "role": "General-purpose",
+  "workspace": "isolated",
+  "reportTo": "<review-leader-id>"
+}
+```
+
+Fork accepts the same item fields as Task, plus required `source`. Its single result is an accepted receipt. Native fork-seed preparation repairs open history tails; the new identity follows the inherited history and precedes the new assignment. Pending native admission retains the seed for recovery; confirmed admission leaves the copied history in the child Session and removes that temporary duplicate.
+
+## SendMessage
+
+Point-to-point communication within the enabled MoA family:
+
+```json
+{"target":"<worker-id>","message":"Prioritize the error state.","delivery":"steer"}
+```
+
+```json
+{"target":"<worker-id>","message":"After this turn, check keyboard navigation.","delivery":"queue"}
+```
+
+| Argument | Contract |
+| --- | --- |
+| `target`, `message` | Required receiving member ID and nonempty message. |
+| `mode` | `notify` by default, or `request`. |
+| `delivery` | `steer` by default, or `queue`. Steer targets the next safe step; queue remains a later native turn. |
+| `timeout_ms` | Required for Request; positive integer milliseconds, at most 86,400,000. |
+| `reply_to` | Explicit Request ID to answer. A reply uses Notify, not Request. |
+
+Notify returns after native acceptance. It can wake a retained Agent. Steer is a soft insertion and does not cancel the tool currently executing. The native pre-step consumes the full eligible next-step batch; it does not spend five model rounds consuming five messages one at a time. Explicit next-turn input stays queued.
+
+A Request waits **inside its current Tool Call**. That is still `Running`, not task completion or Zombie:
+
+```json
+{"target":"<coordinator-id>","message":"Which migration is approved?","mode":"request","timeout_ms":30000}
+```
+
+The receiving message contains its Request ID. Answer explicitly:
+
+```json
+{"target":"<requester-id>","message":"Use migration B.","mode":"notify","reply_to":"<request-id>"}
+```
+
+The waiting Tool Result is one of:
+
+- `answered`: includes `requestId` and the full `answer`.
+- `interrupted`: another eligible message returned control before the answer.
+- `timeout`: the wait deadline passed.
+- `downgraded`: a wait cycle was detected; the message was admitted as nonblocking Notify.
+
+The broker persists routing and operation receipts. A late explicit reply becomes an ordinary inbox message and can wake the sender; it is not discarded or guessed from sender identity. Repeated tool operation identities do not repeat accepted input. New unread input is reconsidered during a pending wait; the lightweight native judge does not consume that inbox. The Request ID correlates communication; it is distinct from the native Tool Call ID.
+
+Cold targets are restored through the actual durable parent chain. Intermediate cold parents receive no invented prompt or false completed task. Cross-family target IDs do not grant access.
+
+## QueryAgent
+
+Inspect direct managed children without running a model:
+
+```json
+{}
+```
+
+```json
+{"ids":["<worker-id>"],"history_offset":10,"history_limit":20}
+```
+
+```json
+{"ids":["<worker-id>"],"wait":"selected","timeout_ms":30000}
+```
+
+`ids` defaults to all visible direct children. `wait` is `all` or `selected`; omitted means an immediate query. A waiting query returns on selected completion, eligible incoming next-step input, native cancellation, or timeout. Its default timeout is 30,000 ms. The waiting caller derives `Waiting`; Request remains `Running`. Explicit next-turn queue input does not interrupt this wait.
+
+Results contain `children`, optionally `history`, and a wait `reason` of `done`, `interrupted`, or `timeout`. Each child's view includes native activity, availability, display phase, and derived `lifecycleState`: `Idle`, `Running`, `Waiting`, `Aborting`, or `Zombie`. A cold retained Session can be resumed; cold is not an unavailable/offline permission state.
+
+`history_offset` and `history_limit` must be supplied together as nonnegative integers. They index committed visible dialogue from newest to oldest: offset zero is the latest message; offset ten and length twenty reads positions 10–29. Zero length or an offset past the available messages returns an empty window. There is no default hundred-message read or byte clipping.
+
+Each history page contains `workerId`, current `status`, `offset`, `limit`, `total`, `messages`, and `observedThroughSeq`. Message entries include relative `index`, native `id`, `seq`, `turn`, `role` (`user` or `assistant`), and full visible `text`. The view includes committed human input, managed assignments, MoA messages, and intermediate/final visible AI replies. It excludes inherited Fork history, system/runtime instructions, reasoning, internal notices, and tool calls/results. Incoming messages can shift later relative indices. Pending inputs remain available in activity views until committed.
+
+Reads do not wake Workers or create capsule participation. Deleted members and failed-creation placeholders are omitted. An existing Worker whose execution failed remains visible.
+
+## KillAgent
+
+Stop a direct child and await actual native execution cleanup:
+
+```json
+{"id":"<worker-id>"}
+```
+
+By default, history and workspace are retained. The Agent is `Aborting` during cleanup and can become Zombie only after cleanup completes. Later SendMessage can continue it.
+
+```json
+{"id":"<worker-id>","continue_with":"Stop the old approach and implement the smaller migration."}
+```
+
+`continue_with` admits the replacement only after the old driver/resources exit, history receives any missing Tool Results, and the abort signal is cleared. It does not race the new wake against old cleanup.
+
+```json
+{"id":"<worker-id>","destroy":true}
+```
+
+`destroy` explicitly removes membership and cleans its owned isolated worktree. It never removes a shared source directory. `destroy` and `continue_with` cannot be combined. Deleted Workers disappear from active queries, timelines, and all capsule seats; native Session history and recovery facts remain.
+
+## ProjectContext
+
+Read or replace a file relative to the project's actual shared context directory, including from an isolated Worker:
+
+```json
+{"action":"read","path":"decisions.md"}
+```
+
+```json
+{"action":"write","path":"decisions.md","content":"# Decisions\n\nUse the accepted API contract.\n","version":"<version-from-read>"}
+```
+
+A read returns content and its current version; a missing/non-file path returns `moa/context-file-not-found`. Replacement requires that version; omit it only for creation. A concurrent modification rejects the stale replacement so the Agent can reread and merge. Keep `index.md` current. Paths cannot escape the context directory, and this tool does not write `notes.md` or `archived.md`. The acting Agent's native filesystem mode remains authoritative.
+
+## Background tools
+
+`query_background_tool` and `cancel_background_tool` are scoped to managed participants:
+
+```json
+{"tool_call_id":"<opaque-handle>","wait_timeout":10}
+```
+
+Query uses the opaque handle returned in a background placeholder, not a guessed bare model call ID. `wait_timeout` is seconds, defaults to zero, and is bounded to 300 seconds. Query returns repeatable full canonical results after completion, or actual native job status/progress and output. The same handle cannot be used by another owner.
+
+```json
+{"tool_call_id":"<opaque-handle>"}
+```
+
+Cancel requests cancellation of that owned native job. `stopping` remains visible until its resource actually exits. It is not permission to cancel arbitrary jobs. Completion is durably recorded and automatically returned to the Agent; a placeholder is a Tool Message indicating transfer, not forged success under the original tool's output schema.
+
+## Completion criteria
+
+With `completionVerification` enabled, participants have:
+
+```json
+{"criteria":"All required tests pass and the documented CLI works.","promise":"The requested CLI change is implemented and verified."}
+```
+
+This is `set_completion_criteria`. Ralph checks for the exact promise in the current task's final AI reply and requests continued work when absent. Successful delivery clears the binding; interrupted work retains it.
+
+The Coordinator additionally has independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots, writes source-anchored `rubrics.md`, and does not inspect implementation output. Verifier must read the applicable rubric and inspect actual deliverables with native tools. Required build/test evidence uses actual completed execution, not a self-declared Pass. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
+
+## UI and backend compatibility
+
+A real Worker turn returns its complete final committed AI message to `reportTo`, including an empty body when none exists. A message-driven background handoff is not a completed Worker task. Receipt identity and native committed message evidence prevent recovery from delivering the same result twice.
+
+The UI-only `projectMode/timeline(sessionId, workerId, limit, signal)` stream shows newest native turns with original input, final AI reply, and recorded artifacts. Its initial ten-turn UI window is independent of QueryAgent's explicit history indices. It renders a two-line preview expandable to original Markdown, and does not call a model. Artifacts come from native deliverables and successful persisted file mutations, not guessed shell side effects.
+
+The Remote service/storage/package identifiers retain their historical `projectMode`/`project-mode` names for existing consumers. Legacy backend request schemas are not a second model-visible delegation path.
+
+## Configuration
+
+| Setting | Default | Meaning |
 | --- | --- | --- |
-| `spawn` | `name`, `task` | Native child and accepted initial-message receipt |
-| `list` | none | Visible managed workers and real current status |
-| `get` | `worker_id` | One worker's status and progress |
-| `send` | `worker_id`, `message`, `delivery` | Native message acceptance; `delivery` is `steer` or `queue` |
-| `history` | `worker_id`, `offset`, `limit` | Current worker status and a newest-first user/assistant message window |
-| `interrupt` | `worker_id` | Request native cancellation; pending queue follows DSH |
-| `delete` | `worker_id` | Drain native resources and remove Project membership |
+| `backgroundStrategy` | `llm-judge` | `after-seconds`, `new-message`, or `llm-judge`. |
+| `backgroundAfterSeconds` | `10` | Nonnegative threshold before applying the chosen slow-tool policy; declared backgroundOnMessage bypasses it for eligible input. |
+| `completionVerification` | `true` | Installs participant completion criteria and the Coordinator's independent outcome helpers. |
+| `dataDirectory` | `.` | New workspace-root memory layout. Explicit private layouts and already saved paths remain supported. |
+| `coordinatorHiddenTools` | Native delegation/workflow entries | Scoped replaced tool names; global preferences are not rewritten. |
+| `progressTextMaxChars` | `100` | UI/activity preview length; does not clip explicit history or automatic final results. |
+| `retryInitialDelayMs`, `retryMaxDelayMs`, `retryMaxAttempts` | `1000`, `30000`, `5` | Existing result-admission retry policy, not task execution retries. |
 
-`list` returns an array of `WorkerView`; `get` returns one `WorkerView`. Public lists/snapshots omit deleted members and failed creation placeholders, while existing Workers with failed execution remain visible. Internal operation records are retained. Its `lifecycle` is Project membership; `status` is busy/idle/unknown; `availability` describes live/cold/unavailable native observation; `phase` is a derived display label. `activity` contains the latest committed input, latest human input, native `observedThroughSeq`, pending human input previews and their total count. An unavailable activity read returns `null`.
-
-The current activity preview includes the latest three pending human inputs and a total count. `list` text uses `progressTextMaxChars` (default 100 characters); `get` returns full text for those entries, with the same preview count. Committed dialogue is read through explicit `history` windows. These preview limits do not cap history or the full automatic completion payload. No human read cursor or separate acknowledgement state is maintained.
-
-`spawn` and `send` may include `task_ref` to link a task in notes. A successful dispatch response means admission, not completion. The coordinator normally delegates before updating task files.
-
-```json
-{"action":"spawn","name":"Frontend","task":"Implement the requested form and report validation.","task_ref":"PM-001"}
-```
-
-```json
-{"action":"send","worker_id":"<native-child-session>","message":"Check keyboard navigation after this task.","delivery":"queue"}
-```
-
-```json
-{"action":"send","worker_id":"<native-child-session>","message":"Prioritize the error state in the current work.","delivery":"steer"}
-```
-
-Steer does not hard-kill a running tool. Queue is not an alias for steer: it targets the next native turn. Cold workers are resumed through the native subagent manager, never as independent root Sessions.
-
-History uses zero-based indices from the newest visible message. `offset: 0, limit: 10` reads the latest ten; `offset: 10, limit: 20` reads positions 10–29. Both arguments are explicit nonnegative integers; zero length or an offset beyond available messages returns an empty window. There is no default count, 100-message cap, byte clipping, or opaque cursor.
-
-```json
-{"action":"history","worker_id":"<native-child-session>","offset":10,"limit":20}
-```
-
-The reply contains `workerId`, current busy/idle/unknown `status`, `offset`, `limit`, `total`, `messages`, and `observedThroughSeq`. Each message includes its relative `index`, native `id`/`seq`/`turn`, `role` (`user` or `assistant`), and full visible `text`. Messages are returned newest first; indices are calculated after filtering dialogue. User messages include coordinator assignments and committed human input; AI entries include committed intermediate replies and finals. System/runtime instructions, internal notices, reasoning, and tool calls/results are excluded. Pending input remains visible through list/get activity until it is committed. Each query indexes its current snapshot, so incoming messages shift relative positions.
-
-History reads do not wake a cold worker, invoke a model, or create capsule participation. Full automatic completion delivery is unchanged.
-
-Every worker turn sends a completion notification with its worker identity, turn and outcome. Its result is the full last committed AI message from that turn; if no AI message exists, the result body is empty and the notification is still delivered to the coordinator. No previous reply is substituted. The coordinator can then inspect history, reassign work or decide another next step; an empty result does not suppress notification or force a runtime retry policy.
-
-Deletion removes the Worker from Project list/snapshots and all capsule seats, including historical turns. There is no include_deleted list option. Deleted Workers reject get/history/timeline, interrupts and new Project dispatches; repeated delete remains idempotent. Native conversation history and internal recovery/delivery facts remain. Queries do not resume cold workers or invoke models.
-
-The UI-only `projectMode/timeline(sessionId, workerId, limit, signal)` Remote stream returns latest native turns with timestamped original inputs, each ended turn's last AI reply, recorded artifacts and completion outcomes, and updates on native Session events. Input and final output render directly as Markdown; intermediate replies and summaries are not displayed. The initial visible window is ten turns; Load earlier increases it. This is independent of `control_workers` history, which still includes intermediate visible AI replies, and does not add an Agent tool or a message-count cap. Artifacts use native `deliverables/presented` events and successful persisted file-mutation metadata; reads, failed tools and guessed shell effects are excluded. Closing/hiding the tab or selecting another worker cancels its observer.
+The short native judge uses the current model route, requests no-thinking output, and does not create a separate Agent. Route availability and real response latency belong in model acceptance evidence.

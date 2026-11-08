@@ -1,143 +1,140 @@
 # Code architecture and reading guide
 
-The current MoA+ implementation is a Cordis Host/Client plugin built on DSH's native Agent Loop, Sessions, subagent manager, inboxes, projections, filesystem and workspace registry. The Coordinator is a role assigned to an ordinary native Agent. A Worker is a native continuable child Session, not a second execution engine.
+MoA+ is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-For the system goal, current role responsibilities and shared context, start with [MoA+ goals and current roles](moa-architecture.md). This guide explains the current implementation. The baseline is DSH 0.2.1-rc.3 with the explicit extensions in [compatibility](compatibility.md).
+This guide describes the unreleased runtime in the current checkout. The v0.1.23 tag and its media document the earlier Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
-## Repository layout
+## Three layers
 
-```text
-packages/project-mode/
-  src/host/       Coordination, native integration and persisted Project facts
-  src/client/     Remote subscriptions, derived UI state and native slot contributions
-  src/shared/     Host/Client transport types
-  lib/            Generated Host, browser factory, Remote descriptors and declarations
-  cordis.patch.yml  Cordis service composition
-compat/rc3/       Reviewed native compatibility patches and exact file hashes
-scripts/         Build, explicit compatibility application and install-consumer checks
-tests/           Real DSH integration, native Client contracts and UI regressions
+```mermaid
+flowchart TB
+    P["Collaboration patterns: delegate, branch, compare, review, continue"]
+    C["Coordinator: goal, direction, notes/archive, review, delivery"]
+    W["Workers/specialists: execution, findings, reporting"]
+    M["Shared knowledge: context/index.md + topic files"]
+    K["Native DSH: Agent Loop, registry, inbox, sessions, tools, jobs, permissions"]
+    P --> C
+    C <-->|"Task / Fork / SendMessage / QueryAgent / KillAgent"| W
+    C <--> M
+    W <--> M
+    C --> K
+    W --> K
 ```
 
-The repository root is a private npm forwarding package for Git installation. `packages/project-mode` is the installable Cordis bundle. `scripts/build.mjs` compiles source and generates Remote artifacts; `scripts/prepare-release.mjs` forwards package metadata and copies release documentation. Built files are committed because Git installation has no build/prepare hook. Edit source, then regenerate; do not hand-edit `lib`.
+Patterns are decisions made through these tools and role prompts. There is no second scheduler, universal cross-turn tool lock, or task-keyword routing layer. The Coordinator retains ordinary execution tools and decides task ownership.
 
-## Main modules and entry points
+## Reading order
 
-| Module | Responsibility | Start reading at |
-| --- | --- | --- |
-| [host/index.ts](../packages/project-mode/src/host/index.ts) | Service composition, Agent-scoped tool mounting, recovery and authorized Remote boundary | `ProjectMode[Service.init]`, `attach`, `recover`, typed Remote wrappers |
-| [host/agent-events.ts](../packages/project-mode/src/host/agent-events.ts) | Native event subscriptions and canonical result normalization before a model step | `bindAgentEvents`, `normalizeCoordinatorStep` |
-| [host/project-lifecycle.ts](../packages/project-mode/src/host/project-lifecycle.ts) | Project mode queries, permanent identity and draft enable/disable maintenance | `ProjectLifecycle.mode`, `setEnabled`, `requireCanDisable`, `createRecord` |
-| [host/project-views.ts](../packages/project-mode/src/host/project-views.ts) | Pure snapshot assembly from already-observed native and durable facts | `buildProjectSnapshot` |
-| [host/worker-operations.ts](../packages/project-mode/src/host/worker-operations.ts) | Validate and own Worker operations, serialize per-Worker mutations, persist admission receipts | `controlForAgent`, `dispatch`, `prepareAssignment`, `admitWorkerInput`, `interruptOrDelete`, `acceptReceipt`, `reconcileAssignment` |
-| [host/completion-outbox.ts](../packages/project-mode/src/host/completion-outbox.ts) | Collect ended turns, persist canonical results, admit them to the Coordinator and recognize consumption | `CompletionOutbox.ingest`, `deliver`, `consume` |
-| [host/turn-coordination.ts](../packages/project-mode/src/host/turn-coordination.ts) | Hold normal native closure until Project work/results settle; freeze historical outcomes | `TurnCoordination.guardTurn`, `freezeTurn` |
-| [host/native-receipt.ts](../packages/project-mode/src/host/native-receipt.ts) | Recognize an already-consumed native result during recovery | `consumedNativeReceipts` |
-| [host/capsule-participation.ts](../packages/project-mode/src/host/capsule-participation.ts) | Record participation and repair historical capsule seats from native evidence | `participatingMemberships`, `repairCapsuleOwnership` |
-| [host/project-memory.ts](../packages/project-mode/src/host/project-memory.ts) | Create a missing progressive context index through the acting Agent's scoped filesystem | `ensureContextIndex` |
-| [host/worker-activity.ts](../packages/project-mode/src/host/worker-activity.ts), [history.ts](../packages/project-mode/src/host/history.ts), [worker-timeline.ts](../packages/project-mode/src/host/worker-timeline.ts) | Read native input/status, committed dialogue and per-turn UI activity | `readWorkerActivity`, `readHistory`, `readWorkerTimeline` |
-| [host/project-archive.ts](../packages/project-mode/src/host/project-archive.ts) | Synchronize family archival through the native workspace registry | `bindProjectArchives` |
-| [client/runtime.ts](../packages/project-mode/src/client/runtime.ts) | Own Remote catalog/mode requests, subscriptions, reconnect and disposal | `ProjectClient` |
-| [client/store.ts](../packages/project-mode/src/client/store.ts) | Reconcile complete Project snapshots and derive stable capsule rows | `ProjectStore.accept`, `push`, `turn` |
-| [client/index.tsx](../packages/project-mode/src/client/index.tsx) | Register native UI contributions and lifecycle bindings | `apply`, `applyProjectClient` |
-| [client/branch.tsx](../packages/project-mode/src/client/branch.tsx), [components.tsx](../packages/project-mode/src/client/components.tsx) | Native sidebar branch, capsules and Project/Back controls | `ProjectBranch`, `bindProjectBranches`, `WorkerCapsuleList`, `ProjectToggle` |
-| [client/panels.tsx](../packages/project-mode/src/client/panels.tsx), [worker-timeline.tsx](../packages/project-mode/src/client/worker-timeline.tsx) | Native right-side tab defaults and the Worker work axis | `registerProjectPanels`, `WorkersPanel` |
-| [client/worker-parent.ts](../packages/project-mode/src/client/worker-parent.ts) | Retain a cold parent while the user opens a managed Worker | `bindWorkerParents` |
-
-`host/control.ts` owns request schemas and the `control_workers` definition; the Service owns Agent-scoped registration. `shared/worker-membership.ts` supplies `isVisibleWorker`, the one predicate for active public lists: deleted members and creation-only failures are omitted, while an existing Worker with a failed execution stays visible. Internal records remain available for recovery.
-
-`host/native.ts` is a small adaptation layer over public native APIs. `host/host-access.ts` is the current shared dependency contract for the extracted Host components. It exposes the Host context and callbacks; the file boundaries are useful, but these components remain coupled through that contract.
-
-## Data structures and ownership
-
-Persisted schemas and their inferred Host types live in [host/state.ts](../packages/project-mode/src/host/state.ts). Public transport interfaces live in [shared/index.ts](../packages/project-mode/src/shared/index.ts). Their purposes differ:
-
-| Structure | What it represents |
+| File | Responsibility and main entry points |
 | --- | --- |
-| `ProjectRecord` / `projectSchema` | Project identity, Coordinator Session ID, workspace, memory paths, mode lock and revision |
-| `Worker` / `workerSchema` | Managed child identity and membership lifecycle; execution itself belongs to the native Session |
-| `assignmentSchema` | One spawn/send operation, native message receipt, delivery mode and its originating Coordinator turn/segment |
-| `Completion` / `completionSchema` | One ended Worker turn, keyed by Project + Worker + native turn-end sequence, with the full last committed assistant payload |
-| `deliverySchema` | The durable canonical result message and native admission/consumption status |
-| `TurnWorkerMembership` / `membershipSchema` | A Worker's participation in a specific Coordinator turn and human-message segment |
-| `TurnWorkerOutcomeView` / `outcomeSchema` | Frozen outcome for that historical capsule seat |
-| `RecordState` | Stored Project aggregate: metadata plus Workers, assignments, completions, deliveries, participation and recovery facts |
-| `Projection` | Project facts folded from native Session events: ended turns, last assistant payload and result anchors |
-| `WorkerView` | Current derived membership, activity, availability and UI phase |
-| `ProjectSnapshot` | A complete Client baseline: public Project metadata, Worker views, memberships, outcomes and current Coordinator activity |
-| `WorkerHistoryPage` | Explicit newest-relative `offset`/`limit` over committed user/assistant text |
-| `WorkerTimelinePage` | UI-only newest-first native turns with original input, final output and recorded artifacts |
+| [host/index.ts](../packages/project-mode/src/host/index.ts) | `ProjectMode[Service.init]`, `prepareAgent`, `attach`, `recover`, and authorized Remote methods compose the plugin. |
+| [host/moa/tools.ts](../packages/project-mode/src/host/moa/tools.ts) | Native model definitions and validation for Task, Fork, QueryAgent, KillAgent, and ProjectContext. |
+| [host/moa/agents.ts](../packages/project-mode/src/host/moa/agents.ts) | `MoAAgents.task`, `fork`, `query`, `kill`, `context`, `recover`, and `lifecycle` implement controls through existing native capabilities. |
+| [host/moa/roles.ts](../packages/project-mode/src/host/moa/roles.ts) | `applyRoleRestrictions` mounts each specialist's execution-tool boundary. |
+| [host/moa/workspaces.ts](../packages/project-mode/src/host/moa/workspaces.ts) | `MoAWorkspaceManager.prepare`, `discoverOwned`, and `destroy` own dirty-state snapshots and cleanup of owned worktrees. |
+| [host/moa/messages.ts](../packages/project-mode/src/host/moa/messages.ts) | `MoAMessageBroker` matches explicit replies, waits interruptibly, detects wait cycles, and persists routing/receipts through `createNativeMessageBroker`. |
+| [host/moa/residency.ts](../packages/project-mode/src/host/moa/residency.ts) | `withManagedAgent` borrows the actual native parent chain for cold message/result delivery without invented input. |
+| [host/moa/judge.ts](../packages/project-mode/src/host/moa/judge.ts) | `judgeInterrupt` makes a short native no-thinking decision about pending input without consuming it or creating an Agent. |
+| [host/moa/background.ts](../packages/project-mode/src/host/moa/background.ts) | `bindBackground` binds policy, job queries/cancellation, canonical result receipts, recovery, and teardown to one native Agent. |
+| [host/moa/completion.ts](../packages/project-mode/src/host/moa/completion.ts) | `bindCompletion` installs Ralph and the Coordinator's owned independent Builder/Verifier helpers. |
+| [host/project-memory.ts](../packages/project-mode/src/host/project-memory.ts) | `memoryPaths`, `identityMessage`, `ensureContextIndex`, and `bindProjectMemory` own paths, identity text, progressive index creation, and full notes admission. |
+| [host/worker-operations.ts](../packages/project-mode/src/host/worker-operations.ts) | `spawnMoA` and the existing prepare/admit/accept/reconcile path persist input acceptance and capsule provenance. Legacy backend controls use the same path. |
+| [host/completion-outbox.ts](../packages/project-mode/src/host/completion-outbox.ts) | `ingest`, `deliver`, and `consume` persist full ended-turn results and route them once to the designated recipient. |
+| [host/agent-events.ts](../packages/project-mode/src/host/agent-events.ts) | `bindAgentEvents` retains native registration order; pre-step normalization reconciles native settlement notices with canonical MoA delivery. |
+| [host/turn-coordination.ts](../packages/project-mode/src/host/turn-coordination.ts) | `guardTurn` waits on current project obligations while yielding to input/Stop; `freezeTurn` records historical capsule outcomes. |
+| [host/project-lifecycle.ts](../packages/project-mode/src/host/project-lifecycle.ts) | `ProjectLifecycle` owns permanent mode identity and draft enable/disable through native maintenance. |
+| [host/project-views.ts](../packages/project-mode/src/host/project-views.ts) | `buildProjectSnapshot` assembles transport views from observed native/durable facts. |
+| [host/capsule-participation.ts](../packages/project-mode/src/host/capsule-participation.ts) | `participatingMemberships` and `repairCapsuleOwnership` retain native turn/human-segment anchors. |
+| [host/history.ts](../packages/project-mode/src/host/history.ts), [worker-activity.ts](../packages/project-mode/src/host/worker-activity.ts), [worker-timeline.ts](../packages/project-mode/src/host/worker-timeline.ts) | Explicit dialogue windows, current input provenance, and read-only work-axis projections. |
+| [host/project-archive.ts](../packages/project-mode/src/host/project-archive.ts) | Family archival through the native workspace registry. |
+| [client/runtime.ts](../packages/project-mode/src/client/runtime.ts), [store.ts](../packages/project-mode/src/client/store.ts) | Remote subscriptions/reconnect and derived complete-snapshot/capsule caches. |
+| [client/index.tsx](../packages/project-mode/src/client/index.tsx), [branch.tsx](../packages/project-mode/src/client/branch.tsx), [components.tsx](../packages/project-mode/src/client/components.tsx) | Native slot contributions: original sidebar rows, capsules, MoA+/Back controls. |
+| [client/panels.tsx](../packages/project-mode/src/client/panels.tsx), [worker-timeline.tsx](../packages/project-mode/src/client/worker-timeline.tsx) | Default closable native tabs and expandable original Markdown input/output. |
 
-Native Session events are authoritative for execution and accepted/committed messages. The Project storage domain records plugin-owned relationships and delivery facts. `notes.md`, `archived.md` and context documents are Agent-maintained project memory; they are not a scheduling database or a source for result deduplication. Client caches are derived presentation state.
+`host/native.ts` is the version-sensitive adapter boundary. `HostAccess` supplies native capabilities and the Host callbacks used by extracted components. It is not a parallel execution engine. `host/control.ts` retains legacy backend request schemas; it no longer defines a model-visible `control_workers` tool.
 
-### Status vocabulary
+## Durable facts and derived views
 
-A Worker's `lifecycle` describes Project membership: `provisioning → active`, with `deleting → deleted` and creation failure `provision-failed`. A live Worker whose execution fails can remain an active member.
+[host/state.ts](../packages/project-mode/src/host/state.ts) owns persisted schemas; [shared/index.ts](../packages/project-mode/src/shared/index.ts) owns transport views.
 
-`status` describes observed native execution (`busy`, `idle`, or unknown `null`). `availability` describes residency/readability (`live`, `cold`, `unavailable`). A cold Session is not inherently unusable; native continuation can resume it. `phase` is a display label derived from those facts and the last outcome. Do not treat these three fields as three independent execution state machines.
+| Structure | Owner and lifetime |
+| --- | --- |
+| `ProjectRecord` / `projectSchema` | Root Session identity, workspace/memory paths, permanent mode lock, revision. Historical name retained. |
+| `Worker` / `workerSchema` | Managed membership (`provisioning`, `active`, `deleting`, `deleted`, `provision-failed`), not execution state. |
+| `AgentDescriptor` | Actual creator, `reportTo`, role, nested permission, workspace mode/ownership, and Fork source facts. Stored in existing project operations. |
+| `MoAWorkspaceRecord` | Shared source reference or owned isolated worktree, branch, Git common directory, and owner identity. |
+| `assignmentSchema` | One prepared input operation and its native acceptance ID, delivery mode, turn, and human-message segment. |
+| `Completion` | One real ended Worker turn, keyed by Worker and native turn-end sequence, containing its complete last committed AI payload. |
+| `deliverySchema` | Canonical result, recipient, admission/consumption state, attempts, and diagnostics. Legacy missing recipient means Coordinator. |
+| `RequestRoute` | Request ID, sender/receiver, waiting/ended/answered route, and explicit answer; retained for late replies/recovery. |
+| `BackgroundResultData` | Full canonical native result and stable identified delivery persisted in the owning Session. |
+| Completion input/criteria records | Task identity, original human/spec snapshots, exact promise, and current task state; stored in existing operations. |
+| `RecordState` | Persisted aggregate of plugin-owned relationships, admissions, results, and recovery facts. |
+| `Projection` | Fold of native events: turn boundaries, committed inputs/finals, handoff carry-over, and capsule anchors. |
+| `WorkerView` / `ProjectSnapshot` | Derived native activity, membership, availability, progress, and UI state. |
+| `WorkerHistoryPage` / `WorkerTimelinePage` | Explicit human/AI message windows versus UI native turns and artifacts. |
 
-Assignment `admission` records native acceptance: `prepared`, `accepted`, `unknown` or `rejected`. `unknown` represents uncertain admission and must be reconciled before repeating a side effect.
+Native Session events are authoritative for execution and accepted/committed messages. Project storage records collaboration and delivery facts. `notes.md`, `archived.md`, and context files are Agent-maintained knowledge/work records, not a result-dedup database. Client caches derive from complete Host snapshots.
 
-Result delivery normally follows `pending → admitted → consumed`. A cancelled result associated with deletion can be `suppressed`. Consumption means the canonical result reached a committed native Coordinator message; it does not assert that the model understood it or completed its review.
+Five-state lifecycle is derived from native activity, approval/query waits, cancellation cleanup, and history. Request's awaited Tool Call remains **Running**; Query/human approval can be **Waiting**. **Aborting** lasts through actual cleanup. **Zombie** retains conversation/workspace without active model execution; SendMessage resumes it. A newly created Agent with no run is **Idle**. Membership, native busy/idle, cold residency, and display phase remain distinct facts.
 
-## Main execution paths
+## Composition and admission
 
-### Enable a Project
+`ProjectLifecycle.setEnabled → native maintenance → memory files/project record → prepareAgent → scoped tools/background/completion bindings`.
 
-`ProjectToggle → ProjectClient.toggle → authorized projectMode.setEnabled → ProjectLifecycle.setEnabled → native Agent maintenance → scoped native filesystem → Project record → attach`.
+The first owned turn locks mode identity. Creation and mode enable await bindings before native tool-schema assembly. Role identity is dialogue: Task first; Fork after inherited history. The five controls replace alternative native delegation in managed scopes; nested control tools default off. Draft disable/unload reverses scoped contributions and drains owned work without editing global preferences.
 
-The Host validates Session access and revision, creates missing memory files without overwriting existing ones, and registers `control_workers` in the Coordinator Agent scope. `tools.suppress` removes only the configured native Coordinator delegation tools. First owned native turn start locks the session's Project identity. Draft disable and plugin disposal reverse scoped contributions; they do not rewrite global tool preferences.
+Task/Fork reserve stable identities and persist descriptor/workspace facts before native activation. `WorkerOperations` prepares an assignment before accepting input, records its native receipt, and establishes capsule participation. Per-Worker mutation ordering ends after admission; it is not held for the whole model task. Fork's temporary recovery seed is removed only after confirmed native acceptance. Uncertain acceptance is reconciled against persisted native evidence before retrying.
 
-### Dispatch work
+Isolated preparation snapshots the source's current tracked/staged/untracked state using an independent Git index. Git commands use the acting native sandbox policy. Owned markers identify cleanup resources; destruction never removes a shared source. For explicitly permitted nested creation, management is scoped to the project's Git resources while ordinary execution keeps the child's own cwd policy. Read-only mode remains read-only; foreign Git resources outside the permitted project boundary are rejected.
 
-`control_workers → toolOperationId → WorkerOperations.controlForAgent → dispatch → prepareAssignment → admitWorkerInput → native subagents → acceptReceipt`. Interrupt/delete use `interruptOrDelete` without creating an Assignment.
+## Messages and result return
 
-The native tool-call identity supports operation idempotency. The Assignment is persisted before native admission. Spawn uses `subagents.startActivation`; send uses native next-step steer or next-turn queue. Accepted admission records the native message ID and capsule participation. Acceptance is not task completion. Per-Worker mutation serialization is released after admission; it is not held while waiting for model work.
+Notify admits an identified message and returns. Request persists its route, admits input, and waits inside the native Tool Call. Explicit `reply_to` resolves that call; unrelated input can interrupt the wait, and a late answer is delivered through the inbox. A wait-cycle check downgrades the new cyclic wait to Notify. The native pre-step drains all eligible next-step input; explicit next-turn queue input remains separate.
 
-### Return results and close a turn
+`withManagedAgent` reads durable headers and borrows the true parent chain, including cold intermediate parents. The reviewed Host-only native callback preserves reconstruction, delegated policy, capacity, and cleanup. It does not create synthetic user prompts or task events for intermediate hydration.
 
 ```mermaid
 sequenceDiagram
-    participant W as Native Worker Session
+    participant W as Native Worker
     participant O as CompletionOutbox
     participant S as Project storage
-    participant C as Native Coordinator Agent
-    W->>O: Native turn/end and projected last AI payload
-    O->>S: Store unique Completion and pending Delivery
-    O->>C: Native steer when busy, followup when idle
-    C->>O: Canonical result commits as user/message
-    O->>S: Mark consumed and record result participation
-    C->>C: Review and decide follow-up or report
-    C->>C: Native turn-stopping guard checks pending work/results
+    participant R as reportTo Agent
+    W->>O: Real turn/end + final committed AI
+    O->>S: Unique completion + pending delivery
+    O->>R: Identified native input, live or cold
+    R->>O: Result commits as user/message
+    O->>S: Mark consumed; preserve original capsule anchor
+    R->>R: Review evidence and choose next action
 ```
 
-`ingestCompletion` preserves the full last committed AI payload; a turn without an AI message still creates a completion notification with an empty result body. The notification identifies its Worker, native turn and outcome.
+An empty final AI result is delivered as empty; an earlier turn's reply is never substituted. The designated `reportTo` receives the result once, without a duplicate full-body copy to the root. The root can still observe team state. A message-driven background handoff is not a Worker completion; projection carries its consumed assignment IDs until a real ending accounts for them.
 
-`admitDeliveries` first checks native history and inbox identity, including already-consumed native notices, before waking a cold Coordinator or admitting a canonical message. `consume` records the original message anchor so a later human input cannot move its capsule. `guardTurn` waits on native change notifications and pending Project facts, returning control for new steer input or native Stop. It does not create a second Agent Loop.
+Normal Coordinator closure considers its own project queue, remaining assignments, actual Worker/background activity, and unconsumed results. Incoming next-step input and native Stop interrupt the wait. Historical errors on consumed/suppressed results do not block another project or later closure. Recovery reconciles durable acceptance, receipts, deletion, worktree ownership, and capsule anchors.
 
-Native notifications are bound in `agent-events.ts`; its Coordinator pre-step normalization reconciles managed native settlement notices with the canonical persisted result. The Service keeps the generated Remote method signatures and authorization boundary. Snapshot reads gather native facts before passing them to the pure `buildProjectSnapshot`.
+## Six control flows
 
-On startup, `recover` reconciles uncertain assignments, interrupted deletions, historical participation and result delivery. `native-receipt.ts` verifies native notice identity/content rather than guessing from similar text or the time the Coordinator later consumed it.
+| Flow | Implementation boundary |
+| --- | --- |
+| Interruptible waiting | QueryAgent waits on native changes, relevant completion, input, timeout, or Stop. It never starts a second driver. |
+| Soft insertion | SendMessage uses native next-step/next-turn admission symmetrically for main and child Agents. |
+| Slow-tool transfer | Native activity detaches into an owned job; `bindBackground` applies AfterSeconds/NewMessage/LLMJudge, records full results, and exposes query/cancel. |
+| Hard interrupt/steer | Native `cancelAndJoin` awaits old driver/resource exit, repairs missing Tool Results, flushes, then admits optional replacement with fresh control. |
+| Completion gates | Ralph checks a bound exact promise; independent Builder/Verifier derive source-anchored criteria and inspect real artifacts/tools. |
+| Parallel/end races | Native batch ordering retains foreground sibling barriers and pairing; eligible final inbox input withdraws candidate completion. |
 
-### Human operation of a Worker
+AfterSeconds without new input returns control within the current turn. A message-driven transfer writes a Tool Message placeholder, ends that turn with handoff, and lets incoming input open the next turn. Actual original-tool output validation/render/finalization runs once; a placeholder is not original-schema success. Pending jobs/results remain owned until real completion/delivery, and idle Agents can wake for their results. See the [reviewed native contract](native-moa-contract.md) for the exact resource and handoff contract.
 
-Before processing each new Coordinator human input, including same-turn steer, the Host samples native Worker state into required runtime context. The role prompt also tells the Coordinator to list Workers and read history as needed. The snapshot includes input provenance and pending-input facts; it is not a transcript of every change.
+Completion helpers are native owned Agents, hidden from the managed Worker catalog. Builder sees original human inputs and captured source references, not implementation output. Verifier reads authoritative workspace `rubrics.md` and checks deliverables through native tools. Promise/source records survive interrupted work and restart. Internal gate notices have a separate source kind so they cannot become new human requirements or capsule segments. Helpers are retired/drained through native ownership; new human input is not held behind an obsolete verifier.
 
-No human read cursor or additional acknowledgement protocol is maintained. The Coordinator uses existing `list/get/history` tools to decide what to inspect and how to update work records. Per-turn automatic result return remains independent of these reads. Exact preview/window behavior is documented in [Tool API](tool-api.md).
+## Memory and UI boundaries
 
-## UI boundaries
+New projects use root `notes.md`, `archived.md`, `rubrics.md`, and `context/index.md`. Existing paths remain unchanged. `bindProjectMemory` injects full notes on every Coordinator inference; above 8,000 characters it appends an organization reminder, leaving archival to the Coordinator. Context remains progressively loaded. ProjectContext applies native conditional writes in the actual shared context directory, so isolated Workers can contribute without overwriting another Agent's latest version.
 
-The Client contributes native slots and tabs. It does not replace the workspace browser, input editor, permissions engine or file preview. Worker permission selection is hidden in managed Worker composers while native delegated policy remains authoritative.
+Workers and Coordinator share a knowledge base, while the Coordinator maintains notes/archive. Same-cwd conversations share these files and `rubrics.md`; independent projects should use separate workspaces. Rubric task/generation/content checks prevent another task's overwritten file from silently passing verification.
 
-`ProjectStore.turn` derives capsules by `(Coordinator Session, native turn, human-message segment, Worker)`. Spawn, accepted updates and received results establish participation. Passive user input and reads do not. Closed seats use frozen outcomes; deleting membership hides all its seats.
+The Client contributes native slots and tabs; it does not replace the workspace browser, composer, permission engine, or file preview. Capsule keys remain `(Coordinator Session, native turn, human-message segment, Worker)`. Dispatch, accepted updates, and received results establish participation; reads and passive input do not. Deletion hides all seats and public membership while native history remains. Workers use Back and inherited permissions.
 
-The Workers tab consumes a read-only native activity stream. Its timeline shows original Markdown input and the last AI output of each ended turn. Each message uses a native disclosure with a two-line text preview and overflow ellipsis. DSH's native Markdown extractor supplies the preview without summarizing or clipping the stored source; opening renders the original Markdown, including full tables and code, and closing returns to the text preview. Artifact links come from recorded native deliveries/successful file mutations. Opening the tab does not call a model.
+The Workers tab is read-only. It shows original input, final AI output, and artifacts with two-line expandable Markdown previews. It does not summarize via a model. Workers/notes defaults use native closable tab behavior. Native sidebar rows retain their alignment and controls.
 
-## Failure handling and remaining maintenance
-
-Background jobs log failures and notify observers. A historical background warning is not a permanent cross-Project execution gate. Normal closure uses the current Project's unresolved assignments, native Worker activity and result-delivery facts. Delivery attempts and errors remain on their durable Delivery records, preserving existing retry and recovery behavior. There is no global `runtime` error latch or parallel error state machine.
-
-The Host entry is reduced from 1,184 to 738 lines, and initialization from 322 to 120 lines. Mode changes, event binding, tool definition and snapshot assembly have named modules, while the native execution order and public/storage contracts remain unchanged.
-
-Remaining localized work includes `repairCapsuleOwnership`, which still combines historical evidence gathering with migration, and the Coordinator pre-step normalization. `HostAccess` remains a shared native capability interface; narrow it further only when an actual responsibility split needs it. Transport enums include values not currently produced by every Host read path; consult actual producers before adding behavior around an enum value.
-
-See [contributing](../CONTRIBUTING.md) for the verification workflow and test map.
+The historical `ProjectMode`, `ProjectClient`, storage, package, and Remote names remain compatibility identifiers. They are not separate product modes or a reason to migrate user data. See [contributing](../CONTRIBUTING.md) for checks and [verification](verification.md) for evidence still required before release.

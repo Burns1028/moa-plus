@@ -1,72 +1,51 @@
 # MoA+
 
-**通过多智能体协作，让智能更进一步。** MoA+ 希望构建一个真正的多智能体系统（Mixture of Agents），探索 Agent 之间的相互协作如何把整个系统的智能能力推向下一个台阶。
+**通过多智能体协作，让智能更进一步。** MoA+ 希望构建一个真正的多智能体系统（Mixture of Agents）：让持久化 Agent 共享知识、交换消息、尝试不同方向，并共同审阅结果。
 
 [English](README.md) | 简体中文
 
-[![Project Mode 实际结果：两个 Worker、生成的笔记和通过的九项测试](docs/media/workflow-result.png)](docs/media/project-workflow.mp4)
+[![v0.1.23 真实任务：两个 Worker、共享记录和通过的九项测试](docs/media/workflow-result.png)](docs/media/project-workflow.mp4)
 
-当前预览版以非官方 DeepSeek Harness 插件的形式实现，提供 Coordinator、持久化 Worker 会话、共享上下文和结果审阅。这些能力是系统继续演进的起点。
+[观看协作演示](docs/media/project-workflow.mp4) · [代码架构](docs/architecture.md) · [工具 API](docs/tool-api.md) · [安装使用](#快速开始)
 
-[观看 60 秒协作演示](docs/media/project-workflow.mp4) · [查看界面效果](#实际效果) · [安装使用](#快速开始)
+**本分支包含尚未发布的 MoA 运行时改造。** 在已发布的 v0.1.23 预览版之上，加入五个 Agent 原语、隔离工作区、请求与回复、后台工具和完成门禁。集成与真实模型／界面验收仍在进行，[验证记录](docs/verification.md)区分了本分支与历史版本的证据。现有包版本号不代表新版本已经发布。
 
-**非官方开发预览版：v0.1.23。** 需要 DSH **0.2.1-rc.3 及本仓库列出的三个兼容扩展**，下方的独立环境脚本会准备好这些扩展；原版 rc.3 无法直接启用插件。详见[兼容说明](docs/compatibility.md)。
+目标运行时是 DSH **0.2.1-rc.3 及显式兼容扩展**，原版 rc.3 无法直接启用。本分支的兼容清单覆盖 13 个原生包；v0.1.23 使用的是此前的三个扩展。混用前请先读[兼容说明](docs/compatibility.md)。
 
-原 Project Mode。v0.1.23 运行时和演示仍使用 **Project** 标识，原有包名保持兼容。
+## 持续工作的协作团队
 
-## 目录
-
-- [当前实现](#当前实现)
-- [实际效果](#实际效果)
-- [快速开始](#快速开始)
-- [使用指南](#使用指南)
-- [项目记忆](#项目记忆)
-- [DSH 界面功能](#dsh-界面功能)
-- [项目结构](#项目结构)
-- [开发](#开发)
-- [API 与文档](#api-与文档)
-- [当前限制](#当前限制)
-- [许可证](#许可证)
-
-## 当前实现
-
-在当前实现中，用户把目标交给 Coordinator，由它创建或复用 Workers、引导工作、审阅结果并维护共享上下文。下文介绍已经可用的能力，后续协作机制将随着设计和验证继续演进。
+Coordinator 负责目标、方向、工作记录、结果审阅和最终交付。Workers 在任务之间保留会话与工作目录。双方运行同一套 DSH 原生 Agent Loop，通过身份、工具集合和继承权限形成分工。
 
 | 能力 | 带来的帮助 |
 | --- | --- |
-| 持续协调 | 同一个 Coordinator 会话维护项目工作记录，判断下一步。 |
-| 完整的 Worker 控制 | 派生或复用 Worker、引导当前工作、排队下发后续指令、查看状态与历史、打断或删除。 |
-| 共享项目知识 | Coordinator 与 Workers 共同维护索引，按需渐进加载上下文。 |
-| 自动返回结果 | Worker 每轮结束后自动返回完整的最终 AI 消息，交给 Coordinator 审阅。 |
-| 用户直接参与 | 进入 Worker 直接引导工作，再返回 Coordinator 继续协调。 |
-| DSH 原生执行 | Session、Agent Loop、工具、权限、消息投递和 Stop 均由 DSH 承担。 |
+| `Task` 与 `Fork` | 冷启动专家，或从选定 Agent 已提交的历史中派生新分支。 |
+| `SendMessage` | 通知同伴、引导当前工作、排队追加指令，或在工具调用中等待明确答复。 |
+| `QueryAgent` 与 `KillAgent` | 查看状态与历史、可中断地等待、停止并等待当前执行退出，或显式删除 Worker。 |
+| 隔离与共享工作区 | 默认把源目录的当前 Git 状态快照到专属 worktree，需要时显式选择共享目录。 |
+| 共享知识 | 先读索引、按需加载，把确认过的可复用知识带到后续任务。 |
+| 后台执行 | 慢工具继续运行时处理新输入；查询、取消，并接回真实结果。 |
+| 完成审阅 | 绑定完整完成承诺，由独立 Agent 从原始需求出卷、调用工具验证结果。 |
+| 用户直接参与 | 进入 Worker 下达指令，再返回能检查变化的 Coordinator。 |
+
+Coordinator 保留普通执行工具，自行判断如何分工；不通过任务关键词或命令次数强制派活。MoA 控制工具替换参与会话中的其他原生派生方式。Worker 默认不能继续派生下级，只有明确启用嵌套协作后才开放。普通 DSH 对话保持原生工具组合。
 
 ## 实际效果
 
-用一个小型 CLI 改动展示协作过程：Exporter 实现标题排序并补测试，Docs 维护使用说明，Coordinator 审阅两边的结果。用户进入 Exporter 会话更改排序要求，下一轮再沿用约定，加入一篇笔记。
+[![v0.1.23 的派发、人工介入、结果审阅与上下文复用](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
 
-[![实际协作任务：派发 Worker、人工更新需求、接回结果并在下一轮复用上下文](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
+这段**已发布 v0.1.23** 的录屏展示真实 CLI 任务：Exporter 实现标题排序；用户直接进入它的会话修改排序；Docs 对齐文档；Coordinator 审阅结果。下一轮继续复用原 Workers 和已经接受的约定。[实际产物](docs/demo-result)通过了九项测试。
 
-这段剪辑展示真实的 CLI 任务：**派发 Workers → 人工进入 Exporter 改排序要求 → Coordinator 接回变化 → 下一轮复用已有 Workers 和共享上下文**。等待过程经过剪辑并全程标注，不代表任务在 60 秒内完成；最终示例通过了 9 项真实测试。可以[复现任务](docs/demo-workflow.md)，也可以[查看实际产物](docs/demo-result)。可以[打开 MP4](docs/media/project-workflow.mp4)控制播放，也可以[查看工作台原图](docs/media/project-workspace.png)。
-[![完整任务的实际结果：沿用排序约定生成四篇笔记，9 项测试通过](docs/media/workflow-result.png)](docs/media/workflow-result.png)
+这是剪去等待并标注的 60 秒片段，不是完成时间基准，也不代表新运行时的所有机制已经验收。可以[复现任务](docs/demo-workflow.md)，或查看[录制说明](docs/media/README.md)。
 
-### 看清每个 Worker 做了什么
+| Worker 工作轴 | 项目记录 |
+| --- | --- |
+| ![原始输入、最终 AI 回复与产物](docs/media/worker-timeline.png) | ![原生会话旁的 notes.md](docs/media/project-notes.png) |
 
-选中 Worker，按由近到远的顺序查看每一轮工作。需要时展开原始指令和最终 AI 回复，打开记录的产物，或直接进入子会话引导它。
-
-[![Worker 工作时间轴：两轮记录、展开的原始输入与最终输出、产物文件链接](docs/media/worker-timeline.png)](docs/media/worker-timeline.png)
-
-### 下一次继续时，项目记录还在
-
-`notes.md` 就在对话旁边，保留目标、已交付工作、当前状态和下一步。Coordinator 负责维护工作记录，可复用的知识则持续积累到共享上下文索引中。
-
-[![DSH 中渲染的 notes.md：项目目标、交付文件、当前状态和后续工作](docs/media/project-notes.png)](docs/media/project-notes.png)
-
-协作视频使用 v0.1.23 独立环境和公开的 Note Bundle 示例；较早的细节图来自 v0.1.22 的虚构项目 **Project Atlas**。这些均为真实 DSH 界面，不是概念图，也不作为速度基准。[素材来源与复用说明](docs/media/README.md)。
+细节截图来自 v0.1.22 的虚构 Project Atlas 工作区，保留原有 **Project** 标识；当前界面使用 **MoA+**。
 
 ## 快速开始
 
-首次试用推荐创建一个独立的**兼容 DSH Web 环境**。需要 Node **24.9+**、npm 和 Git：
+试用**已发布的 v0.1.23 预览版**，需要 Node **24.9+**、npm 和 Git：
 
 ```sh
 git clone --branch v0.1.23 https://github.com/Burns1028/moa-plus.git
@@ -75,111 +54,85 @@ node scripts/project-mode.mjs setup
 node scripts/project-mode.mjs start
 ```
 
-Setup 会安装锁定版本的 rc.3 运行时，并且只在 `~/.dsh-project-mode/rc3` 内应用三个已审计的扩展。不复用日常 Desktop 应用、`~/.dsh`、全局 Agent 配置和工作区。原生 Web 界面在本地打开；配置模型后新建会话，在发送第一条消息前选择 **Project**。
+这个 tag 安装的是旧预览版及三个兼容扩展，不包含本分支的新运行时；该版本在第一条消息前勾选 **Project**。
 
-运行 `node scripts/project-mode.mjs doctor` 可以检查准备结果。[首次运行指南](docs/quickstart.md)说明了路径、重启和恢复方式，也可以直接尝试[可复现的项目任务](docs/demo-workflow.md)。
-
-如果已有准备好的兼容 Desktop／运行时，仍可通过它的原生 CLI 安装插件：
+测试**本分支**时，从对应分支／PR 的源码检出开始，使用同一检出的锁文件、清单和启动脚本，准备全新的独立目录：
 
 ```sh
-dsh plugin --profile desktop add "git+https://github.com/Burns1028/moa-plus.git#v0.1.23"
-```
-
-原版 rc.3 仍不兼容。Setup 是显式运行的脚本，不是 npm 安装钩子，也不会修改已有的 Desktop 应用。[兼容说明](docs/compatibility.md)保留了三个原生扩展和手工准备方式；各版本安装包见 [Releases](https://github.com/Burns1028/moa-plus/releases)。
-
-## 使用指南
-
-| 角色 | 职责 |
-| --- | --- |
-| 用户 | 提出目标、作出决定、与 Coordinator 沟通，也可以进入 Worker 会话直接引导工作。 |
-| Coordinator | 选择和引导 Workers、供给上下文、审阅结果、维护工作记录、整理共享知识并汇报进展。澄清、汇总和简单独立操作也可以由它自己完成。 |
-| Worker | 完成分配的调查或执行任务，补充可复用的发现，以一条自包含的最终 AI 消息返回结果。 |
-
-常见流程：
-
-1. 用户把目标交给 Coordinator。它查看 Workers 状态和相关项目记忆，了解用户对子会话的直接操作。
-2. 它判断复用已有 Worker 还是派生新 Worker，下发目标和上下文，再更新 `notes.md`。
-3. 工作发生变化时，用 **steer** 引导当前工作，用 **queue** 将指令留到当前 turn 结束后处理。打断和删除是另外的操作。
-4. Worker 每轮结束自动返回最后一条完整 AI 消息。没有 AI 消息的轮次，也会通知 Worker 身份、轮次和结果状态，并返回空的 AI 结果。
-5. Coordinator 审阅后继续下发或结束工作，更新工作记录和可复用上下文。正常情况下，相关工作和结果接收完成后，在同一个原生 Coordinator turn 内收口。
-
-用户直接操作 Worker 后，再与 Coordinator 沟通时，它可以查看当前状态并按需回看对话。
-
-## 项目记忆
-
-```text
-.dsh/project-mode/<project-id>/
-├── notes.md                 待办、分工、进度、阻塞和下一步
-├── archived.md              完成或告一段落的工作及其结果
-└── context/
-    ├── context.md           共享索引：文件路径和简短介绍
-    ├── decisions.md         可复用的决定与依据，按需创建
-    └── ...                  其他可复用的项目知识
-```
-
-当前实现中的 `notes.md` 和 `archived.md` 由 Coordinator 维护，让它知道项目进行到了哪里、还有什么需要推进。
-
-上下文由 Coordinator 和 Workers 共同维护。Agent 先读 `context/context.md`，再按当前任务需要读取具体文件。Workers 补充有价值、可复用的发现，并更新索引；Coordinator 更多负责整理、合并、删除过时或重复的内容。日常进度保留在工作记录中。
-
-这些文件随项目持续积累，采用渐进式加载，不会在每次请求中全量展开。详细说明见[目标与当前角色职责](docs/moa-architecture.md)。
-
-## DSH 界面功能
-
-- 新建会话，在发送第一条消息前选择 **Project**。首次 turn 启动后，Project 身份固定。
-- 在原生工作区侧栏展开 Coordinator，打开其 Workers。每个 Worker 都有稳定的身份图标和当前状态。
-- 点击主会话里的 Worker 胶囊进入子会话。胶囊保留在派发、更新或接收结果所对应的对话段，后续普通回复不会搬动旧胶囊。
-- 右侧默认打开 **Workers** 和 **notes.md**。Workers 按由近到远的顺序展示每轮原始输入、最终 AI 输出和记录的产物；每条正文默认显示最多两行文字，超出部分显示省略号，点击正文展开完整 Markdown 或收起。两个 Tab 都允许关闭。
-- Worker 输入框提供返回 Coordinator 的 **Back**，沿用原生派生权限，不提供独立权限选择器。归档主会话时，其管理的 Workers 一起归档。
-
-原生派生和控制工具仅在 Coordinator 的 Agent 作用域中替换，Workers 与普通会话保留原生工具组合。Stop 保持可用，不会自动停止所有 Workers。
-
-## 项目结构
-
-```text
-packages/project-mode/
-├── src/host/       项目生命周期、Worker 操作和结果投递
-├── src/client/     侧栏、胶囊和项目页签
-├── src/shared/     共享类型与接口契约
-└── lib/            插件构建产物
-compat/rc3/         经审计的运行时兼容补丁
-scripts/            构建、兼容和验证脚本
-tests/              回归与原生接口测试
-docs/               模型、架构、API 和验证文档
-```
-
-## 开发
-
-需要 Node **24.9+**、npm 和 Git。
-
-```sh
-git clone https://github.com/Burns1028/moa-plus.git
-cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
-npm test -- --maxWorkers=1
+npm run build
+node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
 
-`npm test` 会先构建插件。修改 `packages/project-mode/src`，通过构建重新生成并提交 `lib` 产物。类型检查、原生接口测试、安装包验证和测试地图见[贡献指南](CONTRIBUTING.md)。
+新会话发送首条消息前勾选 **MoA+**，启动后身份固定。隔离 Worker 需要 Git 工作区；需要直接操作父目录时，在任务中显式选择 `shared`。
 
-## API 与文档
+启动脚本准备独立的原生 Web 运行时、home、Agent 配置和文档目录。模型使用原生设置配置，不复用个人 DSH profile，也不改动已安装的 Desktop 应用。使用相同 `--dir` 运行 `doctor` 检查环境。详见[首次运行指南](docs/quickstart.md)。
 
-Coordinator 通过 `control_workers` 使用 `spawn`、`list`、`get`、`send`、`history`、`interrupt` 和 `delete`。`send` 区分引导当前工作的 **steer** 与留待下一轮处理的 **queue**。参数、示例和结果语义见工具 API。
+## 常见工作流程
 
-| 文档 | 内容 |
-| --- | --- |
-| [目标与当前角色](docs/moa-architecture.md) | 系统目标、当前角色职责与渐进式共享上下文 |
-| [代码架构](docs/architecture.md) | 模块、函数、数据结构和执行路径 |
-| [工具 API](docs/tool-api.md) | Worker 控制、消息投递和历史窗口 |
-| [兼容说明](docs/compatibility.md) | rc.3 所需的显式运行时扩展 |
-| [验证记录](docs/verification.md)／[手工验收](docs/manual-verification.md) | 已验证内容与真实应用检查方法 |
+1. 用户给出目标。Coordinator 检查 Workers，读取工作记录及相关上下文。
+2. 用 `Task` 创建专家，用 `Fork` 继承有用历史，或通过 `SendMessage` 延续已有 Worker。
+3. 更新 `notes.md`；工作进行中及时处理用户输入、调整方向。Request 在当前 Tool Call 内等待回答，Notify 在消息接受后返回。
+4. Worker 一轮真正结束后，把**本轮最后一条完整 AI 消息**自动回传给 `reportTo`，默认是创建者。没有 AI 消息就返回空，不拿旧回复替代；转后台交接不算完成。
+5. Coordinator 审阅证据与产物，补齐缺口、整理知识并交付。正常收口等待相关工作和结果处理完成；新消息与原生 Stop 仍可及时生效。
 
-## 当前限制
+`QueryAgent` 按明确的下标和长度读取最近的人类／AI 消息，不默认加载最近 100 条。用户直接操作 Worker 后，Coordinator 可以检查其状态和输入；不另设人工已读或确认协议。
 
-分工仍由模型判断，预览版不保证每次都作出理想选择，也不使用任务关键词、命令次数或时间阈值强迫派发。
+## 项目记忆
 
-欢迎用一个小项目试用，并在 [试用反馈](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml) 分享使用场景或安装反馈。如果希望持续关注项目，点一个 Star 也能帮助更多人发现它。
+新工作区默认使用：
 
-## 许可证
+```text
+workspace/
+├── notes.md                 Coordinator：阶段、待办、分工、进度、阻塞
+├── archived.md              Coordinator：已完成或告一段落的工作及结果
+├── rubrics.md               独立生成的验收标准
+└── context/
+    ├── index.md             共同维护：文件路径和简短介绍
+    └── ...                  可复用的事实、决策和方法
+```
 
-MIT。参见 [LICENSE](LICENSE) 和[第三方声明](THIRD_PARTY_NOTICES.md)。
+Host 在 Coordinator **每次推理前完整注入 `notes.md`**。超过 8,000 字符时追加整理提醒，不截断，也不代替 Coordinator 自动归档。Context 保持渐进加载：先读索引，再按需读文件。Workers 贡献有复用价值的发现；Coordinator 更多负责整理、合并和删除过时内容。隔离 worktree 中的 `ProjectContext` 也能访问真正的共享知识库。
+
+已有记录的路径及旧 `context/context.md` 索引继续兼容。相同工作目录中的会话共享记忆文件；独立项目宜使用独立工作区。
+
+## 原生 DSH 界面
+
+- 在原生侧栏展开 Coordinator，查看带稳定身份图标和当前状态的 Workers。
+- 胶囊留在参与工作的 turn／消息段底部。被动回复不移动或复制胶囊，接受的新指令和收到的结果才建立参与关系。
+- 右侧默认打开 **Workers** 与 **notes.md**，沿用原生 Tab 切换和关闭方式。工作轴由近到远展示原始输入、最终 AI 输出和记录的产物。
+- 输入／输出先显示一至两行文本和省略号，点击文本展开完整 Markdown。
+- Worker 输入框提供 **Back**，继承权限且不显示独立权限选择器。删除后从有效列表及所有胶囊中隐藏，原生历史保留；归档跟随管理的会话家族。
+
+## 代码与文档
+
+```text
+packages/project-mode/src/
+├── host/                    原生装配、持久化投递、结果和 MoA 控制
+│   └── moa/                 Agent、角色、通信、工作区、后台工具与完成门禁
+├── client/                  原生侧栏、胶囊、控制和 Tab
+└── shared/                  传输视图和共同成员规则
+compat/rc3/                  经审阅的兼容扩展及精确文件哈希
+runtime/rc3/                 独立运行时锁定模板
+scripts/                     构建、显式安装及包消费者检查
+tests/                       原生夹具、Client 契约和启动器检查
+```
+
+为兼容已有安装，历史包名 `dsh-plugin-project-mode`、存储域和 Remote 服务名保持稳定，产品更名不要求迁移历史对话或传输协议。
+
+继续阅读[代码架构](docs/architecture.md)、[目标与角色](docs/moa-architecture.md)、[工具 API](docs/tool-api.md)、[兼容说明](docs/compatibility.md)和[贡献指南](CONTRIBUTING.md)。完整检查命令：
+
+```sh
+npm test -- --maxWorkers=1
+npm run typecheck
+npm run test:native-contract
+npm run test:launcher
+npm run verify:package
+```
+
+模型判断仍会影响分工和验收质量。架构提供独立执行与审阅的能力，不承诺每次任务都能获得理想分工或无误的验收标准。欢迎提交[真实试用与安装反馈](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml)。
+
+MIT。见 [LICENSE](LICENSE) 与[第三方声明](THIRD_PARTY_NOTICES.md)。

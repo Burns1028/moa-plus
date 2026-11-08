@@ -1,6 +1,38 @@
 # Verification
 
-Current source: 0.1.23, 2026-11-02. DSH 0.2.1-rc.3 with the same three explicit compatibility extensions. The 0.1.23 change adds isolated onboarding and public task evidence; plugin coordination behavior is unchanged from 0.1.22. No additional native patch, public/storage schema change, prompt routing gate or human read/ack state was added.
+## Current branch: unreleased MoA runtime
+
+The current checkout contains the six-chapter MoA runtime work. Its new capabilities and wider native compatibility manifest must be verified together. **Whole-branch acceptance is still in progress; the historical results below do not prove the new runtime.** The existing package version is not a release announcement.
+
+The regression sources exercise these separate boundaries:
+
+| Boundary | Evidence source |
+| --- | --- |
+| Task/Fork, role identity, actual reporting target, nested permission, and explicit shared/isolated workspaces | `tests/host/moa-agents.spec.ts`, `moa-controls-integration.spec.ts`, `moa-workspace-integration.spec.ts` |
+| Dirty-state Git snapshots, scoped management, and owned cleanup | `tests/host/moa-workspaces.spec.ts` |
+| Request/ReplyTo, waiting interruption, cycles, late results, and durable receipt recovery | `tests/host/moa-messages.spec.ts` |
+| True cold parent-chain hydration without synthetic intermediate input/task events | `tests/host/moa-residency.spec.ts` |
+| Full per-inference notes, progressive context, and common short native judge | `tests/host/moa-memory.spec.ts`, `project-memory.spec.ts`, `moa-judge.spec.ts` |
+| Timer/message/judge transfer, sibling barriers, real Bash producer/exit, canonical results, cancellation, and recovery | `tests/native-contract/moa-background.spec.ts` |
+| Task-scoped Ralph, independent original sources, tool-backed verdicts, rework, queue semantics, and restart | `tests/host/moa-completion.spec.ts` |
+| Existing result/turn/capsule/native UI contracts | Host receipt/provenance tests, Client tests, and native sidebar/tool contracts listed in [Contributing](../CONTRIBUTING.md) |
+
+Most model requests in these tests use scripted adapters over the actual native loop. Some cases execute the locked native Bash/subprocess/jobs implementation. Those executions prove the corresponding tool/resource behavior; they do not constitute real-model task ownership or visible application acceptance.
+
+Before this branch is described as fully accepted, record:
+
+- Production build and Host/Client typechecks against the final native manifest.
+- Whole Host/Client/integration, native-contract, and launcher results.
+- Fresh npm/forwarding/committed-Git consumers plus clean-checkout `npm ci`.
+- A fresh isolated DSH runtime and real configured model tasks, with actual artifacts and independently rerun checks.
+- Native UI/trajectory inspection of turn closure, message timing, capsule provenance, scoped tools, input previews, status, and existing layout.
+- Independent final branch review and any unresolved limitations.
+
+Use [manual verification](manual-verification.md) for the full runtime scenarios. Keep credentials, profiles, conversations, raw trajectories, and private screenshots outside Git; publish a factual version/task/result summary. Component tests are useful evidence, not a substitute for these final checks.
+
+## Published preview evidence
+
+The sections below concern the earlier tagged releases. They used DSH 0.2.1-rc.3 with the original three extensions, not the current branch's expanded runtime. The v0.1.23 change added isolated onboarding and public task evidence; its coordination behavior was unchanged from v0.1.22.
 
 ## 0.1.23 isolated runtime and real workflow
 
