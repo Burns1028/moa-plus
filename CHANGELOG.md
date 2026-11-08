@@ -6,10 +6,11 @@
 - Preserve current Git state when preparing isolated worktrees, hydrate the true cold parent chain for delivery, and retain existing memory paths, turn/message capsule ownership, and native UI controls.
 - Add explicit Request/ReplyTo matching, same-turn interruption, late-answer recovery, and native slow-tool transfer. SendMessage remains a direct native tool beside run_code under PTC; it is excluded from program SDKs and nested dispatch.
 - Persist full background outcomes through native ignorable plugin records and expose current native job state. Cancellation remains stopping until resource exit; hard continuation waits for the old execution's cleanup.
+- Preserve detached PTC dispatch starts and settlements as ignorable records with their original lineage and canonical payloads, keeping native cold history readable after the foreground turn closes. See the [detached PTC log contract](docs/native-moa-detached-ptc-log-contract.md).
 - Refresh full Coordinator notes before inference and retain progressive shared context. Add exact completion promises, Builder rubric submission from original requirements, and independent verification with retained native execution tools.
 - Keep canonical results unique across inbox claims/recovery and hold Coordinator closure while its final Worker result is queued for ingestion.
 - Use the reviewed rc.3 compatibility manifest covering 13 native packages and 31 file paths. The existing package version remains 0.1.23; these changes are not a new published release.
-- Record 54 regression files / 293 passing tests, Host/Client typechecks, a production build, and 19 passing launcher checks. Package consumers passed at a21aacb; final package and remaining real-app checks are tracked in [verification](docs/verification.md).
+- Record 54 regression files / 296 passing tests, Host/Client typechecks, a production build, and 19 passing launcher checks with no skips. Fresh npm, forwarding-package, and Git consumers passed at `ec9b011`; remaining real-app checks are tracked in [verification](docs/verification.md).
 
 ## 0.1.23 — 2026-11-02
 
