@@ -29,9 +29,12 @@ it.each(["native", "ptc"])("inherits preset execution tools for the Verifier whi
     }
     f.ctx.baseUrl = new URL("./", import.meta.url).href;
     await f.ctx.plugin((await import("@deepseek-ai/cordis-plugin-loader")).default);
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-tool-subagent/model-selection-settings")).default, { enabled: false, allowedModels: [] });
     await f.ctx.plugin((await import("@deepseek-ai/dsh-agent-preset-registry")).default, { default: "standard" });
     await f.ctx.agentPresets.register({ id: "standard", plugins: [
       { name: "@deepseek-ai/dsh-tool-bash", config: { promoteOnTimeout: false } },
+      // Standard registers this variant in each Agent's own scope after setup.
+      { name: "@deepseek-ai/dsh-tool-subagent", config: { provider: "spawn", modelSelectionSettings: true } },
       { name: new URL("./fixtures/tool-presentation.mjs", import.meta.url).href, config: { mode } },
     ] });
     const { agent } = await f.ctx.agents.create({
