@@ -150,7 +150,11 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const builder = await make("builder");
     let verifier: AgentHandle;
     try { verifier = await make("verifier"); } catch (error) { await builder.dispose(); throw error; }
-    builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation. Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${JSON.stringify({ ...input, attachments: undefined })}` }, ...input.attachments] }));
+    builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive task-deliverable acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Read the requirements in chronological order: later clarifications supersede conflicting earlier instructions. An instruction governing subsequent actions applies from its arrival unless the user explicitly makes it retroactive; do not turn it into a restriction on earlier actions. Preserve all other explicit deliverable, artifact, build and test requirements. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation.
+
+You are part of a pre-end completion gate. The parent turn is still open while the Builder and Verifier run; a passing review allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Do not require this review's own completed record or the subsequent parent turn/end as already-existing task deliverables.
+
+Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${JSON.stringify({ ...input, attachments: undefined })}` }, ...input.attachments] }));
     const build = builder.agent.whenIdle().then(async () => {
       if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
       rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
@@ -253,7 +257,11 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         const call = pair.verifier.agent.session.snapshotEvents().filter(event => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
         if (call) successfulBash.add(call.seq);
       });
-      pair.verifier.agent.followup(msg(`Independently verify actual deliverables against this rubric. Inspect artifacts with available native tools and personally run relevant Bash/build/tests where applicable. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection; do not accept claims as evidence. Use read_rubric to read the rubric from disk. Rubric file: ${pair.rubricPath}`));
+      pair.verifier.agent.followup(msg(`Independently verify actual deliverables against this rubric. Interpret the anchored requirements chronologically: later clarifications supersede conflicting earlier instructions, and instructions about subsequent actions apply from their arrival unless explicitly retroactive.
+
+This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
+
+Inspect artifacts with available native tools and personally run relevant Bash/build/tests where applicable. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection; do not accept claims as evidence. Use read_rubric to read the rubric from disk. Rubric file: ${pair.rubricPath}`));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       await pair.read(control);
       const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
