@@ -31,4 +31,4 @@ declare module "@deepseek-ai/dsh-jobs/view" {
 }
 export declare const backgroundHandle: (receipt: Pick<BackgroundReceipt, "owner" | "callSeq">) => string;
 /** Install policy and receipts on one native owner; the loop retains all execution ownership. */
-export declare function bindBackground(ctx: Context, agent: Agent, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">, requestPending?: (callSeq: number) => boolean): Promise<() => Promise<void>>;
+export declare function bindBackground(ctx: Context, agent: Agent, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">): Promise<() => Promise<void>>;

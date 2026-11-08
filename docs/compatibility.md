@@ -12,7 +12,7 @@ The published **v0.1.23** tag used three earlier extensions: Agent-local tool su
 | --- | --- |
 | `dsh-client-ui-conversation` | Per-session native submission choice; MoA Coordinator Enter/Send can steer without changing global preferences. |
 | `dsh-client-ui-workspace` | Native `sidebar.workspaces.session.branch` rendering through original parent/child row callbacks. |
-| `dsh-tools` | Reversible Agent-local suppression, transferable tool execution context, and background metadata/result support. |
+| `dsh-tools` | Reversible Agent-local suppression, transferable tool execution, background metadata/results, and direct protocol tools alongside PTC. |
 | `dsh-agent` | Typed activity/background events, joined cancellation, and derived native ownership/cleanup facts. |
 | `dsh-agent-loop` | Native tool transfer, same-turn timer continuation versus message handoff, canonical result finalization, and cancellation exit barrier. |
 | `dsh-session` | Typed background handoff/receipt event contracts. |
@@ -26,7 +26,7 @@ The published **v0.1.23** tag used three earlier extensions: Agent-local tool su
 
 All names in this table have the `@deepseek-ai/` prefix. Some changes are declarations only; runtime-only distributions therefore apply fewer file edits than development installations.
 
-Read the [background/cancellation contract](native-moa-contract.md) and [promptless residency contract](native-moa-residency-contract.md) before altering these seams. Existing batch-local ordering remains native-owned. There is no universal cross-turn tool lease, alternate scheduler, or bypass for model control calls.
+Read the [background/cancellation contract](native-moa-contract.md), [promptless residency contract](native-moa-residency-contract.md), and [protocol presentation contract](native-moa-protocol-presentation-contract.md) before altering these seams. Existing batch-local ordering remains native-owned. There is no universal cross-turn tool lease, alternate scheduler, or bypass for model control calls.
 
 ## Prepare explicitly
 

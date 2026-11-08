@@ -68,7 +68,6 @@ export declare class MoAMessageBroker {
     private routeLocks;
     private disposed;
     constructor(ports: MessagePorts);
-    hasPendingRequest(senderId: string, callSeq: number): boolean;
     dispose(): void;
     recover(rootId: string, step?: RecoveryStep): Promise<void>;
     send(actor: Agent, input: SendMessageInput, operationId: string, signal: AbortSignal): Promise<unknown>;

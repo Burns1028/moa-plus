@@ -81,6 +81,8 @@ node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 
 `QueryAgent` 按明确的下标和长度读取最近的人类／AI 消息，不默认加载最近 100 条。用户直接操作 Worker 后，Coordinator 可以检查其状态和输入；不另设人工已读或确认协议。
 
+PTC 模式下，`SendMessage` 与 `run_code` 并列，始终通过原生工具调用，不放进脚本 SDK。这样，阻塞的 Request 可以保留原工具结果和 turn；其他 PTC 工具沿用原生行为。
+
 ## 项目记忆
 
 新工作区默认使用：

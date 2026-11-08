@@ -715,7 +715,7 @@ function consumed(agent, message) {
 	return agent.session.snapshotEvents().some((e) => e.type === "user/message" && e.data.id === message.id);
 }
 /** Install policy and receipts on one native owner; the loop retains all execution ownership. */
-async function bindBackground(ctx, agent, config, requestPending = () => false) {
+async function bindBackground(ctx, agent, config) {
 	const jobs = requireNativeBackground(ctx, agent);
 	if (!Number.isFinite(config.backgroundAfterSeconds) || config.backgroundAfterSeconds < 0) throw new Error("backgroundAfterSeconds must be finite and nonnegative");
 	const detachController = jobs.attachController("moa-background");
@@ -805,7 +805,7 @@ async function bindBackground(ctx, agent, config, requestPending = () => false) 
 	disposers.push(agent.ctx.on("agent/tool-activity-started", (activity) => {
 		const key = backgroundHandle(activity.identity);
 		live.set(key, activity.finished);
-		const stop = watchActivity(ctx, agent, activity, config, requestPending);
+		const stop = watchActivity(ctx, agent, activity, config);
 		watchers.add(stop);
 		const cleanup = () => {
 			stop();
@@ -964,7 +964,7 @@ async function bindBackground(ctx, agent, config, requestPending = () => false) 
 		}
 	})();
 }
-function watchActivity(ctx, agent, activity, config, requestPending) {
+function watchActivity(ctx, agent, activity, config) {
 	if (activity.execution.name === "SendMessage" && activity.execution.arguments?.mode === "request") return () => {};
 	const started = Date.now();
 	const abort = new AbortController();
@@ -975,7 +975,6 @@ function watchActivity(ctx, agent, activity, config, requestPending) {
 	const eligible = () => agent.inbox.nextStep.filter((m) => m.source.kind !== "moa-background-result");
 	const inspect = async () => {
 		if (judging || transferred || signal.aborted) return;
-		if (requestPending(activity.identity.callSeq)) return;
 		if (!threshold && !activity.execution.backgroundOnMessage) return;
 		if (!threshold && eligible().length === 0) return;
 		if (threshold && config.backgroundStrategy === "after-seconds") {
@@ -1000,7 +999,7 @@ function watchActivity(ctx, agent, activity, config, requestPending) {
 				}, signal);
 				const pending = new Set(eligible().map((m) => m.id));
 				const messageIds = unread.map((m) => m.id).filter((id) => pending.has(id));
-				if (decision && messageIds.length && !signal.aborted && !requestPending(activity.identity.callSeq)) transferred = (await activity.requestBackground({
+				if (decision && messageIds.length && !signal.aborted) transferred = (await activity.requestBackground({
 					kind: judge ? "llm-judge" : "new-message",
 					messageIds
 				})).kind === "background";
@@ -2875,9 +2874,6 @@ var MoAMessageBroker = class {
 	constructor(ports) {
 		this.ports = ports;
 	}
-	hasPendingRequest(senderId, callSeq) {
-		return [...this.waits.values()].some(({ route, signal }) => !signal.aborted && route.senderId === senderId && nativeOperationSeq(route.operationId, senderId) === callSeq);
-	}
 	dispose() {
 		this.disposed.abort();
 		this.ports.dispose?.();
@@ -3127,6 +3123,7 @@ var MoAMessageBroker = class {
 function createSendMessageTool(broker) {
 	return defineTool({
 		name: "SendMessage",
+		nativeOnly: true,
 		description: "Send a notification or ask another MoA agent a question. Reply to a request using reply_to. Requests wait for an explicit answer, timeout, or priority input.",
 		parameters: {
 			target: {
@@ -5078,7 +5075,7 @@ let ProjectMode = (() => {
 			}
 			let binding = this.backgroundBindings.get(agent);
 			if (!binding) {
-				binding = bindBackground(this.ctx, agent, this.config, (callSeq) => this.messages.hasPendingRequest(agent.id, callSeq));
+				binding = bindBackground(this.ctx, agent, this.config);
 				this.backgroundBindings.set(agent, binding);
 			}
 			try {

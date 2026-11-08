@@ -81,6 +81,8 @@ The launcher prepares a separate native Web runtime, home, Agent configuration, 
 
 `QueryAgent` reads an explicit newest-relative human/AI history window. It does not silently load the last 100 messages. The Coordinator can inspect user activity inside Workers when the user returns; there is no separate human read/ack protocol.
 
+In PTC mode, call `SendMessage` as a native tool beside `run_code`; it is excluded from the script SDK so a blocking Request keeps its original tool result and turn. Other PTC tools retain their normal behavior.
+
 ## Project memory
 
 New workspaces use:
