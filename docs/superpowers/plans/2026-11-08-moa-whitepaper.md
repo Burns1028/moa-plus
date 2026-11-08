@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing TypeScript/Cordis plugin, Zod, DSH 0.2.1-rc.3 compatibility runtime, Vitest, native integration fixtures and Ego real UI acceptance.
 
-**Execution note — 2026-11-09:** Tasks 1–9 are implemented, reviewed and covered by the current 54-file / 296-test regression, typechecks, 19 launcher checks and `ec9b011` package consumers. The initial proposed file split was consolidated after the Stop That Shit review: existing memory, message and completion modules own those responsibilities. File lists and interfaces below describe the delivered code; Git history retains the original proposal. Task 10 has observed real-model core-flow evidence, but fresh Timer2 normal closure after independent reassessment, final restart/recovery, PR delivery and overall goal completion remain open. See the [requirement map and evidence](../../verification.md).
+**Execution note — 2026-11-09:** Tasks 1–10 satisfy the implementation and acceptance criteria, with 54 files / 296 tests at `e617f0f` / bundle `e982a59`, typechecks and 19 launcher checks. Fresh npm/forwarding/Git consumers and clean-checkout npm ci passed at `231663c`. The initial proposed file split was consolidated after the Stop That Shit review: existing memory, message and completion modules own those responsibilities. File lists and interfaces below describe the delivered code; Git history retains the original proposal. Fresh Timer3 independent Pass, normal closure, final restart/recovery and native UI inspection passed on `e982a59`. PR #3 exists with source `231663c` pushed and CI passing; Root owns the final documentation push, Ready metadata and goal-status update. Timer2 Partials and the subsequent pre-end/chronology clarification remain recorded. See the [requirement map and evidence](../../verification.md).
 
 ## Global Constraints
 
@@ -100,6 +100,7 @@
 - [x] Cover exact promises, source-independent Builder input/submission, tool-backed verification, Partial/Block rework, input/end races, cancellation and restart.
 - [x] Use hidden native sessions and hooks, preserve helper evidence, deny Builder execution/delegation and retain Verifier preset capabilities.
 - [x] Pass completion and native preset-isolation regressions; observe real Builder submission, Verifier Pass and Ralph correction separately in Task 10.
+- [x] Clarify chronological instructions and pre-end Builder/Verifier ownership without requiring their own future completion records or the parent's subsequent end.
 
 ## Task 7: Integrate complete runtime into existing Host
 
@@ -128,20 +129,22 @@
 **Status:** Complete.
 
 - [x] Align architecture, API, usage, changelog and compatibility documentation with the delivered code and stable package/storage identities.
-- [x] Pass production build, Host/Client types, 54 files / 296 combined tests, 19 launcher tests and `ec9b011` npm/forwarding/Git consumers with clean-checkout npm ci.
+- [x] Pass production build, Host/Client types, 54 files / 296 combined tests, 19 launcher tests and `231663c` npm/forwarding/Git consumers with clean-checkout npm ci.
 - [x] Complete independent architecture/Stop reviews and bounded reviews of acceptance fixes; resolve findings with focused verification.
 - [x] Maintain the six-chapter and six-control-flow requirement-to-code/test/evidence map in existing [verification](../../verification.md).
 
 ## Task 10: Real DSH/model/UI acceptance and PR
 
-**Status:** In progress. Core exercises are observed; final acceptance and delivery are not complete.
+**Status:** Complete. PR #3 contains the pushed source and passing CI; final documentation push and Ready metadata are delivery housekeeping.
 
 - [x] Prepare a fresh isolated compatible DSH runtime and test workspace without personal sessions/profiles.
 - [x] Observe real Task/Fork, role/nested reporting, Request/ReplyTo/interruption/late replies, direct human Worker control, shared knowledge and full canonical result return.
 - [x] Observe real message-triggered background work, cancellation/resource exit, hard continuation, Ralph promise correction, Builder submission and independent Verifier Pass/rework.
-- [x] Inspect native status/tools/trajectories/capsules and actual artifacts through Ego; observe deletion, family archive and restoration while preserving deletion.
+- [x] Inspect native status/tools/trajectories/capsules and actual artifacts through Ego; observe deletion, family archive and restoration while preserving deletion. After final restart, confirm the cold Worker/Back flow, idle Coordinator, original compact capsule, closable tabs and Markdown previews.
 - [x] Keep scripted versus real-model evidence separate and retain failed runs. The older timer completed its Worker flow but its Coordinator failed cold observation; the detached writer correction and cold-read regressions are in `ec9b011`.
-- [ ] Accept fresh Timer2 only after the current independent reassessment and normal Coordinator closure. Two runs preceded operator clarification; healthy cold observation does not substitute for a completed native end.
-- [ ] Finish final runtime restart/recovery acceptance and verify no duplicate result or reopened completed turn.
-- [ ] Push focused reviewable commits/PRs for the complete goal; keep incomplete work clearly draft. Merge/release remains the user's decision.
-- [ ] Mark the goal complete only when all tasks, all whitepaper requirements and required acceptance are complete.
+- [x] Retain both Timer2 Partial attempts and operator clarification; correct circular pre-end and chronological-scope instructions through `e617f0f`. Accept the separate fresh Timer3 task only after its actual independent Pass and normal completed Coordinator end, now observed on `e982a59`.
+- [x] Finish final runtime restart/recovery acceptance: completed ends and artifact unchanged, one consumed relay at one attempt, no duplicate background result and no reopened model turn.
+- [x] Deliver the complete source in PR #3, with `231663c` pushed and CI passing. Root completes the final documentation push and Ready metadata; merge/release remains the user's decision.
+- [x] Satisfy the complete-goal criteria: all whitepaper implementation, required automated checks and real runtime/UI acceptance have passed.
+
+Root owns the final goal-status and PR-readiness metadata; this document records satisfied implementation and acceptance criteria.

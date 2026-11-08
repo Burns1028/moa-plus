@@ -8,7 +8,7 @@ English | [简体中文](README.zh.md)
 
 [Watch the workflow](docs/media/project-workflow.mp4) · [Architecture](docs/architecture.md) · [Tool API](docs/tool-api.md) · [Install](#quick-start)
 
-**This branch implements the unreleased MoA runtime.** It extends the published v0.1.23 preview with the five Agent primitives, isolated workspaces, request/reply messaging, background tools, and independent completion gates described below. The production build, Host/Client typechecks, 54 regression files / 296 tests, and 19 launcher checks have passed. Fresh npm, forwarding-package, and Git consumers passed at `ec9b011`. [Verification](docs/verification.md) records the tested revisions, observed real-model tasks, and remaining real-app acceptance. The existing package version does not announce a new release.
+**This branch implements the unreleased MoA runtime.** It extends the published v0.1.23 preview with the five Agent primitives, isolated workspaces, request/reply messaging, background tools, and independent completion gates described below. The production build, Host/Client typechecks, 54 regression files / 296 tests, and 19 launcher checks have passed. Fresh npm, forwarding-package, and Git consumers passed at `231663c`. A fresh real-model PTC timer task received its complete automatic result, passed independent artifact verification, and stayed completed without duplicate delivery after restart. [Verification](docs/verification.md) records the tested revisions and native UI evidence. The existing package version does not announce a new release.
 
 The plugin targets DSH **0.2.1-rc.3 with explicit compatibility extensions**. Stock rc.3 cannot enable this runtime directly. The current manifest covers 13 native packages and 31 file paths, with exact hashes for supported variants; v0.1.23 used three earlier extensions. See [compatibility](docs/compatibility.md) before mixing versions.
 
@@ -83,7 +83,7 @@ The launcher prepares a separate native Web runtime, home, Agent configuration, 
 
 In PTC mode, call `SendMessage` as a native tool beside `run_code`; it is excluded from the script SDK so a blocking Request keeps its original tool result and turn. Other PTC tools retain their normal behavior.
 
-The completion Builder receives original human requirements and captured source references. Its only tool, `submit_rubric`, submits validated criteria without reading implementation outputs. The independent Verifier reads the authoritative rubric and uses its retained native preset tools to inspect artifacts and run required checks. Ralph keeps a turn open until its bound exact completion promise is present.
+The completion Builder receives original human requirements and captured source references. Its only tool, `submit_rubric`, submits validated criteria without reading implementation outputs. The independent Verifier reads the authoritative rubric and uses its retained native preset tools to inspect artifacts and run required checks. Both apply later clarifications chronologically and review before the parent turn ends; the native Host still owns actual closure and resource checks. Ralph keeps a turn open until its bound exact completion promise is present.
 
 ## Project memory
 
