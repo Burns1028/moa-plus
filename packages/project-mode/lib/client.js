@@ -1701,7 +1701,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 819,
+						"line": 820,
 						"column": 9
 					}
 				},
@@ -1979,7 +1979,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 835,
+						"line": 836,
 						"column": 9
 					}
 				},
@@ -2460,7 +2460,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 782,
+						"line": 783,
 						"column": 10
 					}
 				},
@@ -2516,7 +2516,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 809,
+						"line": 810,
 						"column": 10
 					}
 				},
@@ -2653,7 +2653,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 847,
+						"line": 848,
 						"column": 9
 					}
 				},
@@ -2745,7 +2745,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 901,
+						"line": 902,
 						"column": 3
 					}
 				},
@@ -2887,7 +2887,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 906,
+						"line": 907,
 						"column": 9
 					}
 				},
@@ -3358,7 +3358,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 757,
+						"line": 758,
 						"column": 9
 					}
 				},
@@ -3551,7 +3551,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 870,
+						"line": 871,
 						"column": 10
 					}
 				}

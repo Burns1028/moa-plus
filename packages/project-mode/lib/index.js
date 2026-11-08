@@ -851,13 +851,25 @@ async function bindBackground(ctx, agent, config) {
 			}
 			record = records(agent).find((r) => backgroundHandle(r.receipt) === handle);
 		}
-		if (record) return {
-			status: "finished",
-			tool_call_id: handle,
-			job_id: receipt.jobId,
-			job: record.job,
-			...record.result
-		};
+		if (record) {
+			let job;
+			try {
+				job = jobs.get(receipt.jobId, agent.id);
+			} catch {
+				if (record.job && [
+					"completed",
+					"killed",
+					"failed"
+				].includes(record.job.status)) job = record.job;
+			}
+			return {
+				status: "finished",
+				tool_call_id: handle,
+				job_id: receipt.jobId,
+				...job ? { job } : {},
+				...record.result
+			};
+		}
 		const job = jobs.get(receipt.jobId, agent.id);
 		return {
 			status: job.status,
@@ -4867,7 +4879,7 @@ let ProjectMode = (() => {
 				settledJobs: (id) => this.projectJobs.get(id) ?? Promise.resolve(),
 				admitWorkerMessage: (agent, request, operationId, signal, admit) => this.workers.controlForAgent(agent, request, operationId, signal, admit),
 				stopManagedWorker: (agent, request, operationId, signal) => this.stopManagedWorker(agent, request, operationId, signal),
-				pendingOperations: (id) => [...this.workers.operations.keys()].filter((key) => JSON.parse(key)[0] === id).length
+				pendingOperations: (id) => [...this.workers.operations.keys()].filter((key) => JSON.parse(key)[0] === id).length + Number(this.projectJobs.has(id))
 			};
 		}
 		mounted = /* @__PURE__ */ new Map();
