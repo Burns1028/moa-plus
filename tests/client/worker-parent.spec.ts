@@ -74,6 +74,16 @@ async function bench() {
         );
       },
     }),
+    followWorkerParent: vi.fn((_root: string, _id: string, signal: AbortSignal) => ({
+      dispose: vi.fn(),
+      async *[Symbol.asyncIterator]() {
+        yield { ready: true };
+        if (signal.aborted) return;
+        await new Promise<void>((resolve) =>
+          signal.addEventListener("abort", () => resolve(), { once: true }),
+        );
+      },
+    })),
   };
   root.provide("remote", {
     $mount: async () => () => {},
@@ -105,7 +115,7 @@ async function bench() {
         ]),
       ]),
     });
-  return { fiber, client, retain, release, show };
+  return { fiber, client, retain, release, show, remote };
 }
 
 it("opens the native parent in the background for a visible worker and releases its one shared reference", async () => {
@@ -131,6 +141,7 @@ it("opens the native parent in the background for a visible worker and releases 
   expect(b.release).toHaveBeenCalledTimes(1);
   b.show({ child: { mainView: 1 } });
   expect(b.retain).toHaveBeenCalledTimes(2);
+  expect(b.remote.followWorkerParent).not.toHaveBeenCalled();
   await b.fiber.dispose();
   expect(b.release).toHaveBeenCalledTimes(2);
 });
@@ -156,4 +167,43 @@ it("does not activate parents for background, ordinary, disabled, or deleted wor
     },
   });
   expect(b.retain).not.toHaveBeenCalled();
+  expect(b.remote.followWorkerParent).not.toHaveBeenCalled();
+});
+
+it("holds a visible nested worker's true parent through one cancellable native stream", async () => {
+  const b = await bench();
+  b.client.store.accept({
+    ...snapshot(),
+    revision: 2,
+    workers: snapshot().workers.map((worker) => ({ ...worker, parentSessionId: sid("leader") })),
+  });
+  b.show({ child: { mainView: 1 } });
+  await vi.waitFor(() => expect(b.remote.followWorkerParent).toHaveBeenCalledTimes(1));
+  const [rootId, workerId, signal] = b.remote.followWorkerParent.mock.calls[0];
+  expect(rootId).toBe(sid("parent"));
+  expect(workerId).toBe(sid("child"));
+  expect(signal.aborted).toBe(false);
+  b.show({ child: { mainView: 1, sidebarChat: 1 } });
+  expect(b.remote.followWorkerParent).toHaveBeenCalledTimes(1);
+  b.show({ child: { sidebarChat: 1 } });
+  expect(signal.aborted).toBe(false);
+  b.show({});
+  await vi.waitFor(() => expect(signal.aborted).toBe(true));
+  expect(b.remote.followWorkerParent.mock.results[0].value.dispose).toHaveBeenCalledTimes(1);
+});
+
+it("releases nested parent streams on worker deletion and plugin unload", async () => {
+  const b = await bench();
+  const data = { ...snapshot(), revision: 2, workers: snapshot().workers.map((worker) => ({ ...worker, parentSessionId: sid("leader") })) };
+  b.client.store.accept(data);
+  b.show({ child: { mainView: 1 } });
+  await vi.waitFor(() => expect(b.remote.followWorkerParent).toHaveBeenCalledTimes(1));
+  const first = b.remote.followWorkerParent.mock.calls[0][2];
+  b.client.store.accept({ ...data, revision: 3, workers: data.workers.map(worker => ({ ...worker, lifecycle: "deleted" as const })) });
+  await vi.waitFor(() => expect(first.aborted).toBe(true));
+  b.client.store.accept({ ...data, revision: 4 });
+  await vi.waitFor(() => expect(b.remote.followWorkerParent).toHaveBeenCalledTimes(2));
+  const second = b.remote.followWorkerParent.mock.calls[1][2];
+  await b.fiber.dispose();
+  expect(second.aborted).toBe(true);
 });

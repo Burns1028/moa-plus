@@ -4,7 +4,7 @@ import type {
 } from "@deepseek-ai/dsh-typert-protocol";
 import type {} from "dsh-plugin-project-mode/remote";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
-import type { SessionModeView, ProjectFrame } from "../shared/index.ts";
+import type { SessionModeView, ProjectFrame, WorkerParentReady } from "../shared/index.ts";
 import { ProjectStore, reuse } from "./store.ts";
 export interface ModeState {
   value?: SessionModeView;
@@ -36,6 +36,11 @@ export class ProjectClient {
   modeVersion = 0;
   connectionVersion = 0;
   constructor(private readonly remote: TypertClientRemote["projectMode"]) {}
+  followWorkerParent(workerId: SessionId, signal: AbortSignal): RemoteStreamHandle<WorkerParentReady, never> {
+    const project = this.store.projects().find(project => project.project.mode === "enabled" && project.workers.some(worker => worker.workerId === workerId && worker.lifecycle === "active"));
+    if (!project) throw new Error("project-mode/not-owned");
+    return this.remote.followWorkerParent(project.project.coordinatorSessionId, workerId, signal);
+  }
   subscribeModes = (listener: () => void) => {
     this.modeListeners.add(listener);
     return () => {
