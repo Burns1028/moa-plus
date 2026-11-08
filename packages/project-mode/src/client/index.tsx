@@ -211,8 +211,12 @@ function applyProjectClient(ctx: Context) {
           return match ? [{ id: w.workerId, ...match }] : [];
         }),
       );
-      const key =
-        JSON.stringify(readonly) + client.modeVersion + client.catalogState;
+      const membership = client.store.projects().map((p) => ({
+        parent: p.project.coordinatorSessionId,
+        mode: p.project.mode,
+        workers: p.workers.map((w) => w.workerId),
+      }));
+      const key = JSON.stringify([readonly, membership, client.modeVersion]);
       if (key === previous) return;
       previous = key;
       dispose();
@@ -231,7 +235,7 @@ function applyProjectClient(ctx: Context) {
               matched: {
                 id: SessionId;
                 parent: SessionId;
-                reason: "deleted" | "disabled" | "pending" | "unavailable";
+                reason: "deleted" | "disabled";
               };
             },
         ) => (
@@ -241,24 +245,9 @@ function applyProjectClient(ctx: Context) {
               {p.t(
                 p.matched.reason === "deleted"
                   ? "readonlyDeleted"
-                  : p.matched.reason === "disabled"
-                    ? "readonlyDisabled"
-                    : p.matched.reason === "pending"
-                      ? "readonlyPending"
-                      : "readonlyUnavailable",
+                  : "readonlyDisabled",
               )}
             </p>
-            {p.matched.reason === "unavailable" && (
-              <button
-                type="button"
-                onClick={() => {
-                  void client.refreshMode(p.matched.id);
-                  void client.loadCatalog();
-                }}
-              >
-                {p.t("retry")}
-              </button>
-            )}
             <button type="button" onClick={() => p.open(p.matched.parent)}>
               {p.t("parent")}
             </button>

@@ -22,8 +22,6 @@ export const en = {
   enabling: "Updating Project…",
   loading: "Loading Project…",
   parent: "Back",
-  readonlyPending: "Loading worker ownership…",
-  readonlyUnavailable: "Worker ownership is unavailable. Retry to continue.",
   readonlyDeleted:
     "This worker was deleted. Its conversation history is retained.",
   readonlyDisabled: "Project is disabled. This worker is read-only.",
@@ -114,8 +112,6 @@ export const zh: Record<ProjectKey, string> = {
   enabling: "正在更新 Project…",
   loading: "正在加载 Project…",
   parent: "Back",
-  readonlyPending: "正在确认 worker 归属…",
-  readonlyUnavailable: "暂时无法确认 worker 归属，请重试。",
   readonlyDeleted: "此 worker 已删除，对话历史仍然保留。",
   readonlyDisabled: "Project 已关闭，此 worker 仅可查看历史。",
   "blocked.agent-running": "请等待当前轮次结束。",
