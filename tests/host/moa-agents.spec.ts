@@ -67,6 +67,7 @@ it("forks a selected session through native activation with a fresh identity", a
       agentOptions: { provider: "test", model: "test" },
     });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    (f.ctx.projectMode as any).moa.dispose();
     const seeds = new Map();
     const unregister = f.ctx.subagents.registerProvider(
       createForkProvider(seeds),
@@ -282,9 +283,16 @@ it("kills the native child without deleting its project membership", async () =>
       new AbortController().signal,
     );
     const controls = new MoAAgents(access, workers);
-    expect(
-      await controls.kill(agent, child, new AbortController().signal),
-    ).toMatchObject({ workerId: child, accepted: true });
+    const stopped = controls.kill(agent, child, new AbortController().signal);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const live = f.ctx.agents.get(child);
+    if (live) expect(controls.lifecycle(live)).toBe("Aborting");
+    release.resolve();
+    expect(await stopped).toMatchObject({
+      workerId: child,
+      accepted: true,
+      lifecycle: "Zombie",
+    });
     expect(
       (await controls.query(agent, {}, new AbortController().signal))
         .children[0].workerId,
@@ -314,7 +322,6 @@ it("runs QueryAgent as a native model tool", async () => {
       (f.ctx.projectMode as any).access,
       (f.ctx.projectMode as any).workers,
     );
-    const dispose = agent.ctx.tools.register(createQueryAgentTool(controls));
     let count = 0;
     f.adapter.handler = () =>
       ++count === 1
@@ -354,8 +361,585 @@ it("runs QueryAgent as a native model tool", async () => {
           m.role === "tool" && JSON.stringify(m.content).includes("children"),
       ),
     ).toBe(true);
-    dispose();
   } finally {
+    await f.dispose();
+  }
+});
+
+it("creates a shared Task with durable identity and workspace facts before native execution", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const seen = Promise.withResolvers<void>();
+    f.adapter.handler = async (options) => {
+      if (options.sessionId !== agent.id) {
+        seen.resolve();
+        await release.promise;
+      }
+      return response("done");
+    };
+    const access = (f.ctx.projectMode as any).access;
+    const controls = new MoAAgents(access, (f.ctx.projectMode as any).workers);
+    const [receipt] = await controls.task(
+      agent,
+      [
+        {
+          name: "worker",
+          task: "inspect",
+          role: "Explorer",
+          workspace: "shared",
+        },
+      ],
+      "task-tool",
+      new AbortController().signal,
+    );
+    await seen.promise;
+    expect(
+      access.record(agent.id).operations[`moa:agent:${receipt.workerId}`],
+    ).toMatchObject({
+      creatorId: agent.id,
+      reportTo: agent.id,
+      role: "Explorer",
+      nested: false,
+      workspace: { mode: "shared", ownerId: receipt.workerId },
+    });
+    const messages = JSON.stringify(
+      f.adapter.requests.find((r) => r.sessionId === receipt.workerId)!
+        .messages,
+    );
+    expect(messages).toContain(`Agent ID: ${receipt.workerId}`);
+  } finally {
+    release.resolve();
+    await f.dispose();
+  }
+});
+
+it("defaults Task to an isolated current-content workspace", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const { execFileSync } = await import("node:child_process");
+  const { writeFile, readFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const git = (...args: string[]) =>
+      execFileSync("git", args, { cwd: f.root });
+    git("init");
+    git("config", "user.name", "Test");
+    git("config", "user.email", "test@example.com");
+    await writeFile(join(f.root, "tracked.txt"), "committed");
+    git("add", "tracked.txt");
+    git("commit", "-m", "initial");
+    await writeFile(join(f.root, "tracked.txt"), "dirty snapshot");
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    f.adapter.handler = async (options) => {
+      if (options.sessionId !== agent.id) await release.promise;
+      return response("done");
+    };
+    const access = (f.ctx.projectMode as any).access;
+    const controls = new MoAAgents(access, (f.ctx.projectMode as any).workers);
+    const [receipt] = await controls.task(
+      agent,
+      [{ name: "worker", task: "work", role: "General-purpose" }],
+      "isolated-task",
+      new AbortController().signal,
+    );
+    const descriptor = access.record(agent.id).operations[
+      `moa:agent:${receipt.workerId}`
+    ];
+    expect(descriptor.workspace.mode).toBe("isolated");
+    expect(
+      await readFile(
+        join(descriptor.workspace.directory, "tracked.txt"),
+        "utf8",
+      ),
+    ).toBe("dirty snapshot");
+    expect(descriptor.workspace.directory).not.toBe(f.root);
+  } finally {
+    release.resolve();
+    await f.dispose();
+  }
+});
+
+it("runs Task as a native model tool and admits a child", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const { createTaskTool } = await import(
+    "../../packages/project-mode/src/host/moa/tools.ts"
+  );
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const controls = new MoAAgents(
+      (f.ctx.projectMode as any).access,
+      (f.ctx.projectMode as any).workers,
+    );
+    const called = Promise.withResolvers<void>();
+    let count = 0;
+    const args = JSON.stringify({
+      tasks: [
+        {
+          name: "worker",
+          task: "inspect",
+          role: "Explorer",
+          workspace: "shared",
+        },
+      ],
+    });
+    f.adapter.handler = async (options) => {
+      if (options.sessionId !== agent.id) {
+        await release.promise;
+        return response("worker done");
+      }
+      if (count > 0) called.resolve();
+      return ++count === 1
+        ? [
+            { type: "block-start", index: 0, blockType: "tool-call" },
+            {
+              type: "tool-call-delta",
+              index: 0,
+              id: "task",
+              name: "Task",
+              argumentsDelta: args,
+            },
+            {
+              type: "block-end",
+              index: 0,
+              block: {
+                type: "tool-call",
+                id: "task",
+                name: "Task",
+                arguments: args,
+              },
+            },
+            { type: "finish", reason: { kind: "tool-calls" } },
+          ]
+        : response("done");
+    };
+    agent.followup(
+      createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "delegate" }],
+      }),
+    );
+    await called.promise;
+    expect(count).toBe(2);
+    expect(
+      await f.ctx.projectMode.controlForAgent(
+        agent,
+        { action: "list" },
+        "list",
+        new AbortController().signal,
+      ),
+    ).toHaveLength(1);
+    release.resolve();
+  } finally {
+    release.resolve();
+    await f.dispose();
+  }
+});
+
+it("Fork carries selected source history into a fresh child identity", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(
+      createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "remember this source fact" }],
+      }),
+    );
+    await agent.whenIdle();
+    const seen = Promise.withResolvers<void>();
+    f.adapter.handler = async (options) => {
+      if (options.sessionId !== agent.id) {
+        seen.resolve();
+        await release.promise;
+      }
+      return response("done");
+    };
+    const controls = new MoAAgents(
+      (f.ctx.projectMode as any).access,
+      (f.ctx.projectMode as any).workers,
+    );
+    const receipt = await controls.fork(
+      agent,
+      agent.id,
+      {
+        name: "fork",
+        task: "branch task",
+        role: "Planner",
+        workspace: "shared",
+      },
+      "fork-tool",
+      new AbortController().signal,
+    );
+    await seen.promise;
+    const messages = JSON.stringify(
+      f.adapter.requests.find((r) => r.sessionId === receipt.workerId)!
+        .messages,
+    );
+    expect(
+      messages.indexOf("remember this source fact"),
+    ).toBeGreaterThanOrEqual(0);
+    expect(messages.indexOf("remember this source fact")).toBeLessThan(
+      messages.indexOf(`Agent ID: ${receipt.workerId}`),
+    );
+    const record = (f.ctx.projectMode as any).access.record(agent.id);
+    expect(record.operations["moa:fork:fork-tool"]).toMatchObject({
+      sourceId: agent.id,
+      watermark: expect.any(Number),
+    });
+    expect(record.operations["moa:fork:fork-tool"]).not.toHaveProperty("seed");
+    await f.ctx.projectMode.snapshot(agent.id);
+    expect(
+      (f.ctx.projectMode as any).access
+        .record(agent.id)
+        .completions.filter((c: any) => c.workerId === receipt.workerId),
+    ).toHaveLength(0);
+    expect(
+      record.operations[`moa:agent:${receipt.workerId}`],
+    ).not.toHaveProperty("forkSeed");
+    controls.dispose();
+  } finally {
+    release.resolve();
+    await f.dispose();
+  }
+});
+
+it("runs Fork as a native model tool", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const { createForkTool } = await import(
+    "../../packages/project-mode/src/host/moa/tools.ts"
+  );
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const controls = new MoAAgents(
+      (f.ctx.projectMode as any).access,
+      (f.ctx.projectMode as any).workers,
+    );
+    const called = Promise.withResolvers<void>();
+    let count = 0;
+    const args = JSON.stringify({
+      source: agent.id,
+      name: "fork",
+      task: "inspect",
+      role: "Explorer",
+      workspace: "shared",
+    });
+    f.adapter.handler = async (options) => {
+      if (options.sessionId !== agent.id) {
+        await release.promise;
+        return response("worker done");
+      }
+      if (count > 0) called.resolve();
+      return ++count === 1
+        ? [
+            { type: "block-start", index: 0, blockType: "tool-call" },
+            {
+              type: "tool-call-delta",
+              index: 0,
+              id: "fork",
+              name: "Fork",
+              argumentsDelta: args,
+            },
+            {
+              type: "block-end",
+              index: 0,
+              block: {
+                type: "tool-call",
+                id: "fork",
+                name: "Fork",
+                arguments: args,
+              },
+            },
+            { type: "finish", reason: { kind: "tool-calls" } },
+          ]
+        : response("done");
+    };
+    agent.followup(
+      createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "branch this" }],
+      }),
+    );
+    await called.promise;
+    expect(
+      await f.ctx.projectMode.controlForAgent(
+        agent,
+        { action: "list" },
+        "list",
+        new AbortController().signal,
+      ),
+    ).toHaveLength(1);
+    release.resolve();
+    controls.dispose();
+  } finally {
+    release.resolve();
+    await f.dispose();
+  }
+});
+
+it("restricts Explorer's native execution tools to read-only capabilities", async () => {
+  const { applyRoleRestrictions } = await import(
+    "../../packages/project-mode/src/host/moa/roles.ts"
+  );
+  const f = await fixture();
+  try {
+    for (const name of ["read", "grep", "glob", "write", "bash"])
+      f.ctx.tools.register({
+        name,
+        description: name,
+        parameters: { type: "object", properties: {} },
+        output: {
+          schema: { type: "string" },
+          render: (_a, v) => [{ type: "text", text: String(v) }],
+        },
+        execute: async () => "ok",
+      });
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("reader"),
+      meta: { cwd: f.root },
+    });
+    const dispose = applyRoleRestrictions(f.ctx, agent, "Explorer");
+    expect(f.ctx.tools.get("read", agent)).toBeDefined();
+    expect(f.ctx.tools.get("grep", agent)).toBeDefined();
+    expect(f.ctx.tools.get("glob", agent)).toBeDefined();
+    expect(f.ctx.tools.get("write", agent)).toBeUndefined();
+    expect(f.ctx.tools.get("bash", agent)).toBeUndefined();
+    dispose();
+    expect(f.ctx.tools.get("write", agent)).toBeDefined();
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("ProjectContext writes only inside the shared context using the acting sandbox policy", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const { default: Policy, setSandboxMode } = await import(
+    "@deepseek-ai/dsh-sandbox-policy"
+  );
+  const { default: Loader } = await import("@deepseek-ai/cordis-plugin-loader");
+  const { default: Group } = await import("@deepseek-ai/cordis-plugin-group");
+  const { default: Presets } = await import(
+    "@deepseek-ai/dsh-agent-preset-registry"
+  );
+  const f = await fixture();
+  try {
+    await f.ctx.plugin(Policy, { mode: "workspace-write" });
+    f.ctx.baseUrl = new URL("./", import.meta.url).href;
+    await f.ctx.plugin(Loader);
+    f.ctx.loader.builtins.group = Group;
+    await f.ctx.plugin(Presets, { default: "confined" });
+    await f.ctx.agentPresets.register({
+      id: "confined",
+      plugins: [
+        {
+          name: "cordis:group",
+          group: true,
+          isolate: { fs: true },
+          config: [
+            {
+              name: new URL("./fixtures/sandbox-fs.mjs", import.meta.url).href,
+              config: { cwd: f.root },
+            },
+          ],
+        },
+      ],
+    });
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+      setup: async (ctx) => {
+        await f.ctx.agentPresets.mount(ctx);
+      },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const controls = new MoAAgents(
+      (f.ctx.projectMode as any).access,
+      (f.ctx.projectMode as any).workers,
+    );
+    await controls.context(
+      agent,
+      { action: "write", path: "fact.md", content: "reusable fact" },
+      new AbortController().signal,
+    );
+    expect(
+      await controls.context(
+        agent,
+        { action: "read", path: "fact.md" },
+        new AbortController().signal,
+      ),
+    ).toMatchObject({ content: "reusable fact" });
+    await expect(
+      controls.context(
+        agent,
+        { action: "write", path: "../notes.md", content: "bad" },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow(/path/);
+    setSandboxMode(agent.session, "read-only");
+    await expect(
+      controls.context(
+        agent,
+        { action: "write", path: "denied.md", content: "bad" },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow(/read.only|denied/i);
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("runs ProjectContext as a native model tool", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const { createProjectContextTool } = await import(
+    "../../packages/project-mode/src/host/moa/tools.ts"
+  );
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const controls = new MoAAgents(
+      (f.ctx.projectMode as any).access,
+      (f.ctx.projectMode as any).workers,
+    );
+    let count = 0;
+    const args = JSON.stringify({
+      action: "write",
+      path: "fact.md",
+      content: "persisted",
+    });
+    f.adapter.handler = () =>
+      ++count === 1
+        ? [
+            { type: "block-start", index: 0, blockType: "tool-call" },
+            {
+              type: "tool-call-delta",
+              index: 0,
+              id: "context",
+              name: "ProjectContext",
+              argumentsDelta: args,
+            },
+            {
+              type: "block-end",
+              index: 0,
+              block: {
+                type: "tool-call",
+                id: "context",
+                name: "ProjectContext",
+                arguments: args,
+              },
+            },
+            { type: "finish", reason: { kind: "tool-calls" } },
+          ]
+        : response("done");
+    agent.followup(
+      createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: "record fact" }],
+      }),
+    );
+    await agent.whenIdle();
+    expect(
+      await controls.context(
+        agent,
+        { action: "read", path: "fact.md" },
+        new AbortController().signal,
+      ),
+    ).toMatchObject({ content: "persisted" });
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("deduplicates concurrent Task retries before workspace and activation", async () => {
+  const { MoAAgents } = await import(
+    "../../packages/project-mode/src/host/moa/agents.ts"
+  );
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    f.adapter.handler = async (options) => {
+      if (options.sessionId !== agent.id) await release.promise;
+      return response("done");
+    };
+    const controls = new MoAAgents(
+      (f.ctx.projectMode as any).access,
+      (f.ctx.projectMode as any).workers,
+    );
+    const input = [
+      {
+        name: "worker",
+        task: "work",
+        role: "Explorer" as const,
+        workspace: "shared" as const,
+      },
+    ];
+    const [a, b] = await Promise.all([
+      controls.task(agent, input, "same", new AbortController().signal),
+      controls.task(agent, input, "same", new AbortController().signal),
+    ]);
+    expect(a).toEqual(b);
+    expect(await f.ctx.subagents.listChildren(agent.id)).toHaveLength(1);
+  } finally {
+    release.resolve();
     await f.dispose();
   }
 });

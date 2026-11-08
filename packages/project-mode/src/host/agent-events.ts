@@ -69,17 +69,31 @@ export function bindAgentEvents(
     if (host.owner(session.id) && event.type === "turn/start")
       progress.delete(session.id);
     if (host.owner(session.id) && event.type === "turn/end") {
+      outbox.claimed.delete(session.id);
       outbox.workerCuts.set(session.id, projected(host.ctx, session));
       host.enqueue(
         SessionId(host.owner(session.id)!.project.coordinatorSessionId),
         () => host.ingest(session.id),
       );
     }
-    if (host.record(session.id) && event.type === "user/message") {
+    if (
+      (host.record(session.id) || host.owner(session.id)) &&
+      event.type === "user/message"
+    ) {
       outbox.claimed.get(session.id)?.delete(event.data.id);
-      host.enqueue(session.id, () => outbox.consume(session.id, event.data.id));
+      host.enqueue(
+        SessionId(
+          (host.record(session.id) ?? host.owner(session.id))!.project
+            .coordinatorSessionId,
+        ),
+        () => outbox.consume(session.id, event.data.id),
+      );
     }
-    if (host.record(session.id) && event.type === "turn/end") {
+    if (
+      host.record(session.id) &&
+      event.type === "turn/end" &&
+      event.data.reason.kind !== "handoff"
+    ) {
       outbox.claimed.delete(session.id);
       host.enqueue(session.id, () =>
         options.freezeTurn(session.id, event.data.turn, event.data.reason.kind),
@@ -106,14 +120,20 @@ async function normalizeCoordinatorStep(
   next: () => Promise<PreStepDecision>,
 ): Promise<PreStepDecision> {
   const { outbox, workers } = options;
-  if (!host.record(agent.id)) return next();
+  const owner = host.record(agent.id) ?? host.owner(agent.id);
+  if (!owner) return next();
+  const rootId = SessionId(owner.project.coordinatorSessionId);
   const control = AbortSignal.any([signal, host.closing.signal]);
   control.throwIfAborted();
   outbox.normalizing.add(agent.id);
   try {
     const decision = await next();
     control.throwIfAborted();
-    if (decision.kind !== "enter" || !host.record(agent.id)) return decision;
+    if (
+      decision.kind !== "enter" ||
+      !(host.record(agent.id) ?? host.owner(agent.id))
+    )
+      return decision;
     if (
       host.record(agent.id)?.project.mode === "enabled" &&
       decision.messages.some((m) => m.source.kind === "user")
@@ -135,9 +155,9 @@ async function normalizeCoordinatorStep(
       const source = m.source;
       return (
         source.kind === "subagent-settled" &&
-        host
-          .record(agent.id)!
-          .workers.some((w) => w.id === source.senderSessionId)
+        (host.record(rootId) ?? owner).workers.some(
+          (w) => w.id === source.senderSessionId,
+        )
       );
     });
 
@@ -146,10 +166,10 @@ async function normalizeCoordinatorStep(
     // worker lock, before replacing its native settlement notice.
     for (const message of managed) {
       if (message.source.kind !== "subagent-settled") continue;
-      for (const assignment of host.record(agent.id)!.assignments) {
+      for (const assignment of host.record(rootId)!.assignments) {
         if (assignment.workerId !== message.source.senderSessionId) continue;
         const admission = workers.operations.get(
-          JSON.stringify([agent.id, assignment.operationId]),
+          JSON.stringify([rootId, assignment.operationId]),
         );
         if (admission) await waitForTurn(admission, control);
         control.throwIfAborted();
@@ -162,9 +182,10 @@ async function normalizeCoordinatorStep(
     }
     control.throwIfAborted();
     const messages = decision.messages.filter((m) => !managed.includes(m));
-    const r = host.record(agent.id)!;
+    const r = host.record(rootId)!;
     for (const d of r.deliveries) {
       if (
+        (d.targetId ?? rootId) === agent.id &&
         d.state !== "consumed" &&
         d.state !== "suppressed" &&
         !messages.some((m) => m.id === d.message.id)

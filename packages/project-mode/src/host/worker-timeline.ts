@@ -50,7 +50,8 @@ export async function readWorkerTimeline(
     if (
       event.type === "user/message" &&
       (event.data.source.kind === "user" ||
-        event.data.source.kind === "project-mode-assignment")
+        event.data.source.kind === "project-mode-assignment" ||
+        event.data.source.kind === "moa-message")
     ) {
       current.inputs.push({
         id: event.data.id,
@@ -61,10 +62,14 @@ export async function readWorkerTimeline(
           .map((b) => b.text)
           .join(""),
         actor:
-          assignments.has(event.data.id) ||
-          event.data.source.kind === "project-mode-assignment"
-            ? "coordinator"
-            : "user",
+          event.data.source.kind === "moa-message"
+            ? event.data.source.senderId === record.project.coordinatorSessionId
+              ? "coordinator"
+              : "agent"
+            : assignments.has(event.data.id) ||
+                event.data.source.kind === "project-mode-assignment"
+              ? "coordinator"
+              : "user",
       });
     }
     if (

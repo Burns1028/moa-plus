@@ -10,7 +10,32 @@ import type {
   WorkerView,
 } from "../shared/index.ts";
 import { controlSchema } from "./control.ts";
-import { messageSchema } from "./state.ts";
+import { messageSchema, projection, type RecordState } from "./state.ts";
+
+/** Native admission owns the copied history once its receipt is committed. */
+function withoutAdmittedForkSeed(
+  operations: RecordState["operations"],
+  workerId: string,
+): RecordState["operations"] {
+  const descriptor = operations[`moa:agent:${workerId}`];
+  if (
+    !descriptor ||
+    typeof descriptor !== "object" ||
+    Array.isArray(descriptor) ||
+    typeof descriptor.forkOperation !== "string"
+  )
+    return operations;
+  const fork = operations[descriptor.forkOperation];
+  if (
+    !fork ||
+    typeof fork !== "object" ||
+    Array.isArray(fork) ||
+    !("seed" in fork)
+  )
+    return operations;
+  const { seed: _seed, ...facts } = fork;
+  return { ...operations, [descriptor.forkOperation]: facts };
+}
 import {
   nativeAdmissionRejection,
   queueHostSubagentPrompt,
@@ -97,6 +122,7 @@ export class WorkerOperations {
     request: ControlWorkersRequest,
     operationId: string,
     signal: AbortSignal,
+    nativeAdmit?: (signal: AbortSignal) => Promise<string>,
   ): Promise<ControlResult> {
     const req = controlSchema.parse(request),
       r = this.host.requireCoordinator(agent);
@@ -135,6 +161,8 @@ export class WorkerOperations {
           req,
           operationId,
           AbortSignal.any([signal, this.host.closing.signal]),
+          undefined,
+          nativeAdmit,
         ),
       )
       .finally(() => {
@@ -157,21 +185,37 @@ export class WorkerOperations {
     operationId: string,
     signal: AbortSignal,
     options?: MoASpawnOptions,
+    nativeAdmit?: (signal: AbortSignal) => Promise<string>,
   ): Promise<ControlResult> {
     signal.throwIfAborted();
     const rootId = options?.rootId ?? agent.id;
     let r = options
       ? this.host.record(rootId)!
       : this.host.requireCoordinator(agent);
-    const rootAgent = this.host.ctx.agents.get(rootId);
-    if (!rootAgent) throw new Error("moa/root-unavailable");
-    const placement = projected(this.host.ctx, rootAgent.session);
-    const turn = this.host.ctx.sessionProjections.stateOf(
-      rootAgent.session,
-      "turnBoundary",
-    )!.lastTurn;
+    const rootAgent =
+      rootId === agent.id ? agent : this.host.ctx.agents.get(rootId);
+    const placement = rootAgent
+      ? projected(this.host.ctx, rootAgent.session)
+      : await (async () => {
+          using observed = await this.host.ctx.sessionQuery.observeSession(
+            rootId,
+            { signal },
+          );
+          return observed.events.reduce(
+            projection.apply,
+            projection.init(observed.header, observed.inheritedEventCount),
+          );
+        })();
+    const turn = rootAgent
+      ? this.host.ctx.sessionProjections.stateOf(
+          rootAgent.session,
+          "turnBoundary",
+        )!.lastTurn
+      : placement.turn;
     if (req.action === "interrupt" || req.action === "delete")
-      return this.interruptOrDelete(agent, req, operationId);
+      return req.action === "delete" && r.operations[`moa:agent:${req.worker_id}`]
+        ? this.host.stopManagedWorker(agent, req, operationId, signal)
+        : this.interruptOrDelete(agent, req, operationId);
     let assignment = r.assignments.find((a) => a.operationId === operationId);
     const workerId =
       req.action === "spawn"
@@ -220,14 +264,16 @@ export class WorkerOperations {
     );
     let accepted = false;
     try {
-      const messageId = await this.admitWorkerInput(
-        agent,
-        req,
-        operationId,
-        workerId,
-        signal,
-        options,
-      );
+      const messageId = nativeAdmit
+        ? await nativeAdmit(signal)
+        : await this.admitWorkerInput(
+            agent,
+            req,
+            operationId,
+            workerId,
+            signal,
+            options,
+          );
       accepted = true;
       const receipt = await this.acceptReceipt(
         agent,
@@ -449,7 +495,7 @@ export class WorkerOperations {
         a.id === assignmentId ? { ...a, messageId, admission: "accepted" } : a,
       ),
       operations: {
-        ...r.operations,
+        ...withoutAdmittedForkSeed(r.operations, workerId),
         [operationId]: JSON.parse(JSON.stringify(receipt)),
       },
       memberships: participatingMemberships(
@@ -480,7 +526,11 @@ export class WorkerOperations {
       assignment = r.assignments.find((a) => a.id === assignmentId)!;
     if (assignment.admission === "accepted") return;
     const catalog = await this.host.ctx.subagents.listChildren(agent.id);
-    if (!catalog.some((c) => c.id === assignment.workerId)) return;
+    if (
+      !catalog.some((c) => c.id === assignment.workerId) &&
+      !r.operations[`moa:agent:${assignment.workerId}`]
+    )
+      return;
     using observed = await this.host.ctx.sessionQuery.observeSession(
       SessionId(assignment.workerId),
     );
@@ -489,9 +539,11 @@ export class WorkerOperations {
         ?.creationOperationId === assignment.operationId;
     const message = observed.events.find(
       (e) =>
+        e.seq >= observed.inheritedEventCount &&
         e.type === "user/message" &&
         (first ||
-          (e.data.source.kind === "project-mode-assignment" &&
+          ((e.data.source.kind === "project-mode-assignment" ||
+            e.data.source.kind === "moa-message") &&
             e.data.source.operationId === assignment.operationId)),
     );
     const inbox = observed.projections?.values.inbox;
@@ -503,7 +555,8 @@ export class WorkerOperations {
       .find(
         (m) =>
           first ||
-          (m.source.kind === "project-mode-assignment" &&
+          ((m.source.kind === "project-mode-assignment" ||
+            m.source.kind === "moa-message") &&
             m.source.operationId === assignment.operationId),
       );
     const id = message?.type === "user/message" ? message.data.id : pending?.id;
