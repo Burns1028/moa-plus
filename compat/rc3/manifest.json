@@ -201,7 +201,7 @@
       {
         "file": "lib/index.js",
         "before": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
-        "after": "334361bf4522c7d566878cf5ac9bb7e9747128868b49d492e7c798be460c1931"
+        "after": "791c25b168884100c7c901dfac2bd64f8fec5165af32d3d414c4b42b05ed2fd0"
       },
       {
         "file": "lib/types/index.d.ts",
@@ -310,7 +310,7 @@
       {
         "file": "lib/index.js",
         "before": "9bcecd8eba724e4b3b11d6e8535bbadc7d2d1a6293dcd6b5af3195745abd488a",
-        "after": "334361bf4522c7d566878cf5ac9bb7e9747128868b49d492e7c798be460c1931"
+        "after": "791c25b168884100c7c901dfac2bd64f8fec5165af32d3d414c4b42b05ed2fd0"
       },
       {
         "file": "lib/types/index.d.ts",

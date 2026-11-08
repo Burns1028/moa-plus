@@ -4,7 +4,7 @@ import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import Jobs from "@deepseek-ai/dsh-jobs-local";
 import { mountAgentLoopTestDependencies } from "@deepseek-ai/dsh-agent-loop-testkit";
 import { SessionId, pluginRecordOf } from "@deepseek-ai/dsh-session";
-import { createUserMessage, type StreamChunk } from "@deepseek-ai/dsh-llm";
+import { createUserMessage, HarnessError, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { Adapter, response } from "../host/fixture.ts";
 import { backgroundHandle, bindBackground, type BackgroundResultData } from "../../packages/project-mode/src/host/moa/background.ts";
 import type { BackgroundReceipt } from "@deepseek-ai/dsh-agent";
@@ -23,9 +23,10 @@ function calls(...names: string[]): StreamChunk[] {
   {type:"block-end",index,block:{type:"tool-call",id:`call-${index}`,name,arguments:"{}"}},
  ]),{type:"finish",reason:{kind:"tool-calls"}}];
 }
-async function setup(strategy:"after-seconds"|"new-message"|"llm-judge"="after-seconds", seconds=0.01) {
+async function setup(strategy:"after-seconds"|"new-message"|"llm-judge"="after-seconds", seconds=0.01, persistenceRoot?:string) {
  const ctx=new Context();
  await mountAgentLoopTestDependencies(ctx,{workingDirectory:true});
+ if(persistenceRoot)await ctx.plugin(Persistence,{root:persistenceRoot,compression:"none"});
  await ctx.plugin(AgentLoop,{agents:[]}); await ctx.plugin(Jobs,{pumpPollMs:5});
  const adapter=new Adapter();ctx.llm.registerAdapter(["test"],adapter);
  const {agent}=await ctx.agents.create({sessionId:SessionId("native-moa"),agentOptions:{provider:"test",model:"test"}});
@@ -367,8 +368,85 @@ it("keeps canonical program subcall values while transferring the whole native r
   const receipt=receiptOf(f);expect(receipt).toBeDefined();expect(f.ctx.jobs.list(f.agent.id)).toHaveLength(1);
   gate.resolve("canonical subcall");await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
   expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("canonical subcall");
-  const dispatch=f.agent.session.snapshotEvents().find(e=>e.type==="tool/ptc-dispatch");expect(JSON.stringify(dispatch)).toContain("canonical subcall");
+  const dispatch=f.agent.session.snapshotEvents().find(e=>pluginRecordOf(e)?.type==="plugin:tools/ptc-dispatch");expect(JSON.stringify(dispatch)).toContain("canonical subcall");
  }finally{gate.resolve("cleanup");await f.dispose();}
+});
+
+it("keeps detached PTC completion and later subcalls readable through native durable cold observation",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"moa-detached-ptc-log-"));
+ const f=await setup("new-message",0,root),gate=Promise.withResolvers<string>();
+ let started=false;
+ let observer:Context|undefined;
+ try{
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default,{mode:"danger-full-access"});
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
+  f.agent.ctx.tools.presentAs("ptc");
+  f.ctx.tools.register({name:"held",description:"held",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}],presentationMeta:()=>({fixture:"held-result"})},execute:()=>{started=true;return gate.promise;}});
+  f.ctx.tools.register({name:"later",description:"later",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}]},execute:()=>"second subcall"});
+  f.ctx.tools.register({name:"broken",description:"broken",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}]},execute:()=>{throw new HarnessError("expected detached failure","EXPECTED_FAILURE");}});
+  const args=JSON.stringify({code:"const first = await tools.held({}); const second = await tools.later({}); let failure; try { await tools.broken({}); } catch (error) { failure = error.message; } return {first, second, failure};",description:"Finish native subcalls after foreground closure"});
+  f.adapter.handler=()=>f.adapter.requests.length===1?[
+   {type:"block-start",index:0,blockType:"tool-call"},{type:"block-end",index:0,block:{type:"tool-call",id:"detached-ptc",name:"run_code",arguments:args}},{type:"finish",reason:{kind:"tool-calls"}},
+  ]:response("done");
+  f.agent.followup(user("run"));await until(()=>started);
+  f.agent.steer(user("Process this message before the held tool finishes"));
+  await f.agent.whenIdle();
+  expect(receiptOf(f)).toBeDefined();
+  gate.resolve("canonical first subcall");
+  await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
+  await f.ctx.sessions.flush(f.agent.session);
+  await using handle=await f.ctx.sessionPersistence.open(f.agent.id,"read");
+  await expect(handle.read(0)).resolves.toBeDefined();
+  const traces=f.agent.session.snapshotEvents().flatMap(event=>{const record=pluginRecordOf(event);return record?.type.startsWith("plugin:tools/ptc-dispatch")?[record]:[];});
+  expect(traces.map(record=>record.type)).toEqual(["plugin:tools/ptc-dispatch","plugin:tools/ptc-dispatch-start","plugin:tools/ptc-dispatch","plugin:tools/ptc-dispatch-start","plugin:tools/ptc-dispatch"]);
+  const start=f.agent.session.snapshotEvents().find(event=>event.type==="tool/ptc-dispatch-start");
+  expect(start?.type).toBe("tool/ptc-dispatch-start");
+  const first=traces[0].data as Record<string,unknown>,laterStart=traces[1].data as Record<string,unknown>,laterResult=traces[2].data as Record<string,unknown>;
+  expect(first).toMatchObject({...start!.data,isError:false,content:[{type:"text",text:"canonical first subcall"}],meta:{fixture:"held-result"}});
+  expect(laterResult).toMatchObject({...laterStart,isError:false,content:[{type:"text",text:"second subcall"}]});
+  expect(first).not.toHaveProperty("error");
+  expect(laterStart.rootCallId).toEqual(first.rootCallId);
+  expect(laterStart.parentCallId).toEqual(first.parentCallId);
+  expect(traces[4].data).toMatchObject({...traces[3].data as object,isError:true,error:{code:"EXPECTED_FAILURE"},content:[{type:"text",text:"Error: expected detached failure"}]});
+  expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("canonical first subcall");
+  expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("second subcall");
+  observer=new Context();await mountAgentLoopTestDependencies(observer,{workingDirectory:true});
+  await observer.plugin(Persistence,{root,compression:"none"});
+  await observer.plugin(AgentLoop,{agents:[]});
+  await observer.plugin((await import("@deepseek-ai/dsh-session-query")).default);
+  using cold=await observer.sessionQuery.observeSession(f.agent.id);
+  expect(cold.source).toBe("prepared");
+  expect(cold.projections?.values.inbox).toMatchObject({"next-step":[],"next-turn":[]});
+ }finally{gate.resolve("cleanup");await observer?.fiber.dispose();await f.dispose();await rm(root,{recursive:true,force:true});}
+});
+
+it.each([false,true])("selects the PTC trace envelope after async shaping (transfer=%s)",async(transfer)=>{
+ const root=await mkdtemp(join(tmpdir(),"moa-ptc-log-shaping-"));
+ const f=await setup("new-message",0,root),gate=Promise.withResolvers<void>();let shaping=false;
+ try{
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default,{mode:"danger-full-access"});
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
+  f.agent.ctx.tools.presentAs("ptc");
+  f.ctx.tools.register({name:"quick",description:"quick",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}]},execute:()=>"canonical quick result"});
+  f.ctx.on("tools/ptc-dispatch-log",async(_dispatch,next)=>{shaping=true;await gate.promise;return next();});
+  const args=JSON.stringify({code:"return await tools.quick({});",description:"Preserve a shaped subcall result"});
+  f.adapter.handler=()=>f.adapter.requests.length===1?[
+   {type:"block-start",index:0,blockType:"tool-call"},{type:"block-end",index:0,block:{type:"tool-call",id:"shaped-ptc",name:"run_code",arguments:args}},{type:"finish",reason:{kind:"tool-calls"}},
+  ]:response("done");
+  f.agent.followup(user("run"));await until(()=>shaping);
+  if(transfer){f.agent.steer(user("Process this now"));await f.agent.whenIdle();expect(receiptOf(f)).toBeDefined();}
+  gate.resolve();if(transfer)await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
+  const events=f.agent.session.snapshotEvents(),ordinary=events.filter(event=>event.type==="tool/ptc-dispatch"),detached=events.flatMap(event=>{const record=pluginRecordOf(event);return record?.type==="plugin:tools/ptc-dispatch"?[record]:[];});
+  expect(ordinary).toHaveLength(transfer?0:1);expect(detached).toHaveLength(transfer?1:0);
+  const result=transfer?detached[0].data:ordinary[0].data;
+  expect(result).toMatchObject({parentCallId:"shaped-ptc",isError:false,content:[{type:"text",text:"canonical quick result"}]});
+  await f.ctx.sessions.flush(f.agent.session);await using handle=await f.ctx.sessionPersistence.open(f.agent.id,"read");
+  await expect(handle.read(0)).resolves.toBeDefined();
+ }finally{gate.resolve();await f.dispose();await rm(root,{recursive:true,force:true});}
 });
 
 it("queries the settled native PTC job after real nested Bash cancellation without changing the canonical result",async()=>{
