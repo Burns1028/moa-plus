@@ -5,6 +5,8 @@ export interface ProjectPaths {
   context: string;
   notes: string;
   archived: string;
+  /** New index; older records are resolved without rewriting their documents. */
+  index?: string;
 }
 /** Public Project metadata, not the full persisted Host aggregate. */
 export interface ProjectRecord {

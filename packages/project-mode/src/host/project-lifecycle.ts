@@ -7,7 +7,11 @@ import type { SessionModeView } from "../shared/index.ts";
 import type { HostAccess } from "./host-access.ts";
 import { recordSchema, type RecordState } from "./state.ts";
 import { ordinarySessionResolver, resolveOrdinaryAgent } from "./native.ts";
-import { contextIndexPath, contextIndexTemplate } from "./project-memory.ts";
+import {
+  contextIndexPath,
+  contextIndexTemplate,
+  memoryPaths,
+} from "./project-memory.ts";
 
 export function hasOwnTurn(
   events: readonly SessionEvent[],
@@ -128,7 +132,7 @@ export class ProjectLifecycle {
       await this.options.put(sessionId, recordSchema.parse(r));
       this.options.attach(agent);
       if (this.host.record(agent.id))
-        this.host.enqueue(() => this.options.recover(agent.id));
+        this.host.enqueue(agent.id, () => this.options.recover(agent.id));
       this.host.notify();
     });
     return this.mode(sessionId);
@@ -165,13 +169,10 @@ export class ProjectLifecycle {
       base = this.host.config.dataDirectory;
     if (isAbsolute(base) || relative(".", base).split(/[\\/]/).includes(".."))
       throw new Error("project-mode/invalid-directory");
-    const root = resolve(cwd, base, id),
-      paths = {
-        root,
-        context: resolve(root, "context"),
-        notes: resolve(root, "notes.md"),
-        archived: resolve(root, "archived.md"),
-      };
+    // New MoA workspaces use the whitepaper's root files. Explicit private
+    // layouts remain supported; persisted legacy paths are never relocated.
+    const root = base === "." ? cwd : resolve(cwd, base, id),
+      paths = memoryPaths(root);
     const presets = this.host.ctx.get("agentPresets");
     const fs = presets?.serviceFor(agent, "fs") ?? agent.ctx.get("fs");
     if (!fs) throw new Error("project-mode/filesystem-unavailable");

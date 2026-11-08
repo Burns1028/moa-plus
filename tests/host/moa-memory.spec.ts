@@ -4,12 +4,13 @@ import { join } from "node:path";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { fixture } from "./fixture.ts";
 import {
-  MoAMemory,
+  ensureContextIndex,
+  readNotes,
   memoryPaths,
   notesInjection,
   identityMessage,
   contextIndexTemplate,
-} from "../../packages/project-mode/src/host/moa/memory.ts";
+} from "../../packages/project-mode/src/host/project-memory.ts";
 
 it("preserves every note character and warns only above 8000 Unicode code points", () => {
   const exact = "🚀".repeat(8000);
@@ -58,18 +59,17 @@ it("creates an index alongside legacy files through the acting agent filesystem 
     await writeFile(join(paths.context, "topic.md"), "topic body\n");
     await writeFile(paths.notes, "full notes\r\n");
     const { index: _index, ...legacyPaths } = paths;
-    const memory = new MoAMemory(f.ctx, agent, {
-      workspacePath: f.root,
-      paths: legacyPaths,
-    });
+    const project = { workspacePath: f.root, paths: legacyPaths };
     const signal = new AbortController().signal;
-    await memory.ensureContextIndex(signal);
+    await ensureContextIndex(f.ctx, agent, project, signal);
     expect(await readFile(paths.index, "utf8")).toContain(contextIndexTemplate);
     expect(await readFile(paths.index, "utf8")).toContain("context.md");
     expect(await readFile(paths.index, "utf8")).toContain("topic.md");
-    expect(await memory.readNotes(signal)).toBe("full notes\r\n");
+    expect(await readNotes(f.ctx, agent, project, signal)).toBe(
+      "full notes\r\n",
+    );
     await writeFile(paths.index, "curated index\n");
-    await memory.ensureContextIndex(signal);
+    await ensureContextIndex(f.ctx, agent, project, signal);
     expect(await readFile(paths.index, "utf8")).toBe("curated index\n");
     expect(await readFile(join(paths.context, "context.md"), "utf8")).toBe(
       "legacy\r\n正文\n",
@@ -90,12 +90,12 @@ it("rejects memory paths outside the acting workspace", async () => {
       meta: { cwd: f.root },
       agentOptions: { provider: "test", model: "test" },
     });
-    const memory = new MoAMemory(f.ctx, agent, {
+    const project = {
       workspacePath: f.root,
       paths: memoryPaths(join(f.root, "..", "outside")),
-    });
+    };
     await expect(
-      memory.ensureContextIndex(new AbortController().signal),
+      ensureContextIndex(f.ctx, agent, project, new AbortController().signal),
     ).rejects.toThrow("project-mode/path-escape");
   } finally {
     await f.dispose();

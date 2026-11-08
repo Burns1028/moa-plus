@@ -8,7 +8,7 @@ export interface Config {
   retryMaxAttempts: number;
 }
 export const Config: z<Config> = z.object({
-  dataDirectory: z.string().default(".dsh/project-mode"),
+  dataDirectory: z.string().default("."),
   coordinatorHiddenTools: z
     .array(z.string())
     .default([

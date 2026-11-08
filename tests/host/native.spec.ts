@@ -892,7 +892,7 @@ it("initializes context through the coordinator scoped sandbox filesystem and pr
     expect(await readFile(mode.paths!.notes, "utf8")).toBe("keep my notes");
     const { join } = await import("node:path");
     const { rm, access } = await import("node:fs/promises");
-    const index = join(mode.paths!.context, "context.md");
+    const index = join(mode.paths!.context, "index.md");
     await rm(index, { force: true });
     setSandboxMode(agent.session, "read-only");
     agent.followup(

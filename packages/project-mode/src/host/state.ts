@@ -18,6 +18,7 @@ export const pathsSchema = z.object({
   context: id,
   notes: id,
   archived: id,
+  index: id.optional(),
 });
 export const projectSchema = z.object({
   version: z.literal(1),
