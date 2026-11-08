@@ -1,6 +1,6 @@
 # Native MOA execution contract
 
-Status: revised proposal for focused independent review, 2026-11-08. This document authorizes no patch by itself. It describes the additional native behavior required by Task 5 of the [whitepaper plan](superpowers/plans/2026-11-08-moa-whitepaper.md). Production artifacts, dependencies and compatibility manifests have not been changed by this research.
+Status: independently reviewed native contract, implemented against pinned rc.3 artifacts on 2026-11-08. The exact production patches and declaration counterparts are listed in `compat/rc3/manifest.json`. Focused scripted native-loop and real Bash/PTC tests cover the behavior below; full application and real-model acceptance are recorded separately in the [whitepaper plan](superpowers/plans/2026-11-08-moa-whitepaper.md).
 
 ## Baseline and ownership
 
@@ -8,7 +8,7 @@ The target is the **published, pinned DSH 0.2.1-rc.3 artifacts**, with this repo
 
 The local Harness source at commit `22ddee3792402c3e70ec5f86a63c3e3e895a2f60` was read only. It has already moved root batch execution into `packages/core/tools/src/batch.ts` and added `ToolExecutor`; these are **reference locations, not the installed patch target**. Likewise, local `packages/jobs/tool-jobs/src/index.ts` has inline-output delivery that the published rc.3 package does not have.
 
-The plugin development `node_modules` currently lacks `dsh-jobs`, `dsh-jobs-local` and `dsh-tool-jobs`. They are present in `runtime/rc3/package-lock.json` through native bundles. The locked published jobs declarations and jobs-local/tool-jobs runtimes were inspected from their tarballs in memory; jobs-local and tool-jobs tarball SHA-512 values matched the lock. The implementation must add the exact native dependencies needed for compile-time and test composition, while retaining the runtime's single existing jobs provider. Missing jobs/controller capability must fail MOA background activation visibly; it must not create an alternative registry.
+The original development composition lacked `dsh-jobs`, `dsh-jobs-local` and `dsh-tool-jobs`; the implementation now pins the required native development and runtime dependencies. They were already present transitively in `runtime/rc3/package-lock.json` through native bundles. The locked published jobs declarations and jobs-local/tool-jobs runtimes were inspected from their tarballs in memory; jobs-local and tool-jobs tarball SHA-512 values matched the lock. The implementation must add the exact native dependencies needed for compile-time and test composition, while retaining the runtime's single existing jobs provider. Missing jobs/controller capability must fail MOA background activation visibly; it must not create an alternative registry.
 
 | Responsibility | Owner and inspected seam |
 | --- | --- |
@@ -32,7 +32,7 @@ No new agent loop, scheduler, inbox or jobs registry is introduced. Native concu
 
 ## Native capability interfaces
 
-Names in this section are proposed interfaces, not existing APIs. Existing branded `SessionId`, `SessionSeq`, `ToolCallId`, `MessageId`, `JobId` and native result types must be imported rather than replaced with strings.
+These are the reviewed compatibility capabilities; they are not APIs in stock rc.3. Existing branded `SessionId`, `SessionSeq`, `ToolCallId`, `MessageId`, `JobId` and native result types must be imported rather than replaced with strings.
 
 ```ts
 interface ToolActivityIdentity {
@@ -94,6 +94,11 @@ interface TurnHandoff {
 // Merge TurnHandoff into the native TurnEndReasonMap.
 
 interface Agent {
+  // Derived from the native cancellation phase or an uncompleted join; no second lifecycle state.
+  readonly moaAborting: boolean;
+  // Keeps a continuation resident until its transferred work and result obligations settle.
+  readonly moaHasPendingBackground: boolean;
+  enableToolBackground(options?: { readonly hasPendingResult?: () => boolean }): () => void;
   cancelAndJoin(
     cause: AgentCancelCause,
     options?: { readonly continuation?: UserMessage },
@@ -230,6 +235,8 @@ The per-job `completionNotice: "producer"` reporter rule above replaces the earl
 Implement `Agent.cancelAndJoin(cause, { continuation? })` in the native phase owner. Both standalone KillAgent and hard-interrupt-with-new-direction call this same method. It reserves the cancellation boundary even when the foreground driver is idle but transferred jobs exist, clears old pending direction once, invokes ordinary foreground cancellation, cancels this Agent's transferred/bound MOA root activities, and joins their actual body/wrapper/finalizer and producer resource-exit promises. Independent explicit native background jobs retain native ownership/control behavior; a producer bound to a transferred root is part of this join.
 
 The old batch drains started foreground calls and repairs missing Tool Messages with ToolCallRecovery before step/end and turn/end. Flush the repaired history before resolving the join or admitting replacement work. During the join, later waking sends are stored in the native inbox but cannot open another driver. A producer that ignores cancellation keeps the Agent Aborting; registry forced-failure or elapsed timeout does not resolve this barrier. Observation/persistence failure is reported and must not produce Zombie or admit dependent execution.
+
+`moaHasPendingBackground` derives from the native transferred activities and the one installed controller's existing result obligations. The controller callback reuses its pending canonical retry map and Session receipt/committed-message evidence; it is cleared on disposal. Native child settlement consults the getter so an idle foreground driver cannot dispose a Worker whose background work still needs to return. Persistence failure retains the result obligation without pretending its process is still running. After a successful explicit stop, a fully persisted result may remain parked for deliberate resume without occupying a live execution slot.
 
 With **no continuation**, resolve only after actual exit and history flush. Do not fabricate a message or open a turn. The plugin then derives Zombie from that completed stop; the Session/workspace remain intact. Later messages received during the join stay parked, including cancelled-tool result receipts; they cannot immediately undo KillAgent. A new explicit wake/resume submitted after the stop completes can resume the Agent using the existing native send path. Store any undelivered canonical results for that resume. Disposal uses the same join without waking and then disposes the owner.
 

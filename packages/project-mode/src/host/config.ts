@@ -1,5 +1,8 @@
 import z from "@deepseek-ai/schemastery";
 export interface Config {
+  backgroundStrategy: "after-seconds" | "new-message" | "llm-judge";
+  backgroundAfterSeconds: number;
+  completionVerification: boolean;
   dataDirectory: string;
   coordinatorHiddenTools: string[];
   progressTextMaxChars: number;
@@ -8,6 +11,9 @@ export interface Config {
   retryMaxAttempts: number;
 }
 export const Config: z<Config> = z.object({
+  backgroundStrategy: z.union(["after-seconds", "new-message", "llm-judge"]).default("llm-judge"),
+  backgroundAfterSeconds: z.number().min(0).default(10),
+  completionVerification: z.boolean().default(true),
   dataDirectory: z.string().default("."),
   coordinatorHiddenTools: z
     .array(z.string())

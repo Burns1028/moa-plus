@@ -1,0 +1,20 @@
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -45,6 +45,7 @@
+  *   `ctx.subprocess` disposal, so a process survives an executor-only reload.
+  */
+ export declare abstract class ShellExecutor extends Service {
++    readonly supportsManagedExecution?: true;
+     constructor(ctx: Context);
+     /**
+      * The sandbox mode this executor applies by default, or `undefined` when it
+--- a/lib/types/types.d.ts
++++ b/lib/types/types.d.ts
+@@ -212,6 +212,7 @@
+  * {@link ShellProcess} itself plus the foreground projection `result()`.
+  */
+ export interface ShellExecution extends ShellProcess {
++    readonly managed?: { terminate(): void; waitForExit(signal?: AbortSignal): Promise<boolean> };
+     /**
+      * Foreground projection: settles when the process closes, with split
+      * collected streams and first-cause `timedOut`/`aborted` classification.

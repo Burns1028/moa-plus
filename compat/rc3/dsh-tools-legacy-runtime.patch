@@ -1,0 +1,106 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -861,6 +861,8 @@
+ 				return userPresentationMeta(args, value);
+ 			} } : {}
+ 		},
++		...options.backgroundOnMessage === true ? { backgroundOnMessage: true } : {},
++		...options.supportsBackgroundProducer === true ? { supportsBackgroundProducer: true } : {},
+ 		...options.deferLoading === true ? { deferLoading: options.deferLoading } : {},
+ 		...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
+ 		async execute(args, exec) {
+@@ -1372,6 +1374,7 @@
+ 						schema,
+ 						arguments: normalized.dispatched,
+ 						...exec.agent ? { agent: exec.agent } : {},
++						background: exec.background,
+ 						parent: exec.token,
+ 						signal: runController.signal
+ 					};
+@@ -2766,7 +2769,8 @@
+ 	});
+ 	/** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
+ 	[TOOL_RUNTIME_SCHEDULER] = {
+-		prepare: (exec) => this.prepareScheduledExecution(exec),
++		prepare: (exec, options) => this.prepareScheduledExecution(exec, options),
++		start: (exec) => this.startScheduledActivity(exec),
+ 		dispatch: (exec) => this.dispatchScheduledExecution(exec),
+ 		finalize: (exec, result) => this.finalizeScheduledExecution(exec, result),
+ 		finish: (exec, result) => this.finishScheduledExecution(exec, result)
+@@ -3238,7 +3242,7 @@
+ 			default: return assertNever(prepared, "scheduled tool preparation");
+ 		}
+ 	}
+-	createExecution(exec) {
++	createExecution(exec, options) {
+ 		const deferredContexts = [];
+ 		const token = createExecutionToken();
+ 		const callId = exec.callId;
+@@ -3246,7 +3250,14 @@
+ 		const name = exec.name;
+ 		const agent = exec.agent;
+ 		const parent = exec.parent;
+-		const signal = exec.signal;
++		const controller = options?.transferable ? new AbortController() : undefined;
++		const relay = () => controller.abort(exec.signal.reason);
++		if (controller) {
++			exec.signal.addEventListener("abort", relay, { once: true });
++			if (exec.signal.aborted) relay();
++		}
++		const signal = controller?.signal ?? exec.signal;
++		const releaseCaller = () => exec.signal.removeEventListener("abort", relay);
+ 		const visible = this.get(name, agent);
+ 		const collapsed = visible !== void 0 && this.collapses(name, agent, parent !== void 0);
+ 		const concludingExecutions = this.concludingExecutions;
+@@ -3254,6 +3265,8 @@
+ 			token,
+ 			callId,
+ 			rootCallId,
++			background: options?.background ?? exec.background,
++			backgroundOnMessage: visible?.backgroundOnMessage === true,
+ 			name,
+ 			signal,
+ 			...agent !== void 0 ? { agent } : {},
+@@ -3280,6 +3293,7 @@
+ 			this.contentFinalizers.set(execution, finalizerFor());
+ 			if (!collapsed) this.contentProjectors.set(execution, capturedProjector);
+ 			this.cancellationStates.set(execution, {
++				controller, releaseCaller,
+ 				callerSignal: signal,
+ 				bodyInvoked: false
+ 			});
+@@ -3318,11 +3332,21 @@
+ 	* @returns the prepared execution plus the next scheduler stage.
+ 	* @internal
+ 	*/
+-	async prepareScheduledExecution(input) {
+-		return this.prepareExecution(input, (prepared) => prepared);
+-	}
+-	async prepareExecution(input, next) {
+-		const created = this.createExecution(input);
++	async prepareScheduledExecution(input, options) {
++		return this.prepareExecution(input, (prepared) => prepared, options);
++	}
++	startScheduledActivity(exec) {
++		const state = this.cancellationStates.get(exec);
++		const dispatch = this.dispatchScheduledExecution(exec);
++		return {
++			dispatch,
++			exited: dispatch.then(() => undefined),
++			cancel: (reason) => state.controller?.abort(reason),
++			releaseCaller: state.releaseCaller
++		};
++	}
++	async prepareExecution(input, next, options) {
++		const created = this.createExecution(input, options);
+ 		if (created.kind !== "ready") return next(created);
+ 		const exec = created.exec;
+ 		if (this.callerCancelled(exec)) return next({
+@@ -3502,6 +3526,7 @@
+ 		} catch (error) {
+ 			finalResult = this.materializeFinalResult(toolErrorResult(error));
+ 		}
++		this.cancellationStates.get(exec)?.releaseCaller?.();
+ 		this.notifyResult(exec, finalResult);
+ 		return finalResult;
+ 	}

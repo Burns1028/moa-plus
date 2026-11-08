@@ -1,0 +1,11 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -266,7 +266,7 @@
+ 			return;
+ 		}
+ 		if (event.type !== "settled") return;
+-		if (killedByModel.delete(event.job.id) || event.awaited || event.cause === "teardown" || event.job.owner === void 0) return;
++		if (event.job.completionNotice === "producer" || killedByModel.delete(event.job.id) || event.awaited || event.cause === "teardown" || event.job.owner === void 0) return;
+ 		const owner = ctx.get("agents")?.get(event.job.owner);
+ 		if (owner === void 0) return;
+ 		const message = createUserMessage({

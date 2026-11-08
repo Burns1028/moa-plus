@@ -108,7 +108,19 @@
     "typescript": "6.0.3",
     "vitest": "5.0.5",
     "zod": "4.4.3",
-    "zustand": "^5.0.16"
+    "zustand": "^5.0.16",
+    "@deepseek-ai/dsh-bash-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-bash-sandbox": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-jobs": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-jobs-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-ptc-runtime-node": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-sandbox-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-shell": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-shell-env": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-subprocess": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-bash": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-jobs": "0.2.1-rc.3"
   },
   "engines": {
     "node": ">=24.9.0"
@@ -211,7 +223,8 @@
     "@deepseek-ai/dsh-scope": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3"
+    "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-jobs": "0.2.1-rc.3"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-api-session-controller": {

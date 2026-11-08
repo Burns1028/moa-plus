@@ -1,3 +1,6 @@
+import { TOOL_RUNTIME_SCHEDULER } from "@deepseek-ai/dsh-tools";
+import type {} from "@deepseek-ai/dsh-jobs";
+import type {} from "@deepseek-ai/dsh-shell";
 import type { SessionController } from "@deepseek-ai/dsh-api-session-controller";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { SessionId } from "@deepseek-ai/dsh-session";
@@ -143,4 +146,15 @@ export async function resolveOrdinaryAgent(
   const result = await resolver.resolveAgent(sessionId);
   if ("error" in result) throw result.error;
   return result.agent;
+}
+
+/** Refuse a partial rc.3 installation before installing MOA execution policy. */
+export function requireNativeBackground(ctx: Context, agent: Agent) {
+  const jobs = agent.ctx.get("jobs");
+  if (!jobs?.supportsProducerNotices || typeof ctx.tools[TOOL_RUNTIME_SCHEDULER]?.start !== "function" || typeof agent.enableToolBackground !== "function" || typeof agent.cancelAndJoin !== "function" || typeof agent.moaAborting !== "boolean" || typeof agent.moaHasPendingBackground !== "boolean")
+    throw new Error("project-mode/native-moa-background-incompatible: patched native tools, loop and jobs provider required");
+  const bash = ctx.tools.get("bash", agent);
+  if (bash && (!bash.supportsBackgroundProducer || !agent.ctx.get("shell")?.supportsManagedExecution))
+    throw new Error("project-mode/native-moa-background-incompatible: patched Bash producer and managed shell provider required");
+  return jobs;
 }

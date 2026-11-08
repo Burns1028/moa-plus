@@ -1,0 +1,172 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -861,6 +861,8 @@
+ 				return userPresentationMeta(args, value);
+ 			} } : {}
+ 		},
++		...options.backgroundOnMessage === true ? { backgroundOnMessage: true } : {},
++		...options.supportsBackgroundProducer === true ? { supportsBackgroundProducer: true } : {},
+ 		...options.deferLoading === true ? { deferLoading: options.deferLoading } : {},
+ 		...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
+ 		async execute(args, exec) {
+@@ -1372,6 +1374,7 @@
+ 						schema,
+ 						arguments: normalized.dispatched,
+ 						...exec.agent ? { agent: exec.agent } : {},
++						background: exec.background,
+ 						parent: exec.token,
+ 						signal: runController.signal
+ 					};
+@@ -2766,7 +2769,8 @@
+ 	});
+ 	/** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
+ 	[TOOL_RUNTIME_SCHEDULER] = {
+-		prepare: (exec) => this.prepareScheduledExecution(exec),
++		prepare: (exec, options) => this.prepareScheduledExecution(exec, options),
++		start: (exec) => this.startScheduledActivity(exec),
+ 		dispatch: (exec) => this.dispatchScheduledExecution(exec),
+ 		finalize: (exec, result) => this.finalizeScheduledExecution(exec, result),
+ 		finish: (exec, result) => this.finishScheduledExecution(exec, result)
+@@ -3238,7 +3242,7 @@
+ 			default: return assertNever(prepared, "scheduled tool preparation");
+ 		}
+ 	}
+-	createExecution(exec) {
++	createExecution(exec, options) {
+ 		const deferredContexts = [];
+ 		const token = createExecutionToken();
+ 		const callId = exec.callId;
+@@ -3246,7 +3250,14 @@
+ 		const name = exec.name;
+ 		const agent = exec.agent;
+ 		const parent = exec.parent;
+-		const signal = exec.signal;
++		const controller = options?.transferable ? new AbortController() : undefined;
++		const relay = () => controller.abort(exec.signal.reason);
++		if (controller) {
++			exec.signal.addEventListener("abort", relay, { once: true });
++			if (exec.signal.aborted) relay();
++		}
++		const signal = controller?.signal ?? exec.signal;
++		const releaseCaller = () => exec.signal.removeEventListener("abort", relay);
+ 		const visible = this.get(name, agent);
+ 		const collapsed = visible !== void 0 && this.collapses(name, agent, parent !== void 0);
+ 		const concludingExecutions = this.concludingExecutions;
+@@ -3254,6 +3265,8 @@
+ 			token,
+ 			callId,
+ 			rootCallId,
++			background: options?.background ?? exec.background,
++			backgroundOnMessage: visible?.backgroundOnMessage === true,
+ 			name,
+ 			signal,
+ 			...agent !== void 0 ? { agent } : {},
+@@ -3280,6 +3293,7 @@
+ 			this.contentFinalizers.set(execution, finalizerFor());
+ 			if (!collapsed) this.contentProjectors.set(execution, capturedProjector);
+ 			this.cancellationStates.set(execution, {
++				controller, releaseCaller,
+ 				callerSignal: signal,
+ 				bodyInvoked: false
+ 			});
+@@ -3318,11 +3332,21 @@
+ 	* @returns the prepared execution plus the next scheduler stage.
+ 	* @internal
+ 	*/
+-	async prepareScheduledExecution(input) {
+-		return this.prepareExecution(input, (prepared) => prepared);
+-	}
+-	async prepareExecution(input, next) {
+-		const created = this.createExecution(input);
++	async prepareScheduledExecution(input, options) {
++		return this.prepareExecution(input, (prepared) => prepared, options);
++	}
++	startScheduledActivity(exec) {
++		const state = this.cancellationStates.get(exec);
++		const dispatch = this.dispatchScheduledExecution(exec);
++		return {
++			dispatch,
++			exited: dispatch.then(() => undefined),
++			cancel: (reason) => state.controller?.abort(reason),
++			releaseCaller: state.releaseCaller
++		};
++	}
++	async prepareExecution(input, next, options) {
++		const created = this.createExecution(input, options);
+ 		if (created.kind !== "ready") return next(created);
+ 		const exec = created.exec;
+ 		if (this.callerCancelled(exec)) return next({
+@@ -3502,6 +3526,7 @@
+ 		} catch (error) {
+ 			finalResult = this.materializeFinalResult(toolErrorResult(error));
+ 		}
++		this.cancellationStates.get(exec)?.releaseCaller?.();
+ 		this.notifyResult(exec, finalResult);
+ 		return finalResult;
+ 	}
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -113,6 +113,8 @@
+ }
+ /** A registered tool: its schema plus the execution function. */
+ export interface ToolDefinition extends ToolSchema {
++    readonly backgroundOnMessage?: boolean;
++    readonly supportsBackgroundProducer?: true;
+     /** Mandatory canonical output declaration. */
+     readonly output: ToolOutputDefinition;
+     /**
+@@ -214,6 +216,9 @@
+  * callers do not choose that token.
+  */
+ export interface ToolExecutionInput {
++    readonly background?: ToolBackgroundCapability;
++    readonly backgroundOnMessage?: boolean;
++    readonly supportsBackgroundProducer?: true;
+     readonly callId: ToolCallId;
+     /**
+      * Root model-requested call owning this execution tree. Callers omit it for
+@@ -357,7 +362,8 @@
+  */
+ export interface ToolRuntimeScheduler {
+     /** Materialize input, run the ordered pre-execute/guard gate, and decide what stage follows. */
+-    prepare(exec: ToolExecutionInput): Promise<ScheduledToolPreparation>;
++    prepare(exec: ToolExecutionInput, options?: { transferable: true; background: ToolBackgroundCapability }): Promise<ScheduledToolPreparation>;
++    start(exec: ToolRunContext): ToolDispatchActivity;
+     /** Run only the around-dispatch/body stage. */
+     dispatch(exec: ToolRunContext): Promise<ScheduledToolDispatch>;
+     /** Run post-execute and definition-owned content finalization, then materialize and notify. */
+@@ -852,4 +858,21 @@
+     private materializeFinalResult;
+ }
+ export default ToolRuntime;
+-//# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
++//# sourceMappingURL=index.d.ts.map
++export interface ToolBackgroundProducer {
++ readonly jobId?: import('@deepseek-ai/dsh-jobs').JobId;
++ readonly exited: Promise<void>;
++ readonly output?: readonly import('@deepseek-ai/dsh-jobs').JobOutputSource[];
++ cancel(reason?: string): void;
++}
++export interface ToolBackgroundCapability {
++ readonly detached: boolean;
++ bindProducer(producer: ToolBackgroundProducer): void;
++ promote(): Promise<import('@deepseek-ai/dsh-agent').BackgroundAdmission>;
++}
++export interface ToolDispatchActivity {
++ readonly dispatch: Promise<ScheduledToolDispatch>;
++ readonly exited: Promise<void>;
++ cancel(reason: unknown): void;
++ releaseCaller(): void;
++}
+--- a/lib/types/schema.d.ts
++++ b/lib/types/schema.d.ts
+@@ -176,6 +176,8 @@
+ export declare function validateArgs(spec: ParameterSchemaSpec, args: unknown): string[];
+ /** Options for {@link defineTool}. */
+ export interface DefineToolOptions<S extends ParameterSchemaSpec, O extends ValueSchemaSpec> {
++    readonly backgroundOnMessage?: boolean;
++    readonly supportsBackgroundProducer?: true;
+     /** Tool name (must be unique). */
+     readonly name: string;
+     /** Human-readable description sent to the model. */
