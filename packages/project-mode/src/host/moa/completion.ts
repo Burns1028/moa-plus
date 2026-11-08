@@ -117,6 +117,9 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       agentOptions: parent.session.requestHeader()?.config ?? parent.options,
       signal,
       setup(ctx, agent) {
+        ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
+        // Helpers use direct tool calls, including when the parent uses PTC.
+        ctx.tools.presentAs("native");
         if (role === "builder") {
           const names = ctx.tools.schemas(agent).map((tool) => tool.name);
           if (names.length) ctx.tools.suppress({ deny: names });

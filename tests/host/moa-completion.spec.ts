@@ -16,6 +16,60 @@ function call(name: string, args: object): StreamChunk[] {
   ];
 }
 
+it.each(["native", "ptc"])("inherits preset execution tools for the Verifier while keeping the Builder tool-free (parent=%s)", async (mode) => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-bash-local")).default, { timeoutMs: 2000 });
+    await f.ctx.plugin(await import("@deepseek-ai/dsh-shell-env"));
+    if (mode === "ptc") {
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+      await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
+    }
+    f.ctx.baseUrl = new URL("./", import.meta.url).href;
+    await f.ctx.plugin((await import("@deepseek-ai/cordis-plugin-loader")).default);
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-agent-preset-registry")).default, { default: "standard" });
+    await f.ctx.agentPresets.register({ id: "standard", plugins: [
+      { name: "@deepseek-ai/dsh-tool-bash", config: { promoteOnTimeout: false } },
+      { name: new URL("./fixtures/tool-presentation.mjs", import.meta.url).href, config: { mode } },
+    ] });
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("completion-preset"), meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+      setup: async ctx => { await f.ctx.agentPresets.mount(ctx); },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    expect(f.ctx.tools.get("bash")).toBeUndefined();
+    expect(f.ctx.tools.get("bash", agent)).toBeDefined();
+    let main = 0, verifier = 0;
+    let builderTools: string[] | undefined, verifierTools: string[] | undefined;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) {
+        builderTools = (options.tools ?? []).map(tool => tool.name);
+        return response(JSON.stringify({ rubric: "- Run the requested command [human]", tests_required: true }));
+      }
+      if (id.startsWith("moa-verifier-")) {
+        verifierTools = (options.tools ?? []).map(tool => tool.name);
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("bash", { description: "Verify artifact", command: "printf 'preset verifier works\\n'", timeoutMs: 2000 });
+        return response('{"status":"Pass","issues":[]}');
+      }
+      if (++main > 1) { agent.cancel({ kind: "user" }); throw new Error("Preset verification failed"); }
+      return response("Completed requested command");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the requested command" }] }));
+    await agent.whenIdle();
+    expect(builderTools).toEqual([]);
+    expect(verifierTools).toEqual(expect.arrayContaining(["bash", "read_rubric"]));
+    expect(verifierTools).not.toContain("Task");
+    expect(main).toBe(1);
+    expect(verifier).toBe(3);
+    expect(agent.session.snapshotEvents().filter(event => event.type === "turn/end")).toMatchObject([{ data: { reason: { kind: "completed" } } }]);
+  } finally { await f.dispose(); }
+});
+
 it("withdraws an answer missing its bound promise and verifies with an independent tool-backed helper", async () => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
