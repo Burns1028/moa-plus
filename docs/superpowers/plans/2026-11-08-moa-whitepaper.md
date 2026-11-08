@@ -8,6 +8,8 @@
 
 **Tech Stack:** Existing TypeScript/Cordis plugin, Zod, DSH 0.2.1-rc.3 compatibility runtime, Vitest, native integration fixtures and Ego real UI acceptance.
 
+**Execution note — 2026-11-09:** Tasks 1–9 are implemented, reviewed and covered by the current 54-file / 296-test regression, typechecks, 19 launcher checks and `ec9b011` package consumers. The initial proposed file split was consolidated after the Stop That Shit review: existing memory, message and completion modules own those responsibilities. File lists and interfaces below describe the delivered code; Git history retains the original proposal. Task 10 has observed real-model core-flow evidence, but fresh Timer2 normal closure after independent reassessment, final restart/recovery, PR delivery and overall goal completion remain open. See the [requirement map and evidence](../../verification.md).
+
 ## Global Constraints
 
 - The user authorized the entire whitepaper as one completion target. Do not stop after an internal task or report a subset as completion.
@@ -28,95 +30,118 @@
 
 ## Task 1: Memory contracts and progressive context
 
-**Files:** Create `src/host/moa/memory.ts`, `tests/host/moa-memory.spec.ts`; integrate existing `project-memory.ts` in Task 7.
+**Status:** Complete.
 
-**Interfaces:** Export `MoAMemoryPaths`, `memoryPaths(root)`, `notesInjection(text)`, `identityMessage(identity)`, `contextIndexTemplate`, and a native-filesystem-backed `MoAMemory` service. Input paths are supplied by the host, including legacy records; read/write uses the acting Agent's scoped filesystem and policy. notesInjection returns the complete text and a cleanup reminder only when character count exceeds 8K. identityMessage contains id, workdir/mode, reportTo and report requirements, as history content.
+**Files:** Reuse `packages/project-mode/src/host/project-memory.ts` and `project-lifecycle.ts`; tests in `tests/host/moa-memory.spec.ts` and `project-memory.spec.ts`.
 
-- [ ] Write tests for full notes preservation, Unicode character budget, reminder boundary, index/legacy coexistence and identity facts; observe expected failure.
-- [ ] Implement the memory functions and policy-aware service without direct unrestricted filesystem writes or model calls.
-- [ ] Run focused memory tests and typecheck; commit only the component and tests.
+**Interfaces:** Existing `ProjectPaths`, `MoAIdentity`, `memoryPaths`, `notesInjection`, `identityMessage`, `contextIndexTemplate`, `contextIndexPath`, `readNotes`, `ensureContextIndex` and `bindProjectMemory`. Paths retain saved legacy records; access uses the acting Agent's native filesystem and policy. Full notes reach each inference, with a reminder above 8K Unicode characters. Identity is dialogue containing id, workdir/mode, reportTo and reporting instructions.
+
+- [x] Cover full notes, Unicode budget/reminder boundaries, legacy index coexistence and identity facts.
+- [x] Use the existing scoped native filesystem and conditional index creation, without a duplicate memory service or model call.
+- [x] Integrate per-inference memory into the Host and pass focused/full regression and typechecks.
 
 ## Task 2: Worktree ownership and current-state isolation
 
-**Files:** Create `src/host/moa/workspaces.ts`, `tests/host/moa-workspaces.spec.ts`.
+**Status:** Complete.
+
+**Files:** `packages/project-mode/src/host/moa/workspaces.ts`, with `tests/host/moa-workspaces.spec.ts` and `moa-workspace-integration.spec.ts`.
 
 **Interfaces:** Export `MoAWorkspaceManager.prepare({ownerId,sourceDirectory,mode,signal})`, `restore(record)`, `destroy(record,signal)` and serializable `MoAWorkspaceRecord`. Isolated creates a Git Worktree based on the source's current tracked and non-ignored untracked content; Shared returns the parent directory. Workspace ownership and native permission roots are explicit. Reusable Context stays shared even when code worktrees differ.
 
-- [ ] Use temporary real Git repositories to fail tests for dirty tracked files, staged files, untracked files, conflicting independent writes, Zombie retention and owned-only destruction.
-- [ ] Reuse native worktree/filesystem APIs where available; any missing native policy seam is a reviewed contract, not an unrestricted shell escape.
-- [ ] Implement cleanup and restore without deleting Shared or user-owned directories; run real temporary-Git tests and commit.
+- [x] Cover dirty tracked/staged/untracked state, independent worktrees, retained Zombie workspaces and owned-only destruction with temporary real Git repositories.
+- [x] Execute Git management through the acting native sandbox policy and filesystem boundary.
+- [x] Prepare, discover, restore and destroy owned records while preserving shared/user-owned directories; pass Git and integration regressions.
 
 ## Task 3: Request broker and interruptible waits
 
-**Files:** Create `src/host/moa/messages.ts`, `request-waits.ts`, `message-state.ts`, `tests/host/moa-messages.spec.ts`.
+**Status:** Complete.
+
+**Files:** `packages/project-mode/src/host/moa/messages.ts`, reusing `judge.ts`, `residency.ts` and existing `host/state.ts` records; `tests/host/moa-messages.spec.ts`.
 
 **Interfaces:** `MoAMessageBroker.send(actor,input,operationId,signal)`; `recover(rootId)`, `dispose()`. Host-supplied ports authorize actual membership, persist routes, deliver identified native messages, observe unread input and invoke the lightweight judge. Export serializable `MoAMessageEnvelope`, `RequestRoute`, `SendMessageInput`, and `RequestResult` (answered/interrupted/timeout/downgraded). No custom Agent Loop/inbox.
 
-- [ ] Fail behavioral tests for normal reply, request await preventing return, priority interruption, ordinary-notification judge false, incremental rejudge, timeout, late reply, parallel requests, cycles, cancellation, double replies and restart routing.
-- [ ] Implement durable request identity before admission, active process waits and wait graph, explicit ReplyTo, late native delivery, abort cleanup and membership removal behavior.
-- [ ] Run focused tests with real event-emitting ports; commit. Integration into actual DSH occurs in Task 7.
+- [x] Cover explicit answer waits, priority interruption, notification judgment/rejudgment, timeout, late reply, cycles, cancellation, duplicate replies and restart routing.
+- [x] Keep durable routes/receipts, active waits and cycle detection in the broker, with native identified delivery and abort/membership cleanup.
+- [x] Integrate `createNativeMessageBroker` and the direct native SendMessage tool into actual DSH, including PTC and held-receipt same-turn regressions.
 
 ## Task 4: Agent identity, five-state views and native control tools
 
-**Files:** Create `src/host/moa/agents.ts`, `tools.ts`, `roles.ts`, `tests/host/moa-agents.spec.ts`; use actual native types.
+**Status:** Complete.
 
-**Interfaces:** `MoAAgents.task`, `fork`, `query`, `kill`, `destroy`, `lifecycle`. Five model-facing definitions Task/Fork/SendMessage/QueryAgent/KillAgent and ProjectContext. Query status by default, explicit newest-relative offset/limit for human/AI history, optional event-driven wait for selected/all children. Kill defaults to stop/sleep; explicit destruction and existing delete remain distinct. Role tool restrictions and nested switch are scoped.
+**Files:** `packages/project-mode/src/host/moa/agents.ts`, `tools.ts`, `roles.ts` and `messages.ts`; native integration and specialist tests under `tests/host/`.
 
-- [ ] Fail native-oriented tests for Task clean history, selected-source Fork at a committed watermark including open-tail repair, fresh identity, parent/reportTo distinction, role tools, maximum batch size, Request Running and Query Waiting.
-- [ ] Implement using native continuation providers, registry, Session fork and history, scoped tool suppression and native cancellation. Do not clone a live JS execution or expose inherited tool authority.
-- [ ] Run targeted native tests and typecheck; commit.
+**Interfaces:** `MoAAgents.task`, `fork`, `query`, `kill`, `context`, `recover` and `lifecycle`. Destruction uses `kill(..., {destroy:true})`. Task/Fork/QueryAgent/KillAgent/ProjectContext definitions live in `tools.ts`; SendMessage lives in `messages.ts`. Query defaults to state, with explicit newest-relative history and interruptible selected/all-child waits. Role restrictions and nested permission are scoped.
+
+- [x] Cover clean Task history, committed-history Fork/open-tail repair, new identity, creator/reportTo distinction, retained preset tools, batch limit and derived lifecycle states.
+- [x] Use native continuation, registry, Session history, scoped capability restrictions and joined cancellation.
+- [x] Pass actual native tool-schema, role, control, residency and history regressions and typechecks.
 
 ## Task 5: Reviewed native background/handoff/cancellation integration
 
-**Files:** Contract in `docs/native-moa-contract.md`; audited additions under `compat/rc3/`; plugin `src/host/moa/background.ts`, native adapter in `native.ts`; tests under `tests/native-contract/` and `tests/host/moa-background.spec.ts`.
+**Status:** Complete.
+
+**Files:** Reviewed native contracts in `docs/native-moa-contract.md`, `native-moa-residency-contract.md`, `native-moa-protocol-presentation-contract.md` and `native-moa-detached-ptc-log-contract.md`; exact patches in `compat/rc3/`; plugin `packages/project-mode/src/host/moa/background.ts` and `host/native.ts`; regressions in `tests/native-contract/moa-background.spec.ts` and `moa-protocol-presentation.spec.ts`.
 
 **Interfaces:** Actual native tool-execution hooks detach supported tool promises into the native background owner. `query_background_tool(tool_call_id,wait_timeout)` and `cancel_background_tool(tool_call_id)`. A handoff records its cause and triggering inbox IDs after all foreground sibling calls settle; it is distinguishable from completed work. Native cancel/continue waits for the cancelled activity to exit and clears its abort state before new input.
 
-- [ ] Inspect exact native execution seams, write the concrete types/events and independent contract review before any core patch.
-- [ ] Fail native tests for all three strategies/threshold bypass, incremental judge, Tool Message placeholder, timer same-turn, message new-turn, sibling barriers, real output return/wakeup, cancel, history pairing and abort/continue ordering.
-- [ ] Implement minimal audited interfaces and plugin integration; update manifest before/after hashes, rollback, declarations, runtime variants and launcher tests as necessary.
-- [ ] Run native control tests and compatibility preflight; commit only after review.
+- [x] Independently review native contracts and pin their actual runtime/declaration changes in the existing manifest.
+- [x] Cover timer/message/judge policy, placeholders, same-turn timer versus message handoff, sibling barriers, canonical output/wakeup, cancellation, pairing and hard continuation.
+- [x] Keep native-only SendMessage outside PTC programs, persist background outcomes and detached traces through native ignorable records, and expose current native job state.
+- [x] Pass native regressions and exact npm/legacy/runtime-only compatibility, refusal, rollback and launcher checks; retain the 13-package / 31-path boundary.
 
 ## Task 6: Completion guards and independent verification
 
-**Files:** Create `src/host/moa/completion.ts`, `verification.ts`, `tests/host/moa-completion.spec.ts`, `tests/host/moa-verification.spec.ts`.
+**Status:** Complete.
 
-**Interfaces:** A model tool binds task completion criteria and exact completion promise. Agent turn-stopping calls an ordered completion guard. Main startup creates hidden native Rubric Builder/Outcome Verify helpers without recursively attaching graders to every Worker. Builder sees original requirements/specs only, writes source-anchored rubrics.md; verifier reads actual artifacts and runs native Bash build/tests; verdict status is Pass/Partial/Block.
+**Files:** `packages/project-mode/src/host/moa/completion.ts` owns both Ralph and independent Builder/Verifier; coverage is in `tests/host/moa-completion.spec.ts`.
 
-- [ ] Fail tests for missing/exact promises, independent builder input, real tool-backed verification, Partial/Block rework, no premature completion event, inbox arriving before/during final commit, and cancellation escaping normal gates.
-- [ ] Implement using native sessions and hooks, not a keyword delegation rule or self-declared successful check. Preserve full helper evidence in the native history.
-- [ ] Run focused tests and native verification fixtures; commit.
+**Interfaces:** `bindCompletion` mounts `set_completion_criteria` and native hooks. Coordinator human input at pre-step captures original requirements/source snapshots and creates hidden helpers; restart fallback recreates them at turn-stopping. Builder's only tool is validated `submit_rubric`; the Host writes `rubrics.md`. Verifier retains native preset execution tools, reads that authoritative rubric, inspects artifacts and runs required checks. Only Pass clears normal completion; Workers do not receive recursive outcome helpers.
+
+- [x] Cover exact promises, source-independent Builder input/submission, tool-backed verification, Partial/Block rework, input/end races, cancellation and restart.
+- [x] Use hidden native sessions and hooks, preserve helper evidence, deny Builder execution/delegation and retain Verifier preset capabilities.
+- [x] Pass completion and native preset-isolation regressions; observe real Builder submission, Verifier Pass and Ralph correction separately in Task 10.
 
 ## Task 7: Integrate complete runtime into existing Host
 
-**Files:** Modify `host/index.ts`, `host-access.ts`, `state.ts`, `agent-events.ts`, `worker-operations.ts`, `completion-outbox.ts`, `turn-coordination.ts`, prompts/config and shared view contracts.
+**Status:** Complete.
 
-- [ ] Add failing native integration scenarios covering real Agent tool execution, actual inbox delivery, hot/cold peers and parents, request replay, returned final AI, handoff-versus-completion and state recovery.
-- [ ] Wire every component into actual Host startup/disposal and persisted records. Install five MOA primitives atomically, replace old model control entries, preserve backend compatibility and ordinary sessions.
-- [ ] Inject identity as dialogue and full notes per inference. Mount role tools/ProjectContext and shared-memory references. Configure workspace permissions through native delegation.
-- [ ] Update durable projections so missing AI stays empty, late replies deduplicate, handoffs do not fabricate completed work and candidate-completion races reenter the native loop.
-- [ ] Run focused scenarios followed by existing full Host/integration regressions and commit.
+**Files:** Existing `packages/project-mode/src/host/` modules: `index.ts`, `host-access.ts`, `state.ts`, `agent-events.ts`, `worker-operations.ts`, `completion-outbox.ts`, `turn-coordination.ts`, `project-memory.ts`, prompts/config; existing shared view contracts.
+
+- [x] Exercise actual Agent execution/inboxes, hot/cold parent chains, Request recovery, full ended-turn AI results and handoff/completion separation.
+- [x] Bind startup/disposal, tools and persisted facts while preserving legacy backend and ordinary-session behavior.
+- [x] Admit identity as dialogue and full notes before inference, with role tools, shared context and native delegated permissions.
+- [x] Preserve empty AI results, canonical claim/recovery deduplication, handoff capsule provenance and same-turn closure through queued final ingestion.
+- [x] Pass focused and complete Host/Client/integration/native-contract regression.
 
 ## Task 8: Minimal native UI and user controls
 
-**Files:** Existing `client/runtime.ts`, `store.ts`, `components.tsx`, `branch.tsx`, `panels.tsx`, timeline and locales as needed; client/native-contract tests.
+**Status:** Complete.
 
-- [ ] Fail UI tests for new derived states while retaining actual busy spinners, permanent MoA identity, capsule ownership, deleted-member hiding and parent/child alignment.
-- [ ] Show only necessary lifecycle/wait/background information through existing native UI. Preserve two-line Markdown previews, closable tabs, Back and inherited permissions.
-- [ ] Run real native-renderer UI regressions and commit.
+**Files:** Existing `packages/project-mode/src/client/` runtime/store/components/branch/panels/timeline modules and locale files; `tests/client/` and native sidebar contracts.
+
+- [x] Cover native busy state, permanent mode identity, capsule ownership, deleted-member hiding and nested parent addresses.
+- [x] Retain original sidebar/controls, Markdown previews, closable Workers/notes tabs, Back and inherited permissions.
+- [x] Pass Client/native-renderer contracts; keep live UI evidence and final scenario acceptance separate in Task 10.
 
 ## Task 9: Package, documentation and broad independent review
 
-- [ ] Update public architecture/API/usage documentation around implemented capabilities and all actual compatibility requirements. Reconcile prior branding work without merging it implicitly.
-- [ ] Run production build, typechecks, full Host/Client/integration/native-contract/launcher tests and npm/forwarding/committed-Git clean-consumer checks.
-- [ ] Generate a whole-branch review package; independently review whitepaper coverage and code quality, fix findings, rerun relevant checks.
-- [ ] Maintain a requirement-to-code/test/evidence map with every six-chapter item accounted for.
+**Status:** Complete.
+
+- [x] Align architecture, API, usage, changelog and compatibility documentation with the delivered code and stable package/storage identities.
+- [x] Pass production build, Host/Client types, 54 files / 296 combined tests, 19 launcher tests and `ec9b011` npm/forwarding/Git consumers with clean-checkout npm ci.
+- [x] Complete independent architecture/Stop reviews and bounded reviews of acceptance fixes; resolve findings with focused verification.
+- [x] Maintain the six-chapter and six-control-flow requirement-to-code/test/evidence map in existing [verification](../../verification.md).
 
 ## Task 10: Real DSH/model/UI acceptance and PR
 
-- [ ] Prepare a fresh isolated compatible DSH runtime and new test workspace; do not reuse personal sessions/profiles.
-- [ ] Run real-model tasks for Task/Fork, independent exploration/review, Request/replies/late input, direct human Worker control, shared knowledge reuse, worktree isolation, slow-tool handoff, cancellation/recovery and real verdict-driven rework.
-- [ ] Use Ego to inspect status, tools, trajectories, turn closure, message timing, capsule ownership and existing layout; inspect actual artifacts and independently run their checks.
-- [ ] Record scripted versus real-model evidence separately; correct defects and repeat only affected acceptance.
+**Status:** In progress. Core exercises are observed; final acceptance and delivery are not complete.
+
+- [x] Prepare a fresh isolated compatible DSH runtime and test workspace without personal sessions/profiles.
+- [x] Observe real Task/Fork, role/nested reporting, Request/ReplyTo/interruption/late replies, direct human Worker control, shared knowledge and full canonical result return.
+- [x] Observe real message-triggered background work, cancellation/resource exit, hard continuation, Ralph promise correction, Builder submission and independent Verifier Pass/rework.
+- [x] Inspect native status/tools/trajectories/capsules and actual artifacts through Ego; observe deletion, family archive and restoration while preserving deletion.
+- [x] Keep scripted versus real-model evidence separate and retain failed runs. The older timer completed its Worker flow but its Coordinator failed cold observation; the detached writer correction and cold-read regressions are in `ec9b011`.
+- [ ] Accept fresh Timer2 only after the current independent reassessment and normal Coordinator closure. Two runs preceded operator clarification; healthy cold observation does not substitute for a completed native end.
+- [ ] Finish final runtime restart/recovery acceptance and verify no duplicate result or reopened completed turn.
 - [ ] Push focused reviewable commits/PRs for the complete goal; keep incomplete work clearly draft. Merge/release remains the user's decision.
 - [ ] Mark the goal complete only when all tasks, all whitepaper requirements and required acceptance are complete.
