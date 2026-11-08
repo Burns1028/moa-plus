@@ -22,11 +22,68 @@ import {
   participatingMemberships,
 } from "./capsule-participation.ts";
 import type { HostAccess } from "./host-access.ts";
+export interface MoASpawnOptions {
+  name: string;
+  task: string;
+  childId: SessionId;
+  cwd: string;
+  identity: string;
+  provider: string;
+  /** Root project owner, distinct from the native creator for nested work. */
+  rootId?: SessionId;
+}
 /** Native worker operations with durable operation identities. */
 export class WorkerOperations {
   readonly operations = new Map<string, Promise<ControlResult>>();
   private workerQueues = new Map<SessionId, Promise<ControlResult>>();
   constructor(private host: HostAccess) {}
+  /** Reuse the Project admission and receipt path with pre-reserved native inputs. */
+  async spawnMoA(
+    agent: Agent,
+    options: MoASpawnOptions,
+    operationId: string,
+    signal: AbortSignal,
+  ): Promise<ControlResult> {
+    const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
+    if (
+      !record ||
+      record.project.mode !== "enabled" ||
+      this.host.ctx.agents.get(agent.id) !== agent
+    )
+      throw new Error("moa/not-member");
+    const rootId = SessionId(record.project.coordinatorSessionId);
+    if (agent.id !== rootId) {
+      const descriptor = record.operations[`moa:agent:${agent.id}`] as
+        | { nested?: boolean }
+        | undefined;
+      if (
+        !descriptor?.nested ||
+        !record.workers.some(
+          (worker) => worker.id === agent.id && worker.lifecycle === "active",
+        )
+      )
+        throw new Error("moa/nested-disabled");
+    }
+    options = { ...options, rootId };
+    const key = JSON.stringify([rootId, operationId]);
+    const receipt = this.host.record(rootId)?.operations[operationId];
+    if (receipt) return receipt as unknown as ControlResult;
+    const pending = this.operations.get(key);
+    if (pending) return pending;
+    const work = this.dispatch(
+      agent,
+      { action: "spawn", name: options.name, task: options.task },
+      operationId,
+      AbortSignal.any([signal, this.host.closing.signal]),
+      options,
+    ).finally(() => {
+      this.operations.delete(key);
+      this.host.notify();
+    });
+    this.operations.set(key, work);
+    this.host.notify();
+    return work;
+  }
   listWorkers(agent: Agent, signal: AbortSignal): Promise<WorkerView[]> {
     const r = this.host.requireCoordinator(agent);
     return Promise.all(
@@ -99,12 +156,18 @@ export class WorkerOperations {
     req: Exclude<ControlWorkersRequest, { action: "list" | "get" | "history" }>,
     operationId: string,
     signal: AbortSignal,
+    options?: MoASpawnOptions,
   ): Promise<ControlResult> {
     signal.throwIfAborted();
-    let r = this.host.requireCoordinator(agent);
-    const placement = projected(this.host.ctx, agent.session);
+    const rootId = options?.rootId ?? agent.id;
+    let r = options
+      ? this.host.record(rootId)!
+      : this.host.requireCoordinator(agent);
+    const rootAgent = this.host.ctx.agents.get(rootId);
+    if (!rootAgent) throw new Error("moa/root-unavailable");
+    const placement = projected(this.host.ctx, rootAgent.session);
     const turn = this.host.ctx.sessionProjections.stateOf(
-      agent.session,
+      rootAgent.session,
       "turnBoundary",
     )!.lastTurn;
     if (req.action === "interrupt" || req.action === "delete")
@@ -112,7 +175,7 @@ export class WorkerOperations {
     let assignment = r.assignments.find((a) => a.operationId === operationId);
     const workerId =
       req.action === "spawn"
-        ? SessionId(assignment?.workerId ?? randomUUID())
+        ? SessionId(assignment?.workerId ?? options?.childId ?? randomUUID())
         : req.worker_id;
     if (
       req.action === "send" &&
@@ -126,8 +189,8 @@ export class WorkerOperations {
           assignment.rejection?.code ?? "PROJECT_OPERATION_REJECTED",
         );
       // An uncertain native call must be reconciled before another admission.
-      await this.reconcileAssignment(agent, assignment.id);
-      r = this.host.record(agent.id)!;
+      await this.reconcileAssignment(agent, assignment.id, rootId);
+      r = this.host.record(rootId)!;
       assignment = r.assignments.find((a) => a.operationId === operationId)!;
       if (assignment.admission === "accepted")
         return this.acceptReceipt(
@@ -138,6 +201,7 @@ export class WorkerOperations {
           assignment.messageId!,
           assignment.coordinatorTurn,
           req.action === "spawn" ? undefined : req.delivery,
+          rootId,
         );
       throw new Error(
         "project-mode/admission-uncertain: reconcile before retry",
@@ -152,6 +216,7 @@ export class WorkerOperations {
       assignmentId,
       turn,
       placement,
+      rootId,
     );
     let accepted = false;
     try {
@@ -161,6 +226,7 @@ export class WorkerOperations {
         operationId,
         workerId,
         signal,
+        options,
       );
       accepted = true;
       const receipt = await this.acceptReceipt(
@@ -171,12 +237,13 @@ export class WorkerOperations {
         messageId,
         turn,
         req.action === "spawn" ? undefined : req.delivery,
+        rootId,
       );
-      this.host.enqueue(agent.id, () => this.host.ingest(workerId));
+      this.host.enqueue(rootId, () => this.host.ingest(workerId));
       return receipt;
     } catch (error) {
       const rejection = accepted ? undefined : nativeAdmissionRejection(error);
-      await this.host.update(agent.id, (r) => ({
+      await this.host.update(rootId, (r) => ({
         ...r,
         workers:
           rejection && req.action === "spawn"
@@ -258,8 +325,9 @@ export class WorkerOperations {
     assignmentId: string,
     turn: number,
     placement: ReturnType<typeof projected>,
+    rootId: SessionId = agent.id,
   ): Promise<void> {
-    await this.host.update(agent.id, (r) => ({
+    await this.host.update(rootId, (r) => ({
       ...r,
       workers:
         req.action === "spawn"
@@ -284,7 +352,9 @@ export class WorkerOperations {
           coordinatorTurn: turn,
           segmentStartSeq: placement.segmentStartSeq,
           participationSeq:
-            nativeOperationSeq(operationId, agent.id) ?? placement.lastSeq,
+            (agent.id === rootId
+              ? nativeOperationSeq(operationId, agent.id)
+              : undefined) ?? placement.lastSeq,
           participationKind: req.action === "spawn" ? "spawn" : "send",
           delivery: req.action === "spawn" ? "steer" : req.delivery,
           admission: "prepared",
@@ -300,18 +370,25 @@ export class WorkerOperations {
     operationId: string,
     workerId: SessionId,
     signal: AbortSignal,
+    options?: MoASpawnOptions,
   ): Promise<string> {
     if (req.action === "spawn") {
       const activation = await this.host.ctx.subagents.startActivation({
-        provider: "spawn",
+        provider: options?.provider ?? "spawn",
         label: req.name,
         childId: workerId,
         delivery: "caller",
         signal,
         request: {
           parent: agent,
-          prompt: [{ type: "text", text: req.task }],
-          cwd: this.host.ctx.workingDirectory.get(agent.session),
+          prompt: [
+            {
+              type: "text",
+              text: options ? `${options.identity}\n\n${req.task}` : req.task,
+            },
+          ],
+          cwd:
+            options?.cwd ?? this.host.ctx.workingDirectory.get(agent.session),
         },
       });
       void activation.result.catch((error) => {
@@ -350,6 +427,7 @@ export class WorkerOperations {
     messageId: string,
     turn: number,
     delivery?: "steer" | "queue",
+    rootId: SessionId = agent.id,
   ): Promise<ControlReceipt> {
     const receipt: ControlReceipt = {
       operationId,
@@ -360,7 +438,7 @@ export class WorkerOperations {
       accepted: true,
       ...(delivery ? { delivery } : {}),
     };
-    await this.host.update(agent.id, (r) => ({
+    await this.host.update(rootId, (r) => ({
       ...r,
       workers: r.workers.map((w) =>
         w.id === workerId && w.lifecycle === "provisioning"
@@ -393,8 +471,12 @@ export class WorkerOperations {
     }));
     return receipt;
   }
-  async reconcileAssignment(agent: Agent, assignmentId: string) {
-    const r = this.host.record(agent.id)!,
+  async reconcileAssignment(
+    agent: Agent,
+    assignmentId: string,
+    rootId: SessionId = agent.id,
+  ) {
+    const r = this.host.record(rootId)!,
       assignment = r.assignments.find((a) => a.id === assignmentId)!;
     if (assignment.admission === "accepted") return;
     const catalog = await this.host.ctx.subagents.listChildren(agent.id);
@@ -434,6 +516,7 @@ export class WorkerOperations {
         id,
         assignment.coordinatorTurn,
         assignment.delivery,
+        rootId,
       );
   }
 }
