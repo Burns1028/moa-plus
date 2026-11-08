@@ -176,7 +176,15 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
       }
       record = records(agent).find(r => backgroundHandle(r.receipt) === handle);
     }
-    if (record) return { status: "finished", tool_call_id: handle, job_id: receipt.jobId, job: record.job, ...record.result };
+    if (record) {
+      let job: JobView | undefined;
+      try { job = jobs.get(receipt.jobId, agent.id); }
+      catch {
+        // The native registry is process-local; a live historical snapshot is not current state.
+        if (record.job && ["completed", "killed", "failed"].includes(record.job.status)) job = record.job;
+      }
+      return { status: "finished", tool_call_id: handle, job_id: receipt.jobId, ...(job ? { job } : {}), ...record.result };
+    }
     const job = jobs!.get(receipt.jobId, agent.id);
     return { status: job.status, finalization_pending: job.status !== "running" && job.status !== "stopping", job, output: jobs!.readAt(receipt.jobId, 0, agent.id) };
   }

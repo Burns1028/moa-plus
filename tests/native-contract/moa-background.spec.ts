@@ -86,6 +86,8 @@ it.each(["consumed","stopped"])("reads a %s background result from durable JSONL
   expect(current.agent.session.snapshotEvents().filter(e=>e.type==="user/message"&&e.data.id===saved[0].data.delivery.id)).toHaveLength(1);
   const result=await current.ctx.tools.execute({agent:current.agent,name:"query_background_tool",callId:"query" as any,signal:new AbortController().signal,arguments:{tool_call_id:handle}});
   expect(result.isError).toBe(false);expect(result.value).toMatchObject({status:"finished",...saved[0].data.result});
+  expect(["running","stopping"]).toContain(saved[0].data.job?.status);
+  expect(result.value).not.toHaveProperty("job");
   if(state==="consumed")expect(JSON.stringify(result)).toContain("the complete durable result");
  }finally{gate.resolve("cleanup");if(current){await current.off();await current.ctx.fiber.dispose();}await rm(root,{recursive:true,force:true});}
 });
@@ -369,6 +371,36 @@ it("keeps canonical program subcall values while transferring the whole native r
  }finally{gate.resolve("cleanup");await f.dispose();}
 });
 
+it("queries the settled native PTC job after real nested Bash cancellation without changing the canonical result",async()=>{
+ const f=await setup();
+ try{
+  await shell(f,true);
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default,{mode:"danger-full-access"});
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+  await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
+  f.agent.ctx.tools.presentAs("ptc");
+  const args=JSON.stringify({code:"const result = await tools.bash({description:'Run an owned child', command:\"printf 'inner-job-output\\n'; sleep 1\", timeoutMs:1500}); return result;",description:"Run and cancel actual nested Bash"});
+  f.adapter.handler=()=>f.adapter.requests.length===1?[
+   {type:"block-start",index:0,blockType:"tool-call"},
+   {type:"block-end",index:0,block:{type:"tool-call",id:"ptc-cancel",name:"run_code",arguments:args}},
+   {type:"finish",reason:{kind:"tool-calls"}},
+  ]:response("done");
+  f.agent.followup(user("run"));await f.agent.whenIdle();
+
+  await until(()=>f.ctx.jobs.list(f.agent.id).some(job=>job.kind==="bash"&&f.ctx.jobs.readAt(job.id,0,f.agent.id).chunks.some(chunk=>chunk.text.includes("inner-job-output"))));
+  const receipt=receiptOf(f),handle=backgroundHandle(receipt),signal=new AbortController().signal,parent=Symbol("native-control-dispatch") as any;
+  const cancelled=await f.ctx.tools.execute({agent:f.agent,name:"cancel_background_tool",callId:"cancel" as any,parent,signal,arguments:{tool_call_id:handle}});
+  expect(cancelled.isError).toBe(false);
+  await until(()=>f.ctx.jobs.get(receipt.jobId,f.agent.id).status==="killed");await f.agent.whenIdle();
+  const saved=backgroundResults(f)[0].data;
+  expect(saved.job?.status).toBe("stopping");
+  const queried=await f.ctx.tools.execute({agent:f.agent,name:"query_background_tool",callId:"query" as any,parent,signal,arguments:{tool_call_id:handle}});
+  expect(queried.isError).toBe(false);
+  expect(queried.value).toMatchObject({status:"finished",job:{status:"killed"},...saved.result});
+  expect(f.ctx.jobs.list(f.agent.id).find(job=>job.kind==="bash")?.status).toBe("killed");
+ }finally{await f.dispose();}
+});
+
 it("transfers real foreground-only Bash without changing its native timeout policy",async()=>{
  const f=await setup("after-seconds",0.01);
  try{
@@ -490,6 +522,6 @@ it("query timeout leaves work alive and cancel reports stopping until actual cle
   const cancel=await f.ctx.tools.execute({agent:f.agent,name:"cancel_background_tool",callId:"cancel" as any,signal,arguments:{tool_call_id:handle}});
   expect(cancel.isError).toBe(false);expect(f.ctx.jobs.get(receipt.jobId,f.agent.id).status).toBe("stopping");
   expect(JSON.stringify(await query())).toContain('"stopping"');cleanup.resolve();await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
-  expect(f.ctx.jobs.get(receipt.jobId,f.agent.id).status).toBe("killed");const final=await query();expect(JSON.stringify(final)).toContain('"finished"');expect(final).toEqual(await query());
+  expect(f.ctx.jobs.get(receipt.jobId,f.agent.id).status).toBe("killed");const final=await query();expect(final.value).toMatchObject({status:"finished",job:{status:"killed"}});expect(final).toEqual(await query());
  }finally{cleanup.resolve();await f.dispose();}
 });
