@@ -179,7 +179,7 @@ For each committed background outcome, append exactly one native `tool/result`, 
 
 The model-facing `tool_call_id` accepted by the two background tools is the **opaque handle printed in this placeholder**. Encode the original owner/call sequence identity, not a raw provider call ID: this repository already establishes that provider ToolCallId can repeat across turns. The receipt preserves the provider ID separately. Resolve the handle against the calling Agent's session before native `jobs.get/wait/kill`; copied or forked history never transfers authority.
 
-Append a plugin-owned, log-only `moa/background-result` event after canonical settlement:
+After canonical settlement, use native `appendPluginRecord` to append the log-only `plugin:moa/background-result` record, with the native `ignorable: true` envelope. Read it through `pluginRecordOf` and validate its payload. Do not add a required event to `SessionEventMap` or bypass the native unknown-event check:
 
 ```ts
 interface BackgroundResultData {

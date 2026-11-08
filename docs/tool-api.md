@@ -190,7 +190,7 @@ With `completionVerification` enabled, participants have:
 
 This is `set_completion_criteria`. Ralph checks for the exact promise in the current task's final AI reply and requests continued work when absent. Successful delivery clears the binding; interrupted work retains it.
 
-The Coordinator additionally has independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots, writes source-anchored `rubrics.md`, and does not inspect implementation output. Verifier must read the applicable rubric and inspect actual deliverables with native tools. Required build/test evidence uses actual completed execution, not a self-declared Pass. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
+The Coordinator additionally has independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots. Its sole tool is `submit_rubric(rubric, tests_required)`, which submits source-anchored Markdown for the Host to write to `rubrics.md`; it has no file, shell, or delegation tools. Plain text is not a submission. Verifier must read the applicable rubric and inspect actual deliverables with inherited native tools. Required build/test evidence uses actual completed execution, not a self-declared Pass. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
 
 ## UI and backend compatibility
 

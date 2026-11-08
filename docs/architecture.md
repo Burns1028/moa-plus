@@ -90,7 +90,7 @@ Isolated preparation snapshots the source's current tracked/staged/untracked sta
 
 ## Messages and result return
 
-Notify admits an identified message and returns. Request persists its route, admits input, and waits inside the native Tool Call. Explicit `reply_to` resolves that call; unrelated input can interrupt the wait, and a late answer is delivered through the inbox. A wait-cycle check downgrades the new cyclic wait to Notify. The native pre-step drains all eligible next-step input; explicit next-turn queue input remains separate.
+Notify admits an identified message and returns. Request persists its route, admits input, and waits inside the native Tool Call. Explicit `reply_to` resolves that call; unrelated input can interrupt the wait, and a late answer is delivered through the inbox. Request owns this wait: its interrupted Tool Result continues the current turn, including inside PTC. The generic slow-tool policy consults the existing broker wait instead of transferring the same wait into a background job. A wait-cycle check downgrades the new cyclic wait to Notify. The native pre-step drains all eligible next-step input; explicit next-turn queue input remains separate.
 
 `withManagedAgent` reads durable headers and borrows the true parent chain, including cold intermediate parents. The reviewed Host-only native callback preserves reconstruction, delegated policy, capacity, and cleanup. It does not create synthetic user prompts or task events for intermediate hydration.
 
@@ -125,7 +125,7 @@ Normal Coordinator closure considers its own project queue, remaining assignment
 
 AfterSeconds without new input returns control within the current turn. A message-driven transfer writes a Tool Message placeholder, ends that turn with handoff, and lets incoming input open the next turn. Actual original-tool output validation/render/finalization runs once; a placeholder is not original-schema success. Pending jobs/results remain owned until real completion/delivery, and idle Agents can wake for their results. See the [reviewed native contract](native-moa-contract.md) for the exact resource and handoff contract.
 
-Completion helpers are native owned Agents, hidden from the managed Worker catalog. Builder sees original human inputs and captured source references, not implementation output. Verifier reads authoritative workspace `rubrics.md` and checks deliverables through native tools. Promise/source records survive interrupted work and restart. Internal gate notices have a separate source kind so they cannot become new human requirements or capsule segments. Helpers are retired/drained through native ownership; new human input is not held behind an obsolete verifier.
+Completion helpers are native owned Agents, hidden from the managed Worker catalog. Builder sees original human inputs and captured source references, not implementation output. Its only tool, `submit_rubric`, submits validated criteria; it cannot read files, run Bash, or delegate. The Host writes that submission to `rubrics.md`, without parsing free-text tool markup. Verifier inherits the native preset's actual execution tools, reads the authoritative rubric, and checks deliverables. Promise/source records survive interrupted work and restart. Internal gate notices have a separate source kind so they cannot become new human requirements or capsule segments. Helpers are retired/drained through native ownership; new human input is not held behind an obsolete verifier.
 
 ## Memory and UI boundaries
 

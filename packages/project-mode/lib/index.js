@@ -715,7 +715,7 @@ function consumed(agent, message) {
 	return agent.session.snapshotEvents().some((e) => e.type === "user/message" && e.data.id === message.id);
 }
 /** Install policy and receipts on one native owner; the loop retains all execution ownership. */
-async function bindBackground(ctx, agent, config) {
+async function bindBackground(ctx, agent, config, requestPending = () => false) {
 	const jobs = requireNativeBackground(ctx, agent);
 	if (!Number.isFinite(config.backgroundAfterSeconds) || config.backgroundAfterSeconds < 0) throw new Error("backgroundAfterSeconds must be finite and nonnegative");
 	const detachController = jobs.attachController("moa-background");
@@ -805,7 +805,7 @@ async function bindBackground(ctx, agent, config) {
 	disposers.push(agent.ctx.on("agent/tool-activity-started", (activity) => {
 		const key = backgroundHandle(activity.identity);
 		live.set(key, activity.finished);
-		const stop = watchActivity(ctx, agent, activity, config);
+		const stop = watchActivity(ctx, agent, activity, config, requestPending);
 		watchers.add(stop);
 		const cleanup = () => {
 			stop();
@@ -964,7 +964,8 @@ async function bindBackground(ctx, agent, config) {
 		}
 	})();
 }
-function watchActivity(ctx, agent, activity, config) {
+function watchActivity(ctx, agent, activity, config, requestPending) {
+	if (activity.execution.name === "SendMessage" && activity.execution.arguments?.mode === "request") return () => {};
 	const started = Date.now();
 	const abort = new AbortController();
 	const signal = AbortSignal.any([activity.execution.signal, abort.signal]);
@@ -974,6 +975,7 @@ function watchActivity(ctx, agent, activity, config) {
 	const eligible = () => agent.inbox.nextStep.filter((m) => m.source.kind !== "moa-background-result");
 	const inspect = async () => {
 		if (judging || transferred || signal.aborted) return;
+		if (requestPending(activity.identity.callSeq)) return;
 		if (!threshold && !activity.execution.backgroundOnMessage) return;
 		if (!threshold && eligible().length === 0) return;
 		if (threshold && config.backgroundStrategy === "after-seconds") {
@@ -998,7 +1000,7 @@ function watchActivity(ctx, agent, activity, config) {
 				}, signal);
 				const pending = new Set(eligible().map((m) => m.id));
 				const messageIds = unread.map((m) => m.id).filter((id) => pending.has(id));
-				if (decision && messageIds.length && !signal.aborted) transferred = (await activity.requestBackground({
+				if (decision && messageIds.length && !signal.aborted && !requestPending(activity.identity.callSeq)) transferred = (await activity.requestBackground({
 					kind: judge ? "llm-judge" : "new-message",
 					messageIds
 				})).kind === "background";
@@ -1033,6 +1035,10 @@ function watchActivity(ctx, agent, activity, config) {
 const criteriaSchema = z.object({
 	criteria: z.string().min(1),
 	promise: z.string().min(1)
+});
+const rubricSchema = z.object({
+	rubric: z.string().min(1),
+	tests_required: z.boolean()
 });
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
@@ -1145,6 +1151,7 @@ function bindCompletion(host) {
 		const generation = randomUUID();
 		generations.set(parent, generation);
 		let rubric;
+		let submitted;
 		const read = async (signal) => {
 			const fs = filesystem(parent);
 			const actual = await fs.readText(await fs.resolve(rubricPath, {
@@ -1196,7 +1203,29 @@ function bindCompletion(host) {
 				ctx.tools.presentAs("native");
 				if (role === "builder") {
 					ctx.tools.restrict({ allow: [] });
-					ctx.tools.guard(() => "Rubric Builder cannot access tools or outputs");
+					ctx.tools.register(defineTool({
+						name: "submit_rubric",
+						description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots. This completes rubric building without reading implementation outputs.",
+						parameters: {
+							rubric: {
+								type: "string",
+								required: true,
+								description: "Markdown acceptance criteria with original requirement/source anchors"
+							},
+							tests_required: {
+								type: "boolean",
+								required: true,
+								description: "True whenever the original requirements or specifications require build or test execution"
+							}
+						},
+						output: output$1,
+						async execute(args, exec) {
+							submitted = rubricSchema.parse(args);
+							exec.concludeTurn();
+							return "Rubric submitted.";
+						}
+					}));
+					ctx.tools.guard((exec) => exec.name === "submit_rubric" ? void 0 : "Rubric Builder cannot access execution tools or implementation outputs");
 				} else ctx.tools.register(defineTool({
 					name: "read_rubric",
 					description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.",
@@ -1219,21 +1248,17 @@ function bindCompletion(host) {
 			source: { kind: "user" },
 			content: [{
 				type: "text",
-				text: `Independently derive acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation. Return JSON only: {"rubric":"Markdown with source anchors", "tests_required":true|false}. Set tests_required true whenever the human requirements or specs require build or test execution.\n${JSON.stringify({
+				text: `Independently derive acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation. Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${JSON.stringify({
 					...input,
 					attachments: void 0
 				})}`
 			}, ...input.attachments]
 		}));
 		const build = builder.agent.whenIdle().then(async () => {
-			const built = JSON.parse(lastText(builder.agent).replace(/^```(?:json)?\s*|\s*```$/g, ""));
-			const parsed = z.object({
-				rubric: z.string().min(1),
-				tests_required: z.boolean()
-			}).parse(built);
-			rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${parsed.rubric}`;
+			if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
+			rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
 			await publish(signal);
-			return parsed.tests_required;
+			return submitted.tests_required;
 		});
 		build.catch(() => {});
 		return {
@@ -2849,6 +2874,9 @@ var MoAMessageBroker = class {
 	disposed = new AbortController();
 	constructor(ports) {
 		this.ports = ports;
+	}
+	hasPendingRequest(senderId, callSeq) {
+		return [...this.waits.values()].some(({ route, signal }) => !signal.aborted && route.senderId === senderId && nativeOperationSeq(route.operationId, senderId) === callSeq);
 	}
 	dispose() {
 		this.disposed.abort();
@@ -5050,7 +5078,7 @@ let ProjectMode = (() => {
 			}
 			let binding = this.backgroundBindings.get(agent);
 			if (!binding) {
-				binding = bindBackground(this.ctx, agent, this.config);
+				binding = bindBackground(this.ctx, agent, this.config, (callSeq) => this.messages.hasPendingRequest(agent.id, callSeq));
 				this.backgroundBindings.set(agent, binding);
 			}
 			try {
