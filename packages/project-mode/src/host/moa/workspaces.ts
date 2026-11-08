@@ -192,7 +192,7 @@ export class MoAWorkspaceManager {
       throw new Error("project-mode/path-escape");
     await fs.writeText(
       marker,
-      JSON.stringify({ ownerId: input.ownerId, directory: target, branch }),
+      JSON.stringify(record),
       { kind: "createIfAbsent" },
       input.signal,
       this.capabilities.policy(),
@@ -255,6 +255,46 @@ export class MoAWorkspaceManager {
       throw new MoAWorkspacePrepareError(record, error, error);
     }
     return record;
+  }
+
+  /** Find preparations whose caller did not receive their record before a crash. */
+  async discoverOwned(
+    sourceDirectory: string,
+    ownerId: string,
+    signal: AbortSignal,
+  ): Promise<MoAWorkspaceRecord[]> {
+    const { fs } = this.capabilities;
+    const { directory, policyRoot } = await this.paths(sourceDirectory, signal);
+    const common = await this.git(
+      directory,
+      ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      signal,
+    );
+    const gitTarget = await fs.resolve(common, { signal });
+    if (this.capabilities.policy().mode !== "danger-full-access" &&
+        !fs.contains(policyRoot, gitTarget))
+      throw new Error("project-mode/isolated-requires-contained-git-root");
+    const gitDirectory = fs.processPath(gitTarget);
+    const owners = await fs.resolve(join(gitDirectory, "moa-owners"), { signal });
+    if (!fs.contains(gitTarget, owners)) throw new Error("project-mode/path-escape");
+    if (!(await fs.stat(owners, signal))) return [];
+    const records: MoAWorkspaceRecord[] = [];
+    for (const entry of await fs.listDir(owners, signal)) {
+      if (entry.type !== "file" || !fs.contains(owners, entry.target)) continue;
+      const content = await fs.readText(entry.target, signal);
+      let record: MoAWorkspaceRecord;
+      try {
+        record = JSON.parse(content);
+        this.restore(record);
+      } catch {
+        continue;
+      }
+      if (record.mode === "isolated" && record.id === entry.name &&
+          record.gitDirectory === gitDirectory && record.ownerId === ownerId &&
+          record.sourceDirectory === directory)
+        records.push(record);
+    }
+    return records;
   }
 
   private async runCommand(cwd: string, argv: string[], signal?: AbortSignal) {
@@ -323,22 +363,23 @@ export class MoAWorkspaceManager {
     );
     if (!fs.contains(gitTarget, marker))
       throw new Error("project-mode/path-escape");
-    const expectedMarker = JSON.stringify({
+    const expectedMarker = JSON.stringify(record);
+    const legacyMarker = JSON.stringify({
       ownerId: record.ownerId,
       directory: record.worktreeRoot,
       branch: record.branch,
     });
-    if (!(await fs.stat(marker, signal)))
+    const markerInfo = await fs.lstat(
+      join(record.gitDirectory, "moa-owners", record.id), undefined, signal,
+    );
+    if (markerInfo && markerInfo.type !== "file")
       throw new Error("project-mode/workspace-not-owned");
-    const markerContent = await fs.readText(marker, signal);
-    const destroyedMarker = JSON.stringify({
-      ownerId: record.ownerId,
-      directory: record.worktreeRoot,
-      branch: record.branch,
-      destroyed: true,
-    });
-    if (markerContent !== expectedMarker && markerContent !== destroyedMarker)
-      throw new Error("project-mode/workspace-not-owned");
+    const markerExists = !!markerInfo;
+    if (markerExists) {
+      const markerContent = await fs.readText(marker, signal);
+      if (markerContent !== expectedMarker && markerContent !== legacyMarker)
+        throw new Error("project-mode/workspace-not-owned");
+    }
     const listing = await this.git(
       directory,
       ["worktree", "list", "--porcelain"],
@@ -359,24 +400,20 @@ export class MoAWorkspaceManager {
       ["branch", "--list", record.branch],
       signal,
     );
-    if (markerContent === destroyedMarker) {
-      const rootTarget = await fs.resolve(record.worktreeRoot, { signal });
-      const indexTarget = await fs.resolve(
-        join(record.gitDirectory, `moa-index-${record.id}`),
-        { signal },
-      );
+    if (!markerExists) {
       if (
         entry ||
         branch ||
-        (await fs.stat(rootTarget, signal)) ||
-        (await fs.stat(indexTarget, signal))
+        (await fs.lstat(record.worktreeRoot, undefined, signal)) ||
+        (await fs.lstat(record.directory, undefined, signal)) ||
+        (await fs.lstat(join(record.gitDirectory, `moa-index-${record.id}`), undefined, signal))
       )
         throw new Error("project-mode/workspace-not-owned");
       return;
     }
     if (
       !entry &&
-      (await fs.stat(await fs.resolve(record.worktreeRoot, { signal }), signal))
+      (await fs.lstat(record.worktreeRoot, undefined, signal))
     )
       throw new Error("project-mode/workspace-not-owned");
     if (entry)
@@ -391,12 +428,6 @@ export class MoAWorkspaceManager {
       directory,
       join(record.gitDirectory, `moa-index-${record.id}`),
     );
-    await fs.writeText(
-      marker,
-      destroyedMarker,
-      undefined,
-      signal,
-      this.capabilities.policy(),
-    );
+    await this.runRemove(directory, fs.processPath(marker));
   }
 }

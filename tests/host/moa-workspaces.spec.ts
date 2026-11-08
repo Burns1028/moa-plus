@@ -7,6 +7,7 @@ import {
   rm,
   realpath,
   stat,
+  unlink,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,6 +41,7 @@ describe.each([
       await writeFile(join(root, "staged"), "staged");
       git("add", "staged");
       await writeFile(join(root, "untracked"), "untracked");
+      await writeFile(join(root, "binary"), Buffer.from([0, 255, 1, 2]));
       await writeFile(join(root, "ignored"), "ignored");
       const fs = new LocalFileSystem(new Context(), {
         cwd: root,
@@ -52,7 +54,6 @@ describe.each([
             ? tmpdir() + "/not-the-policy-root"
             : root,
       };
-      let failBranchDeletion = false;
       let failPreparation = false;
       let failCleanup = false;
       let failIndexRemoval = false;
@@ -81,10 +82,6 @@ describe.each([
           ) {
             failCleanup = false;
             throw new Error("injected cleanup failure");
-          }
-          if (failBranchDeletion && argv.includes("-D")) {
-            failBranchDeletion = false;
-            throw new Error("injected branch failure");
           }
           return {
             argv: [
@@ -118,6 +115,10 @@ describe.each([
         mode: "isolated",
         signal,
       });
+      expect(await manager.discoverOwned(root, "a", signal)).toEqual([a]);
+      expect(await manager.discoverOwned(root, "b", signal)).toEqual([b]);
+      expect(await manager.discoverOwned(root, "missing", signal)).toEqual([]);
+      expect(await readFile(join(a.directory, "binary"))).toEqual(Buffer.from([0, 255, 1, 2]));
       expect(await readFile(join(root, ".git", "index"))).toEqual(
         originalIndex,
       );
@@ -150,9 +151,16 @@ describe.each([
       await expect(
         manager.destroy({ ...a, ownerId: "someone-else" }, signal),
       ).rejects.toThrow("workspace-not-owned");
-      await manager.destroy(a, signal);
-      await manager.destroy(a, signal);
       if (a.mode !== "isolated") throw new Error("expected isolated");
+      const markerPath = join(a.gitDirectory, "moa-owners", a.id);
+      const markerContents = await readFile(markerPath);
+      await unlink(markerPath);
+      await expect(manager.destroy(a, signal)).rejects.toThrow("workspace-not-owned");
+      expect(await readFile(join(a.directory, "tracked"), "utf8")).toBe("a");
+      await writeFile(markerPath, markerContents);
+      await manager.destroy(a, signal);
+      await expect(stat(markerPath)).rejects.toThrow();
+      await manager.destroy(a, signal);
       await mkdir(a.worktreeRoot, { recursive: true });
       await writeFile(join(a.worktreeRoot, "user-file"), "preserve");
       await expect(manager.destroy(a, signal)).rejects.toThrow(
@@ -193,12 +201,17 @@ describe.each([
         expect((await stat(emptyCwd.directory)).isDirectory()).toBe(true);
         await manager.destroy(emptyCwd, signal);
       }
-      if (mode === "workspace-write") {
-        failBranchDeletion = true;
-        await expect(manager.destroy(b, signal)).rejects.toThrow(
-          "injected branch failure",
-        );
-      }
+      const internals = manager as unknown as {
+        git: (cwd: string, args: string[], signal?: AbortSignal, env?: Record<string, string>) => Promise<string>;
+      };
+      const gitMethod = internals.git.bind(manager);
+      internals.git = async (cwd, args, gitSignal, env) => {
+        if (args.includes("-D")) throw new Error("injected branch failure");
+        return gitMethod(cwd, args, gitSignal, env);
+      };
+      await expect(manager.destroy(b, signal)).rejects.toThrow("injected branch failure");
+      expect(await manager.discoverOwned(root, "b", signal)).toEqual([b]);
+      internals.git = gitMethod;
       await manager.destroy(b, signal);
       if (mode === "workspace-write") {
         failIndexRemoval = true;
@@ -242,6 +255,24 @@ describe.each([
           signal,
         );
       }
+      // Simulate a process dying immediately after its marker is published.
+      const writeText = fs.writeText.bind(fs);
+      let crash = true;
+      fs.writeText = async (...args) => {
+        const result = await writeText(...args);
+        if (crash && fs.processPath(args[0]).includes("moa-owners")) {
+          crash = false;
+          throw new Error("injected crash after marker");
+        }
+        return result;
+      };
+      await expect(manager.prepare({ ownerId: "crash", sourceDirectory: root, mode: "isolated", signal }))
+        .rejects.toThrow("injected crash after marker");
+      fs.writeText = writeText;
+      const recovered = await manager.discoverOwned(root, "crash", signal);
+      expect(recovered).toHaveLength(1);
+      await manager.destroy(recovered[0], signal);
+      expect(await manager.discoverOwned(root, "crash", signal)).toEqual([]);
       const empty = await mkdtemp(join(root, "empty-"));
       execFileSync("git", ["init"], { cwd: empty, stdio: "pipe" });
       await expect(
