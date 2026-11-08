@@ -4,6 +4,22 @@ import type {
   ChatSnapshot,
 } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type { TurnWorkerMembership } from "../shared/index.ts";
+import type { UserMessage } from "@deepseek-ai/dsh-llm/types";
+
+export interface IncomingAgentMessage {
+  source: UserMessage["source"];
+  content: UserMessage["content"];
+}
+
+function incoming(event: Parameters<typeof humanBoundaryDefinition.match>[0]): IncomingAgentMessage | undefined {
+  if (event.type !== "user/message" || event.surfaceOp !== "append") return;
+  const source = event.data.source as unknown as Record<string, unknown>;
+  if (
+    source.kind === "moa-message" ||
+    source.kind === "project-mode-result" ||
+    source.kind === "project-mode-assignment"
+  ) return { source: event.data.source, content: event.data.content };
+}
 
 declare module "@deepseek-ai/dsh-client-ui-chat/client" {
   interface ChatNodeDataMap {
@@ -11,6 +27,7 @@ declare module "@deepseek-ai/dsh-client-ui-chat/client" {
       turn: number;
       step: number;
       segmentStartSeq: number;
+      incoming?: IncomingAgentMessage;
     };
   }
 }
@@ -39,15 +56,17 @@ export const humanBoundaryDefinition: ConversationNodeDefinition<{
 export const workerTailDefinition: ConversationNodeDefinition<{
   seq: number;
   segmentStartSeq: number;
+  incoming?: IncomingAgentMessage;
 }> = {
   kind: "project-mode-workers-tail",
   target: "chat",
   match(event) {
-    if (
-      event.type === "user/message" &&
-      (event.data.source as { kind: string }).kind === "project-mode-result"
-    )
-      return { id: `result:${event.data.id}`, role: "start" };
+    if (event.type === "user/message" && incoming(event))
+      return {
+        id: `${(event.data.source as { kind: string }).kind === "project-mode-result" ? "result" : "message"}:${event.data.id}`,
+        role: "start",
+        exclusive: true,
+      };
     if (
       event.type !== "assistant/live-chunk" &&
       event.type !== "assistant/message" &&
@@ -71,6 +90,7 @@ export const workerTailDefinition: ConversationNodeDefinition<{
   },
   start: (_context, match, reader) => ({
     seq: match.event.seq,
+    ...(incoming(match.event) ? { incoming: incoming(match.event) } : {}),
     segmentStartSeq:
       reader.previous<{ seq: number }>(humanBoundaryDefinition.kind)?.state
         .seq ??
@@ -91,7 +111,7 @@ export const workerTailDefinition: ConversationNodeDefinition<{
     const location = [context.start, ...context.matches].find(
       (match) => match?.location.kind === "step",
     )?.location;
-    if (location?.kind !== "step" || !context.state) {
+    if (!context.state || (location?.kind !== "step" && !context.state.incoming)) {
       const previous = context.current.get("chat") as
         | ChatNode<"project-mode-workers-tail">
         | null
@@ -104,13 +124,16 @@ export const workerTailDefinition: ConversationNodeDefinition<{
       kind: "project-mode-workers-tail",
       target: "chat",
       anchorSeq: context.state.seq + 0.2,
-      location: { kind: "turn", turn: location.turn },
+      location: location?.kind === "step"
+        ? { kind: "turn", turn: location.turn }
+        : context.start?.location ?? { kind: "unresolved" },
       visibility: "visible",
-      groupTree: "turn",
+      groupTree: context.state.incoming ? "input" : "turn",
       data: {
-        turn: location.turn.turn,
-        step: location.step.step,
+        turn: location?.kind === "step" ? location.turn.turn : 0,
+        step: location?.kind === "step" ? location.step.step : 0,
         segmentStartSeq: context.state.segmentStartSeq,
+        ...(context.state.incoming ? { incoming: context.state.incoming } : {}),
       },
     };
     return node;
@@ -122,7 +145,7 @@ export function segmentTail(
   snapshot: ChatSnapshot,
   node: ChatNode<"project-mode-workers-tail">,
 ) {
-  if (node.visibility !== "visible") return null;
+  if (node.visibility !== "visible" || node.data.turn === 0) return null;
   const { turn, segmentStartSeq } = node.data;
   const last = snapshot.nodes
     .values()

@@ -31,6 +31,7 @@ import { workerReadOnly, composerMatch } from "./tree.ts";
 import { en, zh } from "./locales.ts";
 import { styles } from "./styles.ts";
 import { useSelected } from "./hooks.ts";
+import { AgentMessage } from "./agent-message.tsx";
 export const inject = [
   "remote",
   "sessions",
@@ -184,14 +185,17 @@ function applyProjectClient(ctx: Context) {
           (s) => s.timeline.turns.get(p.node.data.turn)?.end !== undefined,
         );
         const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
-        return selected ? (
-          <WorkerCapsuleList
-            {...p}
-            turn={p.node.data.turn}
-            segmentStartSeq={p.node.data.segmentStartSeq}
-            closed={closed}
-          />
-        ) : null;
+        return (
+          <>
+            {p.node.data.incoming && <AgentMessage {...p} message={p.node.data.incoming} />}
+            {selected && <WorkerCapsuleList
+              {...p}
+              turn={p.node.data.turn}
+              segmentStartSeq={p.node.data.segmentStartSeq}
+              closed={closed}
+            />}
+          </>
+        );
       },
     ),
   );
