@@ -1,10 +1,13 @@
 import type { Context } from "@deepseek-ai/cordis";
+import { appendPluginRecord, pluginRecordOf } from "@deepseek-ai/dsh-session";
 import type { Agent, BackgroundReceipt, ToolActivityStarted } from "@deepseek-ai/dsh-agent";
 import { createUserMessage, type UserMessage } from "@deepseek-ai/dsh-llm";
 import type { ToolExecutionResult } from "@deepseek-ai/dsh-tools";
 import type { JobId } from "@deepseek-ai/dsh-jobs";
 import type { JobView } from "@deepseek-ai/dsh-jobs/view";
 import type { Config } from "../config.ts";
+import { contentSchema, messageSchema } from "../state.ts";
+import { z } from "zod";
 import { judgeInterrupt } from "./judge.ts";
 import { waitForTurn, requireNativeBackground } from "../native.ts";
 
@@ -16,7 +19,7 @@ export interface BackgroundResultData {
   readonly delivery: UserMessage;
 }
 declare module "@deepseek-ai/dsh-session/types" {
-  interface SessionEventMap { "moa/background-result": BackgroundResultData; }
+  interface PluginRecordMap { "plugin:moa/background-result": BackgroundResultData; }
 }
 declare module "@deepseek-ai/dsh-llm" {
   interface MessageSourceMap { "moa-background-result": { kind: "moa-background-result"; tool_call_id: string }; }
@@ -27,8 +30,33 @@ declare module "@deepseek-ai/dsh-jobs/view" {
 export const backgroundHandle = (receipt: Pick<BackgroundReceipt, "owner" | "callSeq">) =>
   JSON.stringify([receipt.owner, receipt.callSeq]);
 
+const backgroundRecordType = "plugin:moa/background-result";
+const backgroundRecordSchema = z.object({
+  receipt: z.object({
+    owner: z.string().min(1),
+    turn: z.number().int().nonnegative(),
+    step: z.number().int().nonnegative(),
+    callSeq: z.number().int().nonnegative(),
+    callId: z.string().min(1),
+    rootCallId: z.string().min(1),
+    jobId: z.string().min(1),
+    cause: z.discriminatedUnion("kind", [
+      z.object({ kind: z.enum(["after-seconds", "producer-promotion"]) }),
+      z.object({ kind: z.enum(["new-message", "llm-judge"]), messageIds: z.array(z.string().min(1)) }),
+    ]),
+  }).passthrough(),
+  result: z.object({ content: contentSchema, isError: z.boolean() }).passthrough(),
+  additionalContexts: z.array(messageSchema),
+  delivery: messageSchema,
+}).passthrough();
+
 function records(agent: Agent): BackgroundResultData[] {
-  return agent.session.snapshotEvents().flatMap(e => e.type === "moa/background-result" && e.data.receipt.owner === agent.id ? [e.data] : []);
+  return agent.session.snapshotEvents().flatMap(event => {
+    const record = pluginRecordOf(event);
+    if (record?.type !== backgroundRecordType) return [];
+    const data = backgroundRecordSchema.parse(record.data) as unknown as BackgroundResultData;
+    return data.receipt.owner === agent.id ? [data] : [];
+  });
 }
 function receipts(agent: Agent): BackgroundReceipt[] {
   return agent.session.snapshotEvents().flatMap(e => {
@@ -90,7 +118,7 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
         ],
       });
       record = { receipt, result, additionalContexts, delivery, ...(job ? { job } : {}) };
-      agent.session.append("moa/background-result", record);
+      appendPluginRecord(agent.session, backgroundRecordType, record);
     }
     await ctx.sessions.flush(agent.session);
     await deliver(record);

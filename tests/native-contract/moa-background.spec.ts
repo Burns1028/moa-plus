@@ -3,13 +3,17 @@ import { Context } from "@deepseek-ai/cordis";
 import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import Jobs from "@deepseek-ai/dsh-jobs-local";
 import { mountAgentLoopTestDependencies } from "@deepseek-ai/dsh-agent-loop-testkit";
-import { SessionId } from "@deepseek-ai/dsh-session";
+import { SessionId, pluginRecordOf } from "@deepseek-ai/dsh-session";
 import { createUserMessage, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { Adapter, response } from "../host/fixture.ts";
-import { backgroundHandle, bindBackground } from "../../packages/project-mode/src/host/moa/background.ts";
+import { backgroundHandle, bindBackground, type BackgroundResultData } from "../../packages/project-mode/src/host/moa/background.ts";
 import type { BackgroundReceipt } from "@deepseek-ai/dsh-agent";
 import { defineTool, ToolNotFoundError } from "@deepseek-ai/dsh-tools";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
+import * as Persistence from "@deepseek-ai/dsh-session-persistence-jsonl";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const user = (text: string) => createUserMessage({ source: { kind: "user" }, content: [{type:"text",text}] });
 function calls(...names: string[]): StreamChunk[] {
@@ -29,11 +33,72 @@ async function setup(strategy:"after-seconds"|"new-message"|"llm-judge"="after-s
  return {ctx,agent,adapter,off,async dispose(){await off();await ctx.fiber.dispose();}};
 }
 async function until(test:()=>boolean) { await expect.poll(test,{timeout:3000,interval:5}).toBe(true); }
-const backgroundResults=(f:Awaited<ReturnType<typeof setup>>)=>f.agent.session.snapshotEvents().filter(e=>e.type==="moa/background-result");
+const backgroundRecords=(agent:import("@deepseek-ai/dsh-agent").Agent)=>agent.session.snapshotEvents().flatMap(event=>{
+ const record=pluginRecordOf(event);
+ return record?.type==="plugin:moa/background-result"?[{...record,data:record.data as BackgroundResultData}]:[];
+});
+const backgroundResults=(f:Awaited<ReturnType<typeof setup>>)=>backgroundRecords(f.agent);
 function receiptOf(f:Awaited<ReturnType<typeof setup>>) {
  const e=f.agent.session.snapshotEvents().find(e=>e.type==="tool/result" && (e.data.meta as any)?.moaBackground);
  return (e as any)?.data.meta.moaBackground as BackgroundReceipt;
 }
+
+it.each(["consumed","stopped"])("reads a %s background result from durable JSONL after a fresh runtime restart and delivers it only once", async (state) => {
+ const root=await mkdtemp(join(tmpdir(),"moa-background-restart-"));
+ const gate=Promise.withResolvers<string>();
+ let current: {ctx:Context;agent:import("@deepseek-ai/dsh-agent").Agent;adapter:Adapter;off:()=>Promise<void>} | undefined;
+ async function open(resume=false){
+  const ctx=new Context();
+  await mountAgentLoopTestDependencies(ctx,{workingDirectory:true});
+  await ctx.plugin(Persistence,{root,compression:"none"});
+  await ctx.plugin(AgentLoop,{agents:[]});await ctx.plugin(Jobs);
+  const adapter=new Adapter();ctx.llm.registerAdapter(["test"],adapter);
+  const options={agentOptions:{provider:"test",model:"test"}};
+  const {agent}=resume?await ctx.agents.resume({...options,resumeSessionId:SessionId("persisted-background")}):await ctx.agents.create({...options,sessionId:SessionId("persisted-background")});
+  const off=await bindBackground(ctx,agent,{backgroundStrategy:"after-seconds",backgroundAfterSeconds:0.01});
+  return {ctx,agent,adapter,off};
+ }
+ try{
+  current=await open();const first=current;
+  first.ctx.tools.register({name:"held",description:"held",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}]},async execute(_args,exec){if(state==="stopped")await new Promise<void>(resolve=>exec.signal.addEventListener("abort",()=>resolve(),{once:true}));return gate.promise;}});
+  first.adapter.handler=()=>first.adapter.requests.length===1?calls("held"):response("done");
+  first.agent.followup(user("run"));await first.agent.whenIdle();
+  const receipt=first.agent.session.snapshotEvents().find(e=>e.type==="tool/result"&&(e.data.meta as any)?.moaBackground);
+  const handle=backgroundHandle((receipt as any).data.meta.moaBackground);
+  if(state==="stopped"){
+   const stopping=first.agent.cancelAndJoin({kind:"parent"});gate.resolve("the complete durable result");await stopping;
+  }else{
+   gate.resolve("the complete durable result");
+   await until(()=>first.agent.session.snapshotEvents().some(e=>e.type==="user/message"&&e.data.source.kind==="moa-background-result"));
+  }
+  await first.agent.whenIdle();await first.ctx.sessions.flush(first.agent.session);
+  const before=first.agent.session.snapshotEvents().filter(e=>e.type==="user/message"&&e.data.source.kind==="moa-background-result");
+  expect(before).toHaveLength(state==="consumed"?1:0);
+  await first.off();await first.ctx.fiber.dispose();current=undefined;
+  current=await open(true);await current.agent.whenIdle();
+  if(state==="stopped"){current.agent.steer(user("resume deliberately"));await current.agent.whenIdle();}
+  const after=current.agent.session.snapshotEvents().filter(e=>e.type==="user/message"&&e.data.source.kind==="moa-background-result");
+  expect(after).toHaveLength(1);
+  const saved=backgroundRecords(current.agent);expect(saved).toHaveLength(1);
+  expect(after[0].data.id).toBe(saved[0].data.delivery.id);
+  if(state==="consumed"){expect(after).toEqual(before);expect(current.adapter.requests).toHaveLength(0);}
+  await current.off();current.off=await bindBackground(current.ctx,current.agent,{backgroundStrategy:"after-seconds",backgroundAfterSeconds:0.01});await current.agent.whenIdle();
+  expect(current.agent.session.snapshotEvents().filter(e=>e.type==="user/message"&&e.data.id===saved[0].data.delivery.id)).toHaveLength(1);
+  const result=await current.ctx.tools.execute({agent:current.agent,name:"query_background_tool",callId:"query" as any,signal:new AbortController().signal,arguments:{tool_call_id:handle}});
+  expect(result.isError).toBe(false);expect(result.value).toMatchObject({status:"finished",...saved[0].data.result});
+  if(state==="consumed")expect(JSON.stringify(result)).toContain("the complete durable result");
+ }finally{gate.resolve("cleanup");if(current){await current.off();await current.ctx.fiber.dispose();}await rm(root,{recursive:true,force:true});}
+});
+
+it("continues to refuse unrelated unknown required events on durable reopen",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"moa-unknown-event-"));const ctx=new Context();
+ try{
+  await mountAgentLoopTestDependencies(ctx,{workingDirectory:true});await ctx.plugin(Persistence,{root,compression:"none"});await ctx.plugin(AgentLoop,{agents:[]});
+  const {agent}=await ctx.agents.create({sessionId:SessionId("unsupported-event")});
+  agent.session.append("unsupported/required" as never,{} as never);await ctx.sessions.flush(agent.session);
+  await expect(ctx.sessionPersistence.open(agent.id,"read")).rejects.toThrow(/unknown to this harness and not marked ignorable/);
+ }finally{await ctx.fiber.dispose();await rm(root,{recursive:true,force:true});}
+});
 
 it("can disable a draft inside native maintenance without joining itself", async () => {
  const f = await setup();
@@ -367,7 +432,7 @@ it("retries a failed result flush on resume without retaining a false resource f
   f.ctx.tools.register({name:"held",description:"held",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}]},execute:()=>gate.promise});
   f.adapter.handler=()=>f.adapter.requests.length===1?calls("held"):response("done");f.agent.followup(user("run"));await f.agent.whenIdle();
   const original=f.ctx.sessions.flush.bind(f.ctx.sessions);let failed=false;
-  const flush=vi.spyOn(f.ctx.sessions,"flush").mockImplementation(async(session)=>{if(!failed && session.snapshotEvents().some(e=>e.type==="moa/background-result")){failed=true;throw new Error("transient storage failure");}return original(session);});
+  const flush=vi.spyOn(f.ctx.sessions,"flush").mockImplementation(async(session)=>{if(!failed && session.snapshotEvents().some(e=>pluginRecordOf(e)?.type==="plugin:moa/background-result")){failed=true;throw new Error("transient storage failure");}return original(session);});
   gate.resolve("full real result");await until(()=>failed);await until(()=>f.ctx.jobs.get(receiptOf(f).jobId,f.agent.id).status!=="running");
   expect(f.adapter.requests).toHaveLength(2);
   expect(f.agent.moaHasPendingBackground).toBe(true);
@@ -390,7 +455,7 @@ it("restores a pending receipt with a missing process-local job as interrupted w
   const adapter=new Adapter();ctx.llm.registerAdapter(["test"],adapter);
   const {agent}=await ctx.agents.create({sessionId:f.agent.id,seed:saved,agentOptions:{provider:"test",model:"test"}});
   let off=await bindBackground(ctx,agent,{backgroundStrategy:"after-seconds",backgroundAfterSeconds:0.01});await agent.whenIdle();
-  const records=agent.session.snapshotEvents().filter(e=>e.type==="moa/background-result");expect(records).toHaveLength(1);
+  const records=backgroundRecords(agent);expect(records).toHaveLength(1);
   expect(records[0].data.result).toMatchObject({isError:true,error:{info:{code:"MOA_BACKGROUND_UNAVAILABLE"}}});expect(executed).toBe(1);expect(ctx.jobs.list(agent.id)).toHaveLength(0);
   const messageId=records[0].data.delivery.id;expect(agent.session.snapshotEvents().filter(e=>e.type==="user/message" && e.data.id===messageId)).toHaveLength(1);
   await off();off=await bindBackground(ctx,agent,{backgroundStrategy:"after-seconds",backgroundAfterSeconds:0.01});await agent.whenIdle();
