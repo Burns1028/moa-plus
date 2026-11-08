@@ -1162,6 +1162,19 @@ function bindCompletion(host) {
 			writes.set(parent, write);
 			await write;
 		};
+		const hiddenDelegation = [.../* @__PURE__ */ new Set([
+			...host.config.coordinatorHiddenTools,
+			"subagent",
+			"subagent_fork",
+			"workflow",
+			"send_message",
+			"control_workers",
+			"Task",
+			"Fork",
+			"SendMessage",
+			"QueryAgent",
+			"KillAgent"
+		])];
 		const make = async (role) => host.ctx.agents.create({
 			sessionId: SessionId(`moa-${role}-${randomUUID()}`),
 			parentAgent: parent,
@@ -1172,36 +1185,20 @@ function bindCompletion(host) {
 			},
 			agentOptions: parent.session.requestHeader()?.config ?? parent.options,
 			signal,
-			setup(ctx, agent) {
+			setup(ctx) {
 				ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
 				ctx.tools.presentAs("native");
 				if (role === "builder") {
-					const names = ctx.tools.schemas(agent).map((tool) => tool.name);
-					if (names.length) ctx.tools.suppress({ deny: names });
+					ctx.tools.restrict({ allow: [] });
 					ctx.tools.guard(() => "Rubric Builder cannot access tools or outputs");
-				} else {
-					ctx.tools.register(defineTool({
-						name: "read_rubric",
-						description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.",
-						parameters: {},
-						output: output$1,
-						execute: async (_args, exec) => read(exec.signal)
-					}));
-					const names = [.../* @__PURE__ */ new Set([
-						...host.config.coordinatorHiddenTools,
-						"subagent",
-						"subagent_fork",
-						"workflow",
-						"send_message",
-						"control_workers",
-						"Task",
-						"Fork",
-						"SendMessage",
-						"QueryAgent",
-						"KillAgent"
-					])];
-					ctx.tools.suppress({ deny: names });
-				}
+				} else ctx.tools.register(defineTool({
+					name: "read_rubric",
+					description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.",
+					parameters: {},
+					output: output$1,
+					execute: async (_args, exec) => read(exec.signal)
+				}));
+				ctx.tools.suppress({ deny: hiddenDelegation });
 			}
 		});
 		const builder = await make("builder");
