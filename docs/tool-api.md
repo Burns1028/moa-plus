@@ -120,7 +120,7 @@ Inspect direct managed children without running a model:
 {"ids":["<worker-id>"],"wait":"selected","timeout_ms":30000}
 ```
 
-`ids` defaults to all visible direct children. `wait` is `all` or `selected`; omitted means an immediate query. A waiting query returns on selected completion, eligible incoming next-step input, native cancellation, or timeout. Its default timeout is 30,000 ms. The waiting caller derives `Waiting`; Request remains `Running`. Explicit next-turn queue input does not interrupt this wait.
+`ids` defaults to all visible direct children. `wait` is `all` or `selected`; omitted means an immediate query. A waiting query returns on selected completion, eligible incoming next-step input, native cancellation, or timeout. Its default timeout is 30,000 ms. The waiting caller derives `Waiting`; Request remains `Running`. Explicit next-turn queue input does not interrupt this wait. Protocol waits own their exit conditions and are not transferred by the generic slow-tool background policy.
 
 Results contain `children`, optionally `history`, and a wait `reason` of `done`, `interrupted`, or `timeout`. Each child's view includes native activity, availability, display phase, and derived `lifecycleState`: `Idle`, `Running`, `Waiting`, `Aborting`, or `Zombie`. A cold retained Session can be resumed; cold is not an unavailable/offline permission state.
 
@@ -192,7 +192,9 @@ With `completionVerification` enabled, participants have:
 
 This is `set_completion_criteria`. Ralph checks for the exact promise in the current task's final AI reply and requests continued work when absent. Successful delivery clears the binding; interrupted work retains it.
 
-The Coordinator additionally has independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots. Its sole tool is `submit_rubric(rubric, tests_required)`, which submits source-anchored Markdown for the Host to write to `rubrics.md`; it has no file, shell, or delegation tools. Plain text is not a submission. Verifier must read the applicable rubric and inspect actual deliverables with inherited native tools. Required build/test evidence uses actual completed execution, not a self-declared Pass. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
+The Coordinator additionally has independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots. Explicit human references to a revised specification capture another version of that path, anchored to the corresponding requirement; previous versions remain available. Unreferenced edits and internal notices do not update the requirements. Its sole tool is `submit_rubric(rubric, tests_required)`, which submits source-anchored Markdown for the Host to write to `rubrics.md`; it has no file, shell, or delegation tools. Plain text is not a submission.
+
+Verifier reads the applicable rubric with `read_rubric` and the complete frozen final-answer text for the current attempt with `read_candidate`. An empty candidate remains empty. This lets it inspect a deliverable supplied directly in chat without inventing a file or running Bash just to read text. File artifacts and required builds/tests still need actual native inspection or completed execution; the author's claims are not evidence. Candidate snapshots are scoped to one review attempt and released on exit or interruption. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
 
 ## UI and backend compatibility
 

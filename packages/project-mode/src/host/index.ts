@@ -11,6 +11,7 @@ import {
   createProjectContextTool,
 } from "./moa/tools.ts";
 import { applyRoleRestrictions } from "./moa/roles.ts";
+import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./moa/worker-memory-policy.ts";
 import { withManagedAgent } from "./moa/residency.ts";
 import { followWorkerParent } from "./worker-parent-retention.ts";
 import {
@@ -41,7 +42,7 @@ import {
   observeForTurn,
 } from "./native.ts";
 import type {} from "@deepseek-ai/dsh-api-session-controller";
-import type { Agent } from "@deepseek-ai/dsh-agent";
+import { assembleContextFor, type Agent } from "@deepseek-ai/dsh-agent";
 import type { Domain } from "@deepseek-ai/dsh-storage-domain";
 import type {} from "@deepseek-ai/dsh-fs";
 import type {} from "@deepseek-ai/dsh-api-remote-access";
@@ -166,6 +167,7 @@ export default class ProjectMode extends TypertRemoteService {
   }
 
   private mounted = new Map<Agent, { key: string; dispose: () => void }>();
+  private memoryBindings = new Map<Agent, WorkerMemoryPolicyBinding>();
   private reconcilingTools = false;
   private toolsChangedDuringReconciliation = false;
   private backgroundBindings = new Map<Agent, Promise<() => Promise<void>>>();
@@ -176,6 +178,7 @@ export default class ProjectMode extends TypertRemoteService {
   private listeners = new Set<() => void>();
   private progress = new Map<SessionId, string>();
   private workerInputSnapshots = new Map<SessionId, string>();
+  private coordinatorContextPolicy = new WeakSet<Agent>();
   private epoch = randomUUID();
   private available = false;
   private closing = new AbortController();
@@ -249,6 +252,27 @@ export default class ProjectMode extends TypertRemoteService {
       interpolate: false,
       text: ({ agent }) => (agent ? this.roleText(agent) : ""),
     });
+    this.ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
+      if (this.record(agent.id)?.project.mode === "enabled") {
+        // Native complete-prompt ownership is enforced after the assembly
+        // waterfall. Inspect its final named sections before admission refresh
+        // chooses whether the required context needs the policy fallback.
+        const systemPrompt =
+          this.ctx.get("agentPresets")?.serviceFor(agent, "systemPrompt") ??
+          agent.ctx.systemPrompt;
+        const assembly = await systemPrompt.assemble(
+          assembleContextFor(agent, signal),
+        );
+        if (
+          assembly.sections.some(
+            (section) => section.name === "project-mode:coordination",
+          )
+        )
+          this.coordinatorContextPolicy.delete(agent);
+        else this.coordinatorContextPolicy.add(agent);
+      }
+      return next();
+    });
     this.ctx.systemPrompt.context({
       name: "project-mode:worker-state",
       order: 660,
@@ -259,10 +283,8 @@ export default class ProjectMode extends TypertRemoteService {
           ? (this.workerInputSnapshots.get(agent.id) ?? "")
           : "",
     });
-    // Role policy belongs in the system message. A runtime-context snapshot is
-    // user-role data and does not replace the Standard preset's coding-agent
-    // and native-subagent guidance. Keep the required context for live paths
-    // and for presets that deliberately own their complete system prompt.
+    // Keep fixed policy in the system message; required runtime context carries
+    // live paths and supplies policy only when a complete preset replaces it.
     this.ctx.systemPrompt.section({
       name: "project-mode:coordination",
       order: 11000,
@@ -297,6 +319,8 @@ export default class ProjectMode extends TypertRemoteService {
     });
     this.ctx.on("agent/disposed", async ({ agent }) => {
       await this.releaseBackground(agent);
+      this.memoryBindings.get(agent)?.dispose();
+      this.memoryBindings.delete(agent);
       return undefined;
     });
     if (this.config.completionVerification) this.completionAttach = bindCompletion(this.access);
@@ -331,6 +355,8 @@ export default class ProjectMode extends TypertRemoteService {
           }),
         );
         while (this.projectJobs.size) await this.jobs;
+        for (const value of this.memoryBindings.values()) value.dispose();
+        this.memoryBindings.clear();
         for (const value of this.mounted.values()) value.dispose();
         this.mounted.clear();
         this.moa.dispose();
@@ -470,6 +496,9 @@ export default class ProjectMode extends TypertRemoteService {
     ] as unknown as AgentDescriptor | undefined;
     const controls = enabled || descriptor?.nested === true;
     if (this.reconcilingTools || this.closing.signal.aborted) return;
+    const owner = this.owner(agent.id);
+    if (participant && !enabled && owner?.project.mode === "enabled")
+      this.memoryBindings.set(agent, bindWorkerMemoryPolicy(this.ctx, agent, owner.project.paths, this.memoryBindings.get(agent)));
     const deny = participant
       ? [
           ...new Set([
@@ -526,7 +555,7 @@ export default class ProjectMode extends TypertRemoteService {
   private roleText(agent: Agent): string {
     const own = this.record(agent.id);
     if (own?.project.mode === "enabled")
-      return `${coordinatorPrompt}\nPaths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}`;
+      return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}`;
     const parent = this.owner(agent.id);
     return parent
       ? parent.operations[`moa:agent:${agent.id}`]

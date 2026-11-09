@@ -1,7 +1,7 @@
 import { Context, Service } from "@deepseek-ai/cordis";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import type { Agent } from "@deepseek-ai/dsh-agent";
+import { type Agent } from "@deepseek-ai/dsh-agent";
 import { Config } from "./config.ts";
 import type { ControlWorkersRequest, ControlResult, ProjectSnapshot, ProjectFrame, WorkerHistoryPage, WorkerTimelinePage, WorkerParentReady, SessionModeView } from "../shared/index.ts";
 export { Config } from "./config.ts";
@@ -55,6 +55,7 @@ export default class ProjectMode extends TypertRemoteService {
     private lifecycle;
     private get access();
     private mounted;
+    private memoryBindings;
     private reconcilingTools;
     private toolsChangedDuringReconciliation;
     private backgroundBindings;
@@ -63,6 +64,7 @@ export default class ProjectMode extends TypertRemoteService {
     private listeners;
     private progress;
     private workerInputSnapshots;
+    private coordinatorContextPolicy;
     private epoch;
     private available;
     private closing;

@@ -232,8 +232,10 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
 }
 
 function watchActivity(ctx: Context, agent: Agent, activity: ToolActivityStarted, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">): () => void {
-  // Request owns its timeout and interruptible wait, including its Tool Result.
-  if (activity.execution.name === "SendMessage" && (activity.execution.arguments as { mode?: unknown } | undefined)?.mode === "request") return () => {};
+  // Protocol waits own their timeout, inbox interruption and final Tool Result.
+  const args = activity.execution.arguments as { mode?: unknown; wait?: unknown } | undefined;
+  if ((activity.execution.name === "SendMessage" && args?.mode === "request") ||
+      (activity.execution.name === "QueryAgent" && (args?.wait === "all" || args?.wait === "selected"))) return () => {};
   const started = Date.now();
   const abort = new AbortController();
   const signal = AbortSignal.any([activity.execution.signal, abort.signal]);

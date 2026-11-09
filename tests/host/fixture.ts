@@ -14,6 +14,9 @@ import JobsLocal from "@deepseek-ai/dsh-jobs-local";
 import Subagents from "@deepseek-ai/dsh-subagent";
 import * as Spawn from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import SessionQueryEngine from "@deepseek-ai/dsh-session-query";
+import SandboxPolicy from "@deepseek-ai/dsh-sandbox-policy";
+import SandboxedFS from "@deepseek-ai/dsh-fs-sandbox";
+import WorkingDirectory from "@deepseek-ai/dsh-working-directory";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -63,11 +66,15 @@ export async function fixture(
     completionVerification?: boolean;
     backgroundStrategy?: "after-seconds" | "new-message" | "llm-judge";
     backgroundAfterSeconds?: number;
+    sandboxMode?: "read-only" | "workspace-write" | "danger-full-access";
   } = {},
 ) {
   const root = options.root ?? (await mkdtemp(join(tmpdir(), "project-mode-")));
   const ctx = new Context();
-  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true });
+  await mountAgentLoopTestDependencies(ctx);
+  await ctx.plugin(SandboxPolicy, { mode: options.sandboxMode ?? "danger-full-access" });
+  await ctx.plugin(SandboxedFS);
+  await ctx.plugin(WorkingDirectory);
   await ctx.plugin(Persistence, {
     root: join(root, "sessions"),
     compression: "none",

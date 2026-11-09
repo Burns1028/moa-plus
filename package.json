@@ -120,7 +120,8 @@
     "@deepseek-ai/dsh-subprocess": "0.2.1-rc.3",
     "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.3",
     "@deepseek-ai/dsh-tool-bash": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-tool-jobs": "0.2.1-rc.3"
+    "@deepseek-ai/dsh-tool-jobs": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-fs": "0.2.1-rc.3"
   },
   "engines": {
     "node": ">=24.9.0"
@@ -225,7 +226,8 @@
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-rc.3",
     "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-jobs": "0.2.1-rc.3"
+    "@deepseek-ai/dsh-jobs": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-shell": "0.2.1-rc.3"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-api-session-controller": {

@@ -32,7 +32,6 @@ it.each(["native", "ptc"])("keeps a %s-composed protocol call open until its exp
   try {
     if (presentation === "ptc") {
       await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
-      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
       await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
       await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
     }
@@ -333,7 +332,6 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
   try {
     if (presentation === "ptc") {
       await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
-      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
       await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
       await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
     }

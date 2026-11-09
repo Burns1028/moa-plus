@@ -83,7 +83,10 @@ function readyFixture(t, { stock = false } = {}) {
   const source = stock
     ? join(root, "runtime/rc3/node_modules")
     : join(root, "node_modules");
-  for (const entry of manifest)
+  for (const entry of manifest) {
+    const packageRoot = join(modules, entry.package);
+    mkdirSync(packageRoot, { recursive: true });
+    copyFileSync(join(source, entry.package, "package.json"), join(packageRoot, "package.json"));
     for (const file of entry.files) {
       const target = join(modules, entry.package, file.file);
       mkdirSync(dirname(target), { recursive: true });
@@ -95,6 +98,7 @@ function readyFixture(t, { stock = false } = {}) {
           "stock test requires npm ci --prefix runtime/rc3",
         );
     }
+  }
   if (!stock) {
     const patched = spawnSync(
       process.execPath,

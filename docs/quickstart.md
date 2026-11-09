@@ -1,6 +1,6 @@
 # Run MoA+ in an isolated DSH Web runtime
 
-Set up the runtime from `main` in a separate local Web environment. Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. The checkout's explicit compatibility manifest extends **13 native packages across 31 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+Set up the runtime from `main` in a separate local Web environment. Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. The checkout's explicit compatibility manifest extends **19 native packages across 43 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
 ## Install and start
 
@@ -18,6 +18,8 @@ node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
 
 The compatibility command backs up the changed files before extending this checkout's dependencies. Setup installs the locked runtime and this plugin build in the chosen directory, with its own `home/`, `agents/`, configuration, documents, native backups, and plugin archive. It does not modify an installed Desktop app or reuse your personal `~/.dsh` profile.
+
+Worker record protection requires the native sandboxed filesystem and Bash providers. macOS uses Seatbelt; on Linux, install bubblewrap and make sure its user namespaces are available. Landlock-only and Windows ACL backends cannot run Bash with this path-specific policy. See [compatibility](compatibility.md) for supported record states and explicit refusal behavior.
 
 Keep the plugin build, runtime lockfile, and compatibility manifest from the same checkout. A dry-run preflight does not apply changes. The [compatibility guide](compatibility.md) covers manual installation and rollback.
 

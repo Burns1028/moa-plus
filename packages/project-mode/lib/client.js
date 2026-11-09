@@ -1701,7 +1701,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 820,
+						"line": 849,
 						"column": 9
 					}
 				},
@@ -1979,7 +1979,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 836,
+						"line": 865,
 						"column": 9
 					}
 				},
@@ -2460,7 +2460,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 783,
+						"line": 812,
 						"column": 10
 					}
 				},
@@ -2516,7 +2516,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 810,
+						"line": 839,
 						"column": 10
 					}
 				},
@@ -2653,7 +2653,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 848,
+						"line": 877,
 						"column": 9
 					}
 				},
@@ -2745,7 +2745,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 902,
+						"line": 931,
 						"column": 3
 					}
 				},
@@ -2887,7 +2887,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 907,
+						"line": 936,
 						"column": 9
 					}
 				},
@@ -3358,7 +3358,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 758,
+						"line": 787,
 						"column": 9
 					}
 				},
@@ -3551,7 +3551,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 871,
+						"line": 900,
 						"column": 10
 					}
 				}
@@ -4745,7 +4745,7 @@ window.__ModuleLoader__.load({
 .pm-capsules{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0}.pm-capsules>li{display:flex;min-width:0;max-width:100%}.pm-capsule{box-sizing:border-box;display:inline-flex;min-width:0;max-width:min(100%,240px);height:28px;gap:6px;align-items:center;text-align:left;border:1px solid var(--dsw-alias-border-l4);border-radius:999px;padding:4px 8px;font-size:12px;line-height:18px}.pm-capsule strong{min-width:0;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.pm-progress{min-width:0;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary)}
 .pm-worker-icon{display:block;flex:0 0 auto;width:24px;height:24px}
 .pm-capsule .pm-worker-icon{width:16px;height:16px}
-.pm-agent-message{margin:12px 0;color:var(--dsw-alias-label-primary);font:inherit;min-width:0}
+.pm-agent-message{box-sizing:border-box;width:fit-content;max-width:min(calc(var(--dsh-chat-content-width,748px) * .702),82%);margin:12px 0 12px auto;padding:10px 16px;background:var(--dsw-specific-bubble);border-radius:var(--dsw-radius-xl);color:var(--dsw-alias-label-primary);font:inherit;text-align:left;overflow-wrap:anywhere;min-width:0}
 .pm-agent-message>header{color:var(--dsw-alias-label-secondary);font-size:12px;margin-bottom:6px}
 .pm-agent-message .pm-axis-preview{margin-top:4px}.pm-agent-message .pm-axis-preview>summary{display:block;list-style:none;cursor:pointer}.pm-agent-message .pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-agent-message .pm-axis-preview>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;border-radius:3px}
 .pm-agent-message .pm-axis-preview:not([open])>summary{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--dsw-alias-label-secondary,#999)}

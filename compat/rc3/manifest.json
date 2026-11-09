@@ -216,39 +216,6 @@
     ]
   },
   {
-    "package": "@deepseek-ai/dsh-tool-bash",
-    "version": "0.2.1-rc.3",
-    "variant": "moa",
-    "patch": "dsh-tool-bash.patch",
-    "runtimePatch": "dsh-tool-bash-runtime.patch",
-    "files": [
-      {
-        "file": "lib/index.js",
-        "before": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6",
-        "after": "59214b5c9e81a6973584143bee9ed0574c89ff877077653451fbd9a58c60f222"
-      }
-    ]
-  },
-  {
-    "package": "@deepseek-ai/dsh-shell",
-    "version": "0.2.1-rc.3",
-    "variant": "moa",
-    "patch": "dsh-shell.patch",
-    "runtimePatch": "dsh-shell-runtime.patch",
-    "files": [
-      {
-        "file": "lib/types/index.d.ts",
-        "before": "f44ba513c50c3636b0d04c6aebdd3242f2f0e038a273a285717bae75f7291bda",
-        "after": "3c293df33ada6fd2b87ff21a1d12d5e86ff0a2609dc748f0e22486c206b42deb"
-      },
-      {
-        "file": "lib/types/types.d.ts",
-        "before": "c432afa54a6a86709f926ee6f2fcbdaf1351c534715ede60a308c2c22a430092",
-        "after": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40"
-      }
-    ]
-  },
-  {
     "package": "@deepseek-ai/dsh-agent",
     "version": "0.2.1-rc.3",
     "variant": "moa",
@@ -355,6 +322,186 @@
         "file": "lib/types/internal.js",
         "before": "e08b14221f417b73024e62e0466ec745ab9b45ecbcdca0c302ccc800ddadca6d",
         "after": "8b30bb284bf0a0904f79a1686e9abf768459b32e9773527818443a121daf93d9"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-sandbox.patch",
+    "runtimePatch": "dsh-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "2738a2a57d62450251f3328ef92d0691d6c485766519013a2f3dfe72a6149182",
+        "after": "0eb5b2537e34c0f873bc8bdb211301841d40054de09df9ae4c9f6425e713da60"
+      },
+      {
+        "file": "lib/index.js",
+        "before": "b56373befbfcfe281c17c8892e9a4b2cdcb96851290b3ed0ff56b08915e2f743",
+        "after": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-policy",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-sandbox-policy.patch",
+    "runtimePatch": "dsh-sandbox-policy-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+        "after": "04155466af113b375585692e5ca819bb7f4e4646617091929143c0251f5cf335"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "ca96d110c336d16c1285c93d544526f2b25a9c8dc176d82cc2fd2d91623b43af",
+        "after": "5a26fc2a608489e24ad2459f5f4df7249d8410958c8d8fa23d7d21a5114a542f"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-fs.patch",
+    "runtimePatch": "dsh-fs-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "e3695ded49b42d128638cc1a03163117126862af8a32e78dd08dc8dc781066d4",
+        "after": "14690f88b3fe56e250012a78870c2c91bc018c807b68ca4e3dc8f764b4a56fbd"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "1704091dad1c6c4604465a3b2a5ff82d08edf7341cf271ee20ea738b8649655a",
+        "after": "509a1420267c4d065c6cfa8bf627d22e72db784441f5757ebce0a8d8efb42a3d"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-fs-sandbox.patch",
+    "runtimePatch": "dsh-fs-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "cac65e21a0f0895b073cb9a447196ac265f2a171cc7f67c7434a6b3b7782caf5",
+        "after": "f613a96fb110178575ac52cbb6f65fd3eaa83a4cbaa49387783073fe94789637"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "af579ceb6ff5b93ff0b449a66fa8aa941ba00f2a6d50b5632e60e1730803519c",
+        "after": "cc545e8e570359406c22ce8cb0371079d4985bfd701e96836bcdcc39c7a84ec1"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-shell",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-shell.patch",
+    "runtimePatch": "dsh-shell-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "f44ba513c50c3636b0d04c6aebdd3242f2f0e038a273a285717bae75f7291bda",
+        "after": "67fdb5c8d77143c1e0e0e6e8a0d67d6011b1cc410b625bd90a7aa44bee95e2e9"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "c432afa54a6a86709f926ee6f2fcbdaf1351c534715ede60a308c2c22a430092",
+        "after": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-shell",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-upgrade",
+    "patch": "dsh-shell-memory-upgrade.patch",
+    "runtimePatch": "dsh-shell-memory-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "3c293df33ada6fd2b87ff21a1d12d5e86ff0a2609dc748f0e22486c206b42deb",
+        "after": "67fdb5c8d77143c1e0e0e6e8a0d67d6011b1cc410b625bd90a7aa44bee95e2e9"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40",
+        "after": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-bash-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-bash-sandbox.patch",
+    "runtimePatch": "dsh-bash-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "0f788f99113ba7411eb33af71cdafabd07b73cf012c1715c819e03f3f77f342d",
+        "after": "c200ef9fb3f3770dd6f1653a10f32284b1f8ee2289f5ce789c84eecae2a0fe3c"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "98ad2d9a2c7d08b5e5c9b7a479bc108ddf80390ed41b46e6a1b073833c482d52",
+        "after": "3ca207dc8df91d7af41648d49a613f5456e9410f471539468bf53d25b0856b89"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-local",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-sandbox-local.patch",
+    "runtimePatch": "dsh-sandbox-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "be6e1107871cf8d94c040090b13c405bc833822e2f51ed5280e93eececf762be",
+        "after": "50970e992a3b981b0af78764da0dd7303a1633737b301d681ffdb80efda99046"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "c8c9fa8089169c305a2d87227dafcb464bf548a5c812ef616ce78eae04b0172f",
+        "after": "a6e4ef4c382f060d85e81220e673c8fb1b698272f76bb9cd26130fe3414c9130"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-bash",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-tool-bash.patch",
+    "runtimePatch": "dsh-tool-bash-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6",
+        "after": "0de414e33bb95e477976dc84d6d5b7f8f8ae2972ddd5aa006dec92dc140e9920"
+      }
+    ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-bash",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-upgrade",
+    "patch": "dsh-tool-bash-memory-upgrade.patch",
+    "runtimePatch": "dsh-tool-bash-memory-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "59214b5c9e81a6973584143bee9ed0574c89ff877077653451fbd9a58c60f222",
+        "after": "0de414e33bb95e477976dc84d6d5b7f8f8ae2972ddd5aa006dec92dc140e9920"
       }
     ]
   }

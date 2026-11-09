@@ -14,7 +14,9 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-需要 **Node 24.9+**、npm 和 Git。`main` 上的运行时需要配套的 **DSH 0.2.1-rc.3 兼容运行时**，其显式清单扩展了 **13 个原生包、31 个文件路径**。原版 rc.3 或其他插件版本准备的运行时不能替代。
+需要 **Node 24.9+**、npm 和 Git。`main` 上的运行时需要配套的 **DSH 0.2.1-rc.3 兼容运行时**，其显式清单扩展了 **19 个原生包、43 个文件路径**。原版 rc.3 或其他插件版本准备的运行时不能替代。
+
+Worker 的 Bash 记录保护使用 macOS Seatbelt 或 Linux bubblewrap。Linux、Windows 安装前请查看[后端要求][compatibility]。
 
 克隆项目，准备独立的 Web 运行环境：
 

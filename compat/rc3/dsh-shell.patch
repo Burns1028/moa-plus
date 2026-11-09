@@ -1,10 +1,12 @@
 --- a/lib/types/index.d.ts
 +++ b/lib/types/index.d.ts
-@@ -45,6 +45,7 @@
+@@ -45,6 +45,9 @@
   *   `ctx.subprocess` disposal, so a process survives an executor-only reload.
   */
  export declare abstract class ShellExecutor extends Service {
 +    readonly supportsManagedExecution?: true;
++    /** Native executor preserves session readonly paths even under full access. */
++    readonly supportsReadOnlyPaths?: true;
      constructor(ctx: Context);
      /**
       * The sandbox mode this executor applies by default, or `undefined` when it

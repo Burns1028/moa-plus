@@ -1,5 +1,32 @@
 --- a/lib/index.js
 +++ b/lib/index.js
+@@ -23,7 +23,7 @@
+ 	if (sandbox?.runnerFailed) return [`[sandbox: the sandbox runner itself failed under ${sandbox.mode} mode — the command did not run; this is a sandbox problem, not a command failure]`];
+ 	if (sandbox?.denied) {
+ 		const notes = [sandboxDenialMarker(sandbox.mode)];
+-		if (escalationModes.length > 0) notes.push(escalationHintMarker("command"));
++		if (escalationModes.length > 0 && sandbox.mode !== "danger-full-access") notes.push(escalationHintMarker("command"));
+ 		return notes;
+ 	}
+ 	return [];
+@@ -159,7 +159,7 @@
+ 	const markers = [];
+ 	if (result.sandbox?.denied) {
+ 		markers.push(sandboxDenialMarker(result.sandbox.mode));
+-		if (escalationModes.length > 0) markers.push(escalationHintMarker("command"));
++		if (escalationModes.length > 0 && result.sandbox.mode !== "danger-full-access") markers.push(escalationHintMarker("command"));
+ 	}
+ 	if (result.timedOut) markers.push(`[timed out after ${result.timeoutMs}ms]`);
+ 	if (result.stopped !== void 0) markers.push(`[stopped: ${result.stopped}]`);
+@@ -200,7 +200,7 @@
+ 	if (sandbox?.runnerFailed) notices.push(`[sandbox: the sandbox runner itself failed under ${sandbox.mode} mode — the command did not run; this is a sandbox problem, not a command failure]`);
+ 	else if (sandbox?.denied) {
+ 		notices.push(sandboxDenialMarker(sandbox.mode));
+-		if (escalationModes.length > 0) notices.push(escalationHintMarker("command"));
++		if (escalationModes.length > 0 && sandbox.mode !== "danger-full-access") notices.push(escalationHintMarker("command"));
+ 	}
+ 	if (notices.length === 0) return delta;
+ 	return `${delta}${delta.length > 0 && !delta.endsWith("\n") ? "\n" : ""}${notices.join("\n")}`;
 @@ -390,9 +390,13 @@
  		const startJob = (registry, args, exec, spec) => {
  			let proc;
@@ -75,7 +102,17 @@
  			description: bashDescription(),
  			parameters: {
  				description: {
-@@ -701,7 +726,15 @@
+@@ -652,6 +677,9 @@
+ 				}],
+ 				presentationMeta: (_args, value) => ({ cwd: value.cwd })
+ 			},
++			projectContent(exec, result) {
++				return result.value?.sandbox?.denied && resolveSandboxPolicy(exec)?.readOnlyPaths?.length ? [...result.content, { type: "text", text: "Session read-only paths remain protected after escalation." }] : result.content;
++			},
+ 			async execute(args, exec) {
+ 				const standingPolicy = resolveSandboxPolicy(exec);
+ 				validateBashArgs(args, standingPolicy?.mode);
+@@ -701,7 +729,15 @@
  					...request,
  					signal: exec.signal
  				});

@@ -14,7 +14,9 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-Requires **Node 24.9+**, npm, and Git. The runtime on `main` needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **13 native packages across 31 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+Requires **Node 24.9+**, npm, and Git. The runtime on `main` needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+
+Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.
 
 Clone the project and prepare a separate Web runtime:
 
