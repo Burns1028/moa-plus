@@ -15,9 +15,11 @@ node scripts/project-mode.mjs start
 
 That version uses the **Project** label and earlier `control_workers` model interface. Its [Note Bundle recording](demo-workflow.md) is historical evidence for that version.
 
-The **unreleased current branch** adds the five MoA primitives and wider reviewed native runtime. Start from the actual branch/PR source checkout you intend to test, then prepare a new directory:
+The **unreleased MoA runtime** adds the five primitives and wider reviewed native runtime. It is under review in [PR #3](https://github.com/Burns1028/moa-plus/pull/3). Clone that branch, then prepare a new directory:
 
 ```sh
+git clone --branch feat/moa-whitepaper --single-branch https://github.com/Burns1028/moa-plus.git
+cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"

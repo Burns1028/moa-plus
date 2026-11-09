@@ -1,6 +1,8 @@
 # Code architecture and reading guide
 
-MoA+ is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
+MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harness. Separate execution contexts preserve room for local exploration; direct communication coordinates the work; indexed shared knowledge carries useful findings forward; independent review checks the delivered result against its original requirements.
+
+The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
 This guide describes the unreleased runtime in the current checkout. The v0.1.23 tag and its media document the earlier Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
@@ -21,7 +23,7 @@ flowchart TB
     W --> K
 ```
 
-Patterns are decisions made through these tools and role prompts. There is no second scheduler, universal cross-turn tool lock, or task-keyword routing layer. The Coordinator retains ordinary execution tools and decides task ownership.
+Patterns are decisions made through these tools and role prompts: create a clean specialist, branch useful history, ask a peer, compare results, or continue an existing Worker. The Coordinator retains ordinary execution tools and decides task ownership. Native DSH owns execution ordering, inbox admission, resource cleanup, and permissions; the plugin composes the collaboration around those guarantees.
 
 ## Reading order
 
