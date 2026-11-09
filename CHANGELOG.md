@@ -7,6 +7,7 @@
 - Keep explicit QueryAgent waits under their own completion, input, cancellation and timeout rules instead of transferring them through the generic slow-tool policy.
 - Inject fixed Coordinator guidance once in the active prompt assembly, preserving dynamic paths and complete-system-prompt fallback.
 - Enforce Worker read-only access to the Coordinator's actual notes/archive through native session policy, filesystem and Bash providers, while retaining ordinary writes and shared Context. Unsupported restriction backends fail explicitly; Linux restricted Bash requires bubblewrap.
+- Display received Agent messages in right-aligned native-style bubbles in Coordinator and Worker chats, retaining sender identity, expandable original Markdown, and existing capsule navigation.
 
 ## Unreleased — MoA runtime
 

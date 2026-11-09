@@ -67,7 +67,7 @@ async function bench() {
   return { assembler, read, draw, client };
 }
 
-it("shows each MoA input once as a compact preview that opens its original Markdown, preserving ordinary native contexts", async () => {
+it.each(["parent", "another-worker"])("shows a worker message on the right in %s as one compact preview that opens its original Markdown, preserving ordinary native contexts", async recipient => {
   const b = await bench();
   const body = "**Ready**\n\n- evidence\n\n" + "Complete reusable evidence. ".repeat(30) + "\n\n### Final evidence\n\nOriginal final paragraph.";
   b.assembler.replaceWindow([
@@ -79,8 +79,11 @@ it("shows each MoA input once as a compact preview that opens its original Markd
   expect(nodes.filter(n => n.anchorSeq >= 3 && n.anchorSeq < 4)).toHaveLength(1);
   const incoming = nodes.find(n => n.kind === "project-mode-workers-tail") as Chat.ChatNode<"project-mode-workers-tail">;
   expect(incoming).toBeDefined();
-  const ui = b.draw(incoming, "another-worker");
+  const ui = b.draw(incoming, recipient);
   expect(screen.getByText("From Builder")).toBeDefined();
+  const message = ui.container.querySelector<HTMLElement>("[data-moa-message]")!;
+  expect(getComputedStyle(message).marginLeft).toBe("auto");
+  expect(getComputedStyle(message).marginRight).toBe("0px");
   const disclosure = ui.container.querySelector("details")!;
   expect(disclosure).not.toBeNull();
   expect(disclosure.open).toBe(false);
@@ -137,6 +140,7 @@ it("retains a result-only capsule seat and original final content without its ro
   expect(segmentTail(b.read(), result)?.segmentStartSeq).toBe(3);
   const ui = b.draw(result);
   expect(screen.getByText("From Builder")).toBeDefined();
+  expect(getComputedStyle(ui.container.querySelector("[data-moa-message]")!).marginLeft).toBe("auto");
   const disclosure = ui.container.querySelector("details")!;
   expect(disclosure.open).toBe(false);
   fireEvent.click(disclosure.querySelector("summary")!);
