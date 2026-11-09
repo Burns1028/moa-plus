@@ -1,10 +1,10 @@
 # Verification
 
-## Current branch: unreleased MoA runtime
+## Current main: unreleased MoA runtime
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **13 native packages / 31 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
-This is an unreleased branch; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
+This is the unreleased runtime on main; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
 
 ### Current automated evidence
 

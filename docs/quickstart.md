@@ -15,10 +15,10 @@ node scripts/project-mode.mjs start
 
 That version uses the **Project** label and earlier `control_workers` model interface. Its [Note Bundle recording](demo-workflow.md) is historical evidence for that version.
 
-The **unreleased MoA runtime** adds the five primitives and wider reviewed native runtime. It is under review in [PR #3](https://github.com/Burns1028/moa-plus/pull/3). Clone that branch, then prepare a new directory:
+The **unreleased MoA runtime** adds the five primitives and wider reviewed native runtime. It is available on `main` following [PR #3](https://github.com/Burns1028/moa-plus/pull/3). Clone main, then prepare a new directory:
 
 ```sh
-git clone --branch feat/moa-whitepaper --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -28,7 +28,7 @@ node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
 node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
 
-Use the same checkout's plugin build, runtime lockfile, and manifest. Do not install the current plugin into an older three-extension runtime. Full integration and real-model/UI acceptance for the branch are tracked in [verification](verification.md); these commands are not a new release announcement.
+Use the same checkout's plugin build, runtime lockfile, and manifest. Do not install the current plugin into an older three-extension runtime. Full integration and real-model/UI acceptance for the current runtime are tracked in [verification](verification.md); these commands are not a new release announcement.
 
 ## Configure and start a conversation
 
@@ -36,7 +36,7 @@ The start command opens the native DSH Web UI locally. Configure your model usin
 
 You can supply the provider's `DEEPSEEK_API_KEY` in the launching environment. The launcher does not copy keys from another profile. Native model and permission choices remain yours.
 
-Setup explicitly creates a separate runtime directory containing its own `home/`, `agents/`, documents, native backups, and plugin archive. The default historical location is `~/.dsh-project-mode/rc3`; the directory/profile/package names remain compatibility identifiers. For current branch testing, `--dir` makes it easy to keep a new runtime separate from an older trial.
+Setup explicitly creates a separate runtime directory containing its own `home/`, `agents/`, documents, native backups, and plugin archive. The default historical location is `~/.dsh-project-mode/rc3`; the directory/profile/package names remain compatibility identifiers. For current runtime testing, `--dir` makes it easy to keep a new runtime separate from an older trial.
 
 ## Check or choose the location
 

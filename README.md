@@ -8,7 +8,7 @@ English | [简体中文](README.zh.md)
 
 [Architecture][roles] · [Try the runtime](#try-the-runtime) · [Watch a real workflow](docs/media/project-workflow.mp4) · [Verification][verification]
 
-**Developer preview:** the new MoA runtime is under review in [PR #3](https://github.com/Burns1028/moa-plus/pull/3) on `feat/moa-whitepaper`. It requires the matching DSH **0.2.1-rc.3 compatibility runtime**. The latest published tag, **v0.1.23**, is the earlier Project Mode preview. [Version and setup details][compatibility].
+**Developer preview:** the new MoA runtime is available on `main` following [PR #3](https://github.com/Burns1028/moa-plus/pull/3), and has not yet been tagged as a new release. It requires the matching DSH **0.2.1-rc.3 compatibility runtime**. The latest published tag, **v0.1.23**, is the earlier Project Mode preview. [Version and setup details][compatibility].
 
 ## Why organize a team?
 
@@ -61,10 +61,10 @@ These detail images are from the v0.1.22 fictional Project Atlas fixture. The cu
 
 ## Try the runtime
 
-Requires **Node 24.9+**, npm, and Git. To try the runtime under review in a separate Web environment:
+Requires **Node 24.9+**, npm, and Git. To try the runtime from main in a separate Web environment:
 
 ```sh
-git clone --branch feat/moa-whitepaper --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -110,10 +110,10 @@ MoA+ is an unofficial DSH plugin. Its historical package name, `dsh-plugin-proje
 
 MIT. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
-[roles]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/moa-architecture.md
-[architecture]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/architecture.md
-[tools]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/tool-api.md
-[verification]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/verification.md
-[compatibility]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/compatibility.md
-[quickstart]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/quickstart.md
-[contributing]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/CONTRIBUTING.md
+[roles]: https://github.com/Burns1028/moa-plus/blob/main/docs/moa-architecture.md
+[architecture]: https://github.com/Burns1028/moa-plus/blob/main/docs/architecture.md
+[tools]: https://github.com/Burns1028/moa-plus/blob/main/docs/tool-api.md
+[verification]: https://github.com/Burns1028/moa-plus/blob/main/docs/verification.md
+[compatibility]: https://github.com/Burns1028/moa-plus/blob/main/docs/compatibility.md
+[quickstart]: https://github.com/Burns1028/moa-plus/blob/main/docs/quickstart.md
+[contributing]: https://github.com/Burns1028/moa-plus/blob/main/CONTRIBUTING.md

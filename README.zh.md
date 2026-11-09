@@ -8,7 +8,7 @@ MoA+ 以 DeepSeek Harness 插件的形式构建多智能体系统（Mixture of A
 
 [架构与角色][roles] · [试用新运行时](#试用新运行时) · [观看真实协作](docs/media/project-workflow.mp4) · [验证记录][verification]
 
-**开发预览**：新 MoA 运行时位于 `feat/moa-whitepaper` 分支，正在 [PR #3](https://github.com/Burns1028/moa-plus/pull/3) 中接受审阅，需要配套的 DSH **0.2.1-rc.3 兼容运行时**。最新已发布 tag **v0.1.23** 是此前的 Project Mode 预览版。详见[版本与兼容说明][compatibility]。
+**开发预览**：新 MoA 运行时已通过 [PR #3](https://github.com/Burns1028/moa-plus/pull/3) 合入 `main`，尚未发布新版本，需要配套的 DSH **0.2.1-rc.3 兼容运行时**。最新已发布 tag **v0.1.23** 是此前的 Project Mode 预览版。详见[版本与兼容说明][compatibility]。
 
 ## 为什么要组织一支团队？
 
@@ -61,10 +61,10 @@ MoA+ 沿用 DSH 原生界面：
 
 ## 试用新运行时
 
-需要 **Node 24.9+**、npm 和 Git。通过待审分支，在独立 Web 环境中试用：
+需要 **Node 24.9+**、npm 和 Git。通过 main 分支，在独立 Web 环境中试用：
 
 ```sh
-git clone --branch feat/moa-whitepaper --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -110,10 +110,10 @@ MoA+ 是非官方 DSH 插件。历史包名 `dsh-plugin-project-mode` 与已保�
 
 MIT。见 [LICENSE](LICENSE) 与[第三方声明](THIRD_PARTY_NOTICES.md)。
 
-[roles]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/moa-architecture.md
-[architecture]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/architecture.md
-[tools]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/tool-api.md
-[verification]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/verification.md
-[compatibility]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/compatibility.md
-[quickstart]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/quickstart.md
-[contributing]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/CONTRIBUTING.md
+[roles]: https://github.com/Burns1028/moa-plus/blob/main/docs/moa-architecture.md
+[architecture]: https://github.com/Burns1028/moa-plus/blob/main/docs/architecture.md
+[tools]: https://github.com/Burns1028/moa-plus/blob/main/docs/tool-api.md
+[verification]: https://github.com/Burns1028/moa-plus/blob/main/docs/verification.md
+[compatibility]: https://github.com/Burns1028/moa-plus/blob/main/docs/compatibility.md
+[quickstart]: https://github.com/Burns1028/moa-plus/blob/main/docs/quickstart.md
+[contributing]: https://github.com/Burns1028/moa-plus/blob/main/CONTRIBUTING.md
