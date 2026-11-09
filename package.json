@@ -134,8 +134,9 @@
     "multi-agent",
     "ai-agents",
     "agent-orchestration",
-    "project-management",
-    "typescript"
+    "typescript",
+    "mixture-of-agents",
+    "shared-memory"
   ],
   "license": "MIT",
   "main": "./packages/project-mode/lib/index.js",
@@ -267,10 +268,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Burns1028/dsh-plugin-project-mode.git"
+    "url": "git+https://github.com/Burns1028/moa-plus.git"
   },
-  "homepage": "https://github.com/Burns1028/dsh-plugin-project-mode#readme",
+  "homepage": "https://github.com/Burns1028/moa-plus#readme",
   "bugs": {
-    "url": "https://github.com/Burns1028/dsh-plugin-project-mode/issues"
+    "url": "https://github.com/Burns1028/moa-plus/issues"
   }
 }

@@ -116,7 +116,9 @@
     "multi-agent",
     "ai-agents",
     "agent-orchestration",
-    "typescript"
+    "typescript",
+    "mixture-of-agents",
+    "shared-memory"
   ],
   "icon": "./assets/icon.svg",
   "dsh": {
