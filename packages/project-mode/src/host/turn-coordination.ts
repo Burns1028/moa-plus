@@ -8,7 +8,7 @@ import type { HostAccess } from "./host-access.ts";
 export class TurnCoordination {
   readonly waiting = new Set<string>();
   constructor(private host: HostAccess) {}
-  async guardTurn(agent: Agent, turn: number, signal: AbortSignal) {
+  async guardTurn(agent: Agent, signal: AbortSignal) {
     const lifetime = AbortSignal.any([signal, this.host.closing.signal]);
     const inputReady = new AbortController();
     const control = AbortSignal.any([lifetime, inputReady.signal]);

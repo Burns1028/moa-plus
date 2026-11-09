@@ -58,7 +58,7 @@ it.each(["deleting", "deleted"] as const)(
       if (state === "deleting") await entered.promise;
       else {
         await deletion;
-        await host.guardTurn(agent, 1, new AbortController().signal);
+        await host.guardTurn(agent, new AbortController().signal);
       }
       if (state === "deleting")
         await host.workers.reconcileAssignment(agent, assignment.id);

@@ -37,7 +37,6 @@ import { historySchema } from "./control.ts";
 import {
   resolveOrdinaryAgent,
   registerProjection,
-  projected,
   abortableChange,
   observeForTurn,
 } from "./native.ts";
@@ -285,7 +284,7 @@ export default class ProjectMode extends TypertRemoteService {
         this.mounted.delete(agent);
       },
       recover: (id) => this.recover(id),
-      guardTurn: (agent, turn, signal) => this.guardTurn(agent, turn, signal),
+      guardTurn: (agent, signal) => this.guardTurn(agent, signal),
       freezeTurn: (id, turn, reason) => this.freezeTurn(id, turn, reason),
       refreshWorkersForInput: (agent, ids, signal) =>
         this.refreshWorkersForInput(agent, ids, signal),
@@ -746,14 +745,11 @@ export default class ProjectMode extends TypertRemoteService {
   private ingest(id: SessionId) {
     return this.outbox.ingest(id);
   }
-  private consume(id: SessionId, messageId: string) {
-    return this.outbox.consume(id, messageId);
-  }
   private deliver(id: SessionId) {
     return this.outbox.deliver(id);
   }
-  private guardTurn(agent: Agent, turn: number, signal: AbortSignal) {
-    return this.turns.guardTurn(agent, turn, signal);
+  private guardTurn(agent: Agent, signal: AbortSignal) {
+    return this.turns.guardTurn(agent, signal);
   }
   private freezeTurn(id: SessionId, turn: number, reason: string) {
     return this.turns.freezeTurn(id, turn, reason);

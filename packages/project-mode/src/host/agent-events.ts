@@ -15,7 +15,7 @@ interface AgentEventOptions {
   attach(agent: Agent): void;
   disposeAgent(agent: Agent): void;
   recover(id: SessionId): Promise<void>;
-  guardTurn(agent: Agent, turn: number, signal: AbortSignal): Promise<void>;
+  guardTurn(agent: Agent, signal: AbortSignal): Promise<void>;
   freezeTurn(id: SessionId, turn: number, reason: string): Promise<void>;
   refreshWorkersForInput(
     agent: Agent,
@@ -29,7 +29,7 @@ export function bindAgentEvents(
   host: HostAccess,
   options: AgentEventOptions,
 ): void {
-  const { outbox, workers, progress } = options;
+  const { outbox, progress } = options;
   bindProjectMemory(host);
   host.ctx.on("tools/change", options.reconcileTools);
   host.ctx.on("agent/created", async ({ agent }) => {
@@ -112,9 +112,9 @@ export function bindAgentEvents(
     }
     host.notify();
   });
-  host.ctx.on("agent/turn-stopping", async ({ agent, turn, signal }) => {
+  host.ctx.on("agent/turn-stopping", async ({ agent, signal }) => {
     if (host.record(agent.id)?.project.mode === "enabled")
-      await options.guardTurn(agent, turn, signal);
+      await options.guardTurn(agent, signal);
   });
   host.ctx.on("agent/pre-step", ({ agent, signal }, next) =>
     normalizeCoordinatorStep(host, options, agent, signal, next),
