@@ -4,6 +4,17 @@
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
+### Rubric configuration and collaboration contracts: 2026-11-10
+
+At `424dc09`, only the Builder selects the model's lowest supported reasoning effort after native model selection. The Coordinator and Verifier retain their selected effort. Work ownership, specialist execution tools, selective Context contributions and explicit Notify replies are described in the actual native model inputs and schemas; execution permissions and lifecycle controls are unchanged.
+
+- **339 tests across 59 files** passed: 278 Host/Client/integration tests and 61 native-contract tests. Production build, both typechecks and all 19 launcher checks passed. New regressions first reproduced the inherited Builder setting and missing guidance.
+- Fresh npm, forwarding-package and committed-Git consumers passed installation, explicit compatibility, declarations, Loader discovery, Client roundtrip and disposal; clean-checkout `npm ci` passed. [CI run 42657808589](https://github.com/Burns1028/moa-plus/actions/runs/42657808589) passed the launcher and native record-ownership checks on macOS and Ubuntu.
+- One fresh native CLI task used the official DeepSeek Flash High route with independent completion verification enabled. The Builder's actual request used `off`, submitted its rubric through the real tool, and completed. Two execution Workers returned their complete final AI messages exactly once. The Verifier retained High, inspected the rubric and candidate, performed native file/command checks, and returned Pass. The Coordinator completed normally 23 ms later. No experiment call, token or task-time cap interrupted that task.
+- Real Ego browser inspection confirmed compact Worker capsules, sidebar children and activity, navigation into a Worker, Back to the Coordinator, native closable tabs, and expansion of the original Markdown result.
+
+These are implementation and integration checks. Orchestration-pattern effectiveness is a separate evaluation; this evidence does not establish a performance improvement over ordinary mode.
+
 ### Independent whitepaper review corrections
 
 The follow-up corrects final-chat-answer inspection, chronological same-path source revisions, explicit QueryAgent waits, and native notes/archive ownership, and removes duplicate active Coordinator policy injection. Ownership applies to managed Workers and the hidden execution-capable Verifier; it retains ordinary output/Context writes and joined cleanup. Its [separately reviewed contract](native-memory-ownership-contract.md) documents backend requirements and unsupported states.
