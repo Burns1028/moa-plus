@@ -1,21 +1,10 @@
-# Try MoA+ in an isolated DSH Web runtime
+# Run MoA+ in an isolated DSH Web runtime
 
-The launcher prepares a separate DSH **0.2.1-rc.3** environment with the checked-out plugin and its exact compatibility manifest. It does not modify an installed Desktop app or reuse the personal `~/.dsh` profile. Requires **Node 24.9+**, npm, and Git.
+Set up the runtime from `main` in a separate local Web environment. Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. The checkout's explicit compatibility manifest extends **13 native packages across 31 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
-## Choose the implementation
+## Install and start
 
-The published **v0.1.23** preview has persistent coordination and the original three compatibility extensions:
-
-```sh
-git clone --branch v0.1.23 https://github.com/Burns1028/moa-plus.git
-cd moa-plus
-node scripts/project-mode.mjs setup
-node scripts/project-mode.mjs start
-```
-
-That version uses the **Project** label and earlier `control_workers` model interface. Its [Note Bundle recording](demo-workflow.md) is historical evidence for that version.
-
-The **unreleased MoA runtime** adds the five primitives and wider reviewed native runtime. It is available on `main` following [PR #3](https://github.com/Burns1028/moa-plus/pull/3). Clone main, then prepare a new directory:
+Choose a new empty directory outside this checkout and your ordinary DSH home. Replace `/absolute/empty-moa-runtime` below and reuse the same `--dir` for setup, doctor, and start.
 
 ```sh
 git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
@@ -28,15 +17,17 @@ node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
 node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
 
-Use the same checkout's plugin build, runtime lockfile, and manifest. Do not install the current plugin into an older three-extension runtime. Full integration and real-model/UI acceptance for the current runtime are tracked in [verification](verification.md); these commands are not a new release announcement.
+The compatibility command backs up the changed files before extending this checkout's dependencies. Setup installs the locked runtime and this plugin build in the chosen directory, with its own `home/`, `agents/`, configuration, documents, native backups, and plugin archive. It does not modify an installed Desktop app or reuse your personal `~/.dsh` profile.
 
-## Configure and start a conversation
+Keep the plugin build, runtime lockfile, and compatibility manifest from the same checkout. A dry-run preflight does not apply changes. The [compatibility guide](compatibility.md) covers manual installation and rollback.
 
-The start command opens the native DSH Web UI locally. Configure your model using its native settings, create a conversation, and select **MoA+** before sending its first message. Mode identity remains fixed after starting. The older v0.1.23 UI instead says Project.
+## Configure a conversation
 
-You can supply the provider's `DEEPSEEK_API_KEY` in the launching environment. The launcher does not copy keys from another profile. Native model and permission choices remain yours.
+The start command opens the native DSH Web UI locally. Configure your model using its native settings, create a conversation, and select **MoA+** before sending its first message. Mode identity remains fixed after starting.
 
-Setup explicitly creates a separate runtime directory containing its own `home/`, `agents/`, documents, native backups, and plugin archive. The default historical location is `~/.dsh-project-mode/rc3`; the directory/profile/package names remain compatibility identifiers. For current runtime testing, `--dir` makes it easy to keep a new runtime separate from an older trial.
+You can supply the provider's `DEEPSEEK_API_KEY` in the launching environment. The launcher does not copy keys from another profile. Choose model and permissions in the native settings.
+
+The Web server listens on `127.0.0.1` by default and selects an available port. Ctrl+C stops it; closing the browser tab leaves the terminal process running.
 
 ## Check or choose the location
 
@@ -45,24 +36,28 @@ node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
 node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime -- --no-open --port 8080
 ```
 
-Use an empty directory outside this checkout and the ordinary DSH home, then reuse the same `--dir` for setup, doctor, and start. Symlinked paths are refused; on macOS, the canonical temporary root is `/private/tmp` rather than `/tmp`.
+`doctor` is read-only. It checks ownership, runtime lock/package versions, the plugin artifact, and applied native hashes. Symlinked paths are refused; on macOS, the canonical temporary root is `/private/tmp` rather than `/tmp`.
 
-`doctor` is read-only. It checks ownership, runtime lock/package versions, the plugin artifact, and applied native hashes. A dry-run preflight alone does not prepare an environment: all runtime changes from that checkout's manifest must already be applied.
+The default location, `~/.dsh-project-mode/rc3`, and the profile/package names remain compatibility identifiers. An explicit `--dir` keeps this runtime separate from earlier installations.
 
-The Web server listens on `127.0.0.1` by default and selects an available port. Ctrl+C stops it. Closing the browser tab does not stop the terminal process.
+## Give the team its first task
 
-## First task
+Use a Git workspace for default isolated Workers. Give the Coordinator a complete goal and observable expected result. It can create specialists with `Task`, branch useful history with `Fork`, or continue existing Workers with `SendMessage`. To work directly in the parent's directory, choose `workspace: "shared"` explicitly. See the [Tool API](tool-api.md) for current calls.
 
-Use a new Git workspace for the current runtime's default isolated Workers. Give the Coordinator a complete goal and observable expected result. It can create specialists with Task, branch useful history with Fork, or continue existing Workers with SendMessage. For an assignment that should directly use the parent's directory, choose `workspace: "shared"` explicitly.
+The [Note Bundle starter](../examples/note-bundle) is a small task fixture with one intentionally failing feature test. Copy it to a new workspace, initialize Git if using isolated Workers, and follow its feature request.
 
-The public [Note Bundle starter](../examples/note-bundle) is a small task fixture with one intentional failing feature test. Copy it to a new workspace, initialize Git if using isolated Workers, and follow its feature request. The older [demo workflow](demo-workflow.md) illustrates the goal and human intervention, but its old tool names are not the current API. See [Tool API](tool-api.md) for current calls.
+Click a Worker capsule to enter its native conversation, give it instructions directly, and use Back to return to the Coordinator. Each finished Worker turn returns its complete final AI message to its designated reporting Agent; its conversation remains available for another assignment.
 
-New workspaces contain `notes.md`, `archived.md`, and `context/index.md`; independent acceptance can publish `rubrics.md`. Context is shared even when execution uses separate worktrees. Same-cwd conversations share these files, so choose a separate workspace for an independent project.
+New workspaces contain `notes.md`, `archived.md`, and `context/index.md`; independent acceptance can publish `rubrics.md`. Coordinator and Workers share Context even across isolated worktrees. Conversations in the same directory share these files, so use a separate workspace for an independent project. See [roles and common flows](moa-architecture.md) for the collaboration model.
 
 ## Restart and recovery
 
-If downloading is interrupted, rerun the same setup. Only a directory carrying a valid launcher ownership marker can be retried. A prepared runtime is verified before reuse; a changed runtime template/plugin artifact needs a new empty directory. Existing native backups are retained and checked.
+If downloading is interrupted, rerun setup with the same directory. Only a directory carrying a valid launcher ownership marker can be retried. Setup verifies a prepared runtime before reuse and retains its checked native backups. A changed runtime template or plugin artifact needs a new empty directory.
 
-Native Session persistence and identified MoA admissions/results support interrupted work recovery. Cold Workers restore through their true parent chain without fake prompts. New input can continue a retained Worker; no browser credentials or personal sessions are needed to test this path.
+Native Session persistence preserves collaboration and result-delivery records for interrupted work. Retained Workers can continue with new input. See [verification](verification.md) for current-runtime evidence and [manual verification](manual-verification.md) for model/UI checks beyond installation.
 
-To stop a trial, stop its terminal process and keep its directory if the work records are needed. See [compatibility](compatibility.md) for a manual runtime route and reversal. See [manual verification](manual-verification.md) for actual model/UI checks beyond installation.
+To stop a trial, stop its terminal process. Keep its directory if you need the work records; [compatibility](compatibility.md) explains reversal.
+
+## Earlier published Project Mode
+
+For the **v0.1.23** tag, follow its [installation instructions](https://github.com/Burns1028/moa-plus/tree/v0.1.23#quick-start). It uses the Project label, the earlier `control_workers` interface, and three compatibility extensions. Use that tag's build and runtime together. Its [demo recording](demo-workflow.md) illustrates that version's workflow; current tool contracts are documented separately in the [Tool API](tool-api.md).

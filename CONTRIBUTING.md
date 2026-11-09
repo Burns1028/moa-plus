@@ -16,6 +16,8 @@ These commands modify only this checkout's native dependencies. They do not modi
 
 ## Make a focused change
 
+Submit changes from a branch through a pull request. `main` requires the GitHub Actions launcher checks on macOS and Linux, an up-to-date branch, and resolved review conversations. These rules also apply to administrators; force pushes and branch deletion are disabled. A separate approving reviewer is not required.
+
 Edit `packages/project-mode/src`; generated `lib` artifacts are committed for Git installation. Build to regenerate them. Keep plugin state schemas separate from public view types, and keep execution state owned by DSH.
 
 For behavior changes, add a regression covering a meaningful native or UI boundary, and run the relevant checks. Start with a focused test; before releasing, run the full integration and package checks:

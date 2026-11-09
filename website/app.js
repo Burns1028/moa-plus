@@ -13,10 +13,10 @@ const translations = {
     heroLine2: "多个头脑。",
     heroLine3: "新的可能。",
     heroDescription:
-      "复杂的问题，值得多一种视角。MoA+ 让独立的 Agent 组成一支团队，共同思考、构建，并在协作中积累知识。",
+      "MoA+ 是 DeepSeek Harness 的多 Agent 协作插件。独立的 Agent 一起探索、构建和审阅，并把共享知识带入下一次任务。",
     tryRuntime: "体验运行时",
     viewSource: "探索源代码",
-    heroRelease: "开源。main 分支开发者预览。",
+    heroRelease: "开源。基于 DSH 原生运行时。",
     stageTag: "一支团队，在对话中协作",
     illustration: "协作示意",
     coordinatorRole: "保持全局判断",
@@ -93,11 +93,11 @@ const translations = {
     startHeading2: "难题开始。",
     startLede: "带上你的模型、工作区，还有那个想弄明白的问题。",
     getOnGithub: "在 GitHub 获取 MoA+",
-    developerPreview: "开发者预览",
+    sourceInstallation: "从源码安装",
     installTitle: "从 main 体验新运行时。",
     installRequirements: "需要 Node 24.9+、npm 和 Git。",
     installCompatibility:
-      "当前运行时尚未发布，需要匹配的 DSH 0.2.1-rc.3 兼容运行时：涉及 13 个原生包、31 个文件路径。",
+      "从 main 安装时，需要匹配的 DSH 0.2.1-rc.3 兼容运行时：涉及 13 个原生包、31 个文件路径。",
     installIsolation:
       "启动器准备独立的 Web 环境，使用单独的 home、配置与文档目录，不会安装进你的个人 Desktop 应用。",
     firstRunGuide: "首次运行与回滚指南",

@@ -2,7 +2,7 @@
 
 MoA+ 的目标是通过 Agent 之间的协作，把系统的智能能力推向下一个台阶。它把多个独立的执行上下文、共享知识、可中断通信与结果审阅组织成一支可以持续工作的团队。Coordinator 对全局方向和交付负责，Workers 在各自的上下文中推进具体责任，已经确认的知识继续服务后续任务。
 
-当前实现是 DeepSeek Harness 插件，复用原生运行体、会话、工具、收件箱、权限和后台任务。完整新运行时在 [PR #3](https://github.com/Burns1028/moa-plus/pull/3) 中接受审阅，尚未发布；具体实现与验收状态见[代码架构](architecture.md)和[验证记录](verification.md)。
+MoA+ 以 DeepSeek Harness 插件的形式，复用原生运行体、会话、工具、收件箱、权限和后台任务。这份文档说明 Coordinator 与 Workers 的职责、生命周期和协作流程；模块与数据模型见[代码架构](architecture.md)，工具行为见[工具 API](tool-api.md)，运行环境要求见[兼容说明](compatibility.md)。
 
 ## 为什么需要协作
 
