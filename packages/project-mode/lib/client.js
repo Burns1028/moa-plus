@@ -3859,7 +3859,7 @@ window.__ModuleLoader__.load({
 		// src/client/input-policy.ts
 		/** Bind enabled coordinators to the native composer's busy Steer preference. */
 		function bindCoordinatorInputPolicy(client, submission, sessions) {
-			if (typeof submission?.register !== "function") throw new Error("Project Mode requires the native composer submission compatibility API; apply the approved local DSH compatibility patch before enabling the plugin.");
+			if (typeof submission?.register !== "function") throw new Error("MoA+ requires the native composer submission compatibility API; apply the approved local DSH compatibility patch before enabling the plugin.");
 			const installed = /* @__PURE__ */ new Map();
 			const reconcile = () => {
 				const candidates = /* @__PURE__ */ new Set([...sessions.getSnapshot().ids, ...client.store.projects().map((p) => p.project.coordinatorSessionId)]);

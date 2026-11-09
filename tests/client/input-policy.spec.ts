@@ -197,6 +197,6 @@ it("rejects a host missing the native policy capability before registering Proje
       undefined as any,
       createSnapshotStore({ ids: [] }),
     ),
-  ).toThrow(/native.*composer.*compatibility/i);
+  ).toThrow(/^MoA\+ requires the native composer submission compatibility API/);
   client.dispose();
 });

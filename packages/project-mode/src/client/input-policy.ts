@@ -12,7 +12,7 @@ export function bindCoordinatorInputPolicy(
 ): () => void {
   if (typeof submission?.register !== "function")
     throw new Error(
-      "Project Mode requires the native composer submission compatibility API; apply the approved local DSH compatibility patch before enabling the plugin.",
+      "MoA+ requires the native composer submission compatibility API; apply the approved local DSH compatibility patch before enabling the plugin.",
     );
   const installed = new Map<SessionId, () => void>();
   const reconcile = () => {
