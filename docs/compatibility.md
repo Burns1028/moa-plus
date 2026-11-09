@@ -6,7 +6,7 @@ The published **v0.1.23** tag used three earlier extensions: Agent-local tool su
 
 ## Current native boundary
 
-`compat/rc3/manifest.json` is the authoritative file and SHA-256 list. The current manifest covers these **13 packages**, with separate npm/Desktop Client variants and an upgrade variant for the previously published tool-isolation patch:
+`compat/rc3/manifest.json` is the authoritative file and SHA-256 list. The current manifest covers these **19 packages**, with separate npm/Desktop Client variants and an upgrade variant for the previously published tool-isolation patch:
 
 | Native package | Required extension |
 | --- | --- |
@@ -23,10 +23,18 @@ The published **v0.1.23** tag used three earlier extensions: Agent-local tool su
 | `dsh-shell` | Managed shell resource termination/exit contract. |
 | `dsh-bash-local` | Actual subprocess-backed managed termination and exit observation. |
 | `dsh-subagent` | Host-only promptless borrowing of the true cold parent chain, preserving native restoration, capacity, lineage, and teardown. |
+| `dsh-sandbox` | Typed per-execution readonly paths, preserved independently of the permission mode. |
+| `dsh-sandbox-policy` | Scoped session readonly contributions, including approved mode escalation. |
+| `dsh-fs` | Typed ownership capability and non-escalatable readonly-path error. |
+| `dsh-fs-sandbox` | Canonical record-path checks before full-access delegation. |
+| `dsh-bash-sandbox` | Retain native confinement when full-access execution has readonly paths. |
+| `dsh-sandbox-local` | Seatbelt and bwrap record restrictions; explicit refusal of unsupported restriction dialects. |
 
 All names in this table have the `@deepseek-ai/` prefix. Some changes are declarations only; runtime-only distributions therefore apply fewer file edits than development installations.
 
-Read the [background/cancellation contract](native-moa-contract.md), [promptless residency contract](native-moa-residency-contract.md), and [protocol presentation contract](native-moa-protocol-presentation-contract.md) before altering these seams. Existing batch-local ordering remains native-owned. There is no universal cross-turn tool lease, alternate scheduler, or bypass for model control calls.
+Read the [background/cancellation contract](native-moa-contract.md), [promptless residency contract](native-moa-residency-contract.md), [protocol presentation contract](native-moa-protocol-presentation-contract.md), and [record ownership contract](native-memory-ownership-contract.md) before altering these seams. Existing batch-local ordering remains native-owned. There is no universal cross-turn tool lease, alternate scheduler, or bypass for model control calls.
+
+Workers need the matching native sandboxed filesystem and Bash providers to protect the Coordinator's notes/archive. Restricted Bash uses macOS Seatbelt or Linux bubblewrap; Linux installations must have a working `bwrap` backend. Landlock-only, Windows ACL and custom-runner restriction dialects currently refuse restricted Bash rather than discard the record policy. Hardlinked or symlinked record entries also refuse that call; on bwrap, the Coordinator must recreate a missing record before restricted Bash runs. Other files and Coordinator/ordinary sessions keep their native permissions. These requirements apply to Worker record ownership even in full-access mode.
 
 ## Prepare explicitly
 

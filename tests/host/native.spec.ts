@@ -840,14 +840,13 @@ it("deduplicates concurrent completion ingestion before coordinator admission", 
 });
 
 it("initializes context through the coordinator scoped sandbox filesystem and preserves existing files", async () => {
-  const f = await fixture();
+  const f = await fixture(undefined, { sandboxMode: "read-only" });
   try {
     const { default: Policy, setSandboxMode } = await import(
       "@deepseek-ai/dsh-sandbox-policy"
     );
     const { SandboxedFileSystem } = await import("@deepseek-ai/dsh-fs-sandbox");
     const { readFile, writeFile } = await import("node:fs/promises");
-    await f.ctx.plugin(Policy, { mode: "read-only" });
     const { default: Loader } = await import(
       "@deepseek-ai/cordis-plugin-loader"
     );

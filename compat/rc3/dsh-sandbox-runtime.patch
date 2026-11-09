@@ -1,0 +1,18 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -267,6 +267,9 @@
+ * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
+ * channel.
+ */
++var ReadOnlyPathUnsupportedError = class extends HarnessError {
++	constructor(detail) { super(`Readonly path policy is unsupported: ${detail}. Session readonly paths remain protected in every sandbox mode.`, "READ_ONLY_PATH_UNSUPPORTED"); }
++};
+ var SandboxUnavailableError = class extends HarnessError {
+ 	constructor(mode, detail) {
+ 		super(`sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL restricted-token runner can start (Windows) — otherwise switch the consumer to danger-full-access.` + (detail === void 0 ? "" : ` Runner failure: ${detail}`), SANDBOX_UNAVAILABLE);
+@@ -286,4 +289,4 @@
+ 	}
+ };
+ //#endregion
+-export { ESCALATION_TARGETS, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
++export { ESCALATION_TARGETS, ReadOnlyPathUnsupportedError, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };

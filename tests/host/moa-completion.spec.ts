@@ -20,11 +20,10 @@ it.each(["native", "ptc"])("inherits preset execution tools for the Verifier whi
   const f = await fixture(undefined, { completionVerification: true });
   try {
     await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
-    await f.ctx.plugin((await import("@deepseek-ai/dsh-bash-local")).default, { timeoutMs: 2000 });
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-bash-sandbox")).default, { timeoutMs: 2000 });
     await f.ctx.plugin(await import("@deepseek-ai/dsh-shell-env"));
     if (mode === "ptc") {
-      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
-      await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
       await f.ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
     }
     f.ctx.baseUrl = new URL("./", import.meta.url).href;
@@ -380,7 +379,8 @@ it.each([false, true])("accepts actual native Bash success from canonical exit f
   const f = await fixture(undefined, { completionVerification: true });
   try {
     await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
-    await f.ctx.plugin((await import("@deepseek-ai/dsh-bash-local")).default, { timeoutMs: promote ? 20 : 2000, maxTimeoutMs: 3000 });
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-sandbox-local")).default);
+    await f.ctx.plugin((await import("@deepseek-ai/dsh-bash-sandbox")).default, { timeoutMs: promote ? 20 : 2000, maxTimeoutMs: 3000 });
     await f.ctx.plugin(await import("@deepseek-ai/dsh-shell-env"));
     await f.ctx.plugin(await import("@deepseek-ai/dsh-tool-bash"), { promoteOnTimeout: promote });
     await f.ctx.plugin(await import("@deepseek-ai/dsh-tool-jobs"));

@@ -1,6 +1,8 @@
 import { it, expect } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, type GenerateOptions } from "@deepseek-ai/dsh-llm";
+import Loader from "@deepseek-ai/cordis-plugin-loader";
+import Presets from "@deepseek-ai/dsh-agent-preset-registry";
 import { fixture, response } from "./fixture.ts";
 import { coordinatorPrompt } from "../../packages/project-mode/src/host/coordinator-prompt.ts";
 
@@ -20,13 +22,41 @@ function prompt(text: string) {
   });
 }
 
+function runtimeText(request: GenerateOptions) {
+  return (
+    request.messages
+      .filter((message) => message.source.kind === "runtime-context")
+      .at(-1)?.content.filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n") ?? ""
+  );
+}
+
+function policyCopies(request: GenerateOptions) {
+  return (
+    request.messages
+      .flatMap((message) => message.content)
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n")
+      .split(coordinatorPrompt).length - 1
+  );
+}
+
 it("puts coordinator policy in the actual system message and removes it on plugin disposal", async () => {
   const f = await fixture();
   try {
+    f.ctx.baseUrl = new URL("./", import.meta.url).href;
+    await f.ctx.plugin(Loader);
+    await f.ctx.plugin(Presets, { default: "ordinary" });
+    await f.ctx.agentPresets.register({ id: "ordinary", plugins: [] });
     const { agent } = await f.ctx.agents.create({
       sessionId: SessionId("guidance-coordinator"),
       meta: { cwd: f.root },
       agentOptions: { provider: "test", model: "test" },
+      setup: async (ctx) => {
+        await f.ctx.agentPresets.mount(ctx);
+      },
     });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     agent.followup(prompt("盘点磁盘使用情况，分类给我"));
@@ -43,18 +73,19 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     expect(system).toContain("existing worker");
     expect(system).toContain("steer");
     expect(system).toContain("queue");
-    // Presets that own their complete system message still need the same role
-    // in required runtime context. These two prompt surfaces must not drift.
-    const coordinatorPolicy = system
-      .slice(system.indexOf("You are the MoA+ coordinator"))
-      .trim();
-    const runtime = first.messages
-      .filter((message) => message.source.kind === "runtime-context")
-      .flatMap((message) => message.content)
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("\n");
-    expect(runtime).toContain(coordinatorPolicy);
+    expect(policyCopies(first)).toBe(1);
+    expect(runtimeText(first)).not.toContain(coordinatorPrompt);
+    expect(runtimeText(first)).toContain("Paths:");
+    expect(runtimeText(first)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(first)).toContain("Worker state sampled for this user input");
+
+    agent.followup(prompt("Continue with the latest team state"));
+    await agent.whenIdle();
+    const continued = f.adapter.requests.at(-1)!;
+    expect(policyCopies(continued)).toBe(1);
+    expect(runtimeText(continued)).not.toContain(coordinatorPrompt);
+    expect(runtimeText(continued)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(continued)).not.toBe(runtimeText(first));
 
     const snapshot = await f.ctx.projectMode.snapshot(agent.id);
     await expect(
@@ -71,6 +102,90 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     expect(systemText(f.adapter.requests.at(-1)!)).not.toContain(
       "MoA+ coordinator",
     );
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("keeps one coordinator policy in required context when the native preset owns the complete system prompt", async () => {
+  const f = await fixture();
+  const completePrompt = "A preset-owned complete SYSTEM prompt.";
+  let registerComplete!: () => () => void;
+  let removeComplete!: () => void;
+  try {
+    f.ctx.baseUrl = new URL("./", import.meta.url).href;
+    await f.ctx.plugin(Loader);
+    f.ctx.loader.builtins["complete-system-prompt"] = {
+      inject: ["systemPrompt"],
+      apply(ctx) {
+        registerComplete = () =>
+          ctx.systemPrompt.section({
+            name: "preset:complete-system",
+            order: 0,
+            complete: true,
+            text: completePrompt,
+          });
+        removeComplete = registerComplete();
+        ctx.systemPrompt.suppressRuntimeContext();
+      },
+    };
+    await f.ctx.plugin(Presets, { default: "complete" });
+    await f.ctx.agentPresets.register({
+      id: "complete",
+      plugins: [{ name: "cordis:complete-system-prompt" }],
+    });
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("guidance-complete-preset"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+      setup: async (ctx) => {
+        await f.ctx.agentPresets.mount(ctx);
+      },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(prompt("Coordinate the project"));
+    await agent.whenIdle();
+    const request = f.adapter.requests[0];
+    const fallbackSnapshot = request.messages.find(
+      (message) => message.source.kind === "runtime-context",
+    )!;
+    expect(systemText(request)).toBe(completePrompt);
+    expect(policyCopies(request)).toBe(1);
+    expect(runtimeText(request)).toContain(coordinatorPrompt);
+    expect(runtimeText(request)).toContain("Paths:");
+    expect(runtimeText(request)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(request)).toContain("Worker state sampled for this user input");
+
+    // Native history retains previous runtime snapshots. Check the current
+    // system and latest runtime contributions as ownership changes live.
+    removeComplete();
+    agent.followup(prompt("Continue after removing complete ownership"));
+    await agent.whenIdle();
+    const ordinary = f.adapter.requests.at(-1)!;
+    expect(systemText(ordinary)).toContain(coordinatorPrompt);
+    expect(runtimeText(ordinary)).not.toContain(coordinatorPrompt);
+    expect(runtimeText(ordinary)).toContain(`${f.root}/context/index.md`);
+    expect(ordinary.messages).toContainEqual(fallbackSnapshot);
+    expect(
+      `${systemText(ordinary)}\n${runtimeText(ordinary)}`.split(coordinatorPrompt),
+    ).toHaveLength(2);
+
+    removeComplete = registerComplete();
+    agent.followup(prompt("Continue with complete ownership restored"));
+    await agent.whenIdle();
+    const restored = f.adapter.requests.at(-1)!;
+    expect(systemText(restored)).toBe(completePrompt);
+    expect(runtimeText(restored)).toContain(coordinatorPrompt);
+    expect(runtimeText(restored)).toContain(`${f.root}/context/index.md`);
+    expect(
+      `${systemText(restored)}\n${runtimeText(restored)}`.split(coordinatorPrompt),
+    ).toHaveLength(2);
+
+    await f.plugin.dispose();
+    agent.followup(prompt("Continue after plugin disposal"));
+    await agent.whenIdle();
+    expect(systemText(f.adapter.requests.at(-1)!)).toBe(completePrompt);
+    expect(runtimeText(f.adapter.requests.at(-1)!)).not.toContain(coordinatorPrompt);
   } finally {
     await f.dispose();
   }

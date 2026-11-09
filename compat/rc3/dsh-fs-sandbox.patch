@@ -1,0 +1,35 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -102,6 +102,7 @@
+ */
+ var SandboxedFileSystem = class extends LocalFileSystem {
+ 	static inject = ["sandboxPolicy"];
++	supportsReadOnlyPaths = true;
+ 	defaultMode;
+ 	constructor(ctx, config) {
+ 		super(ctx, config);
+@@ -153,6 +154,14 @@
+ 	async checkedTarget(target, sandboxPolicy) {
+ 		const policy = sandboxPolicy ?? this.ctx.sandboxPolicy.resolve();
+ 		const { mode } = policy;
++		if (policy.readOnlyPaths?.length) {
++			const fresh = await this.resolve(target.displayPath);
++			for (const path of policy.readOnlyPaths) {
++				const restricted = await this.resolve(path);
++				if (await isPathUnder(this.processPath(fresh), this.processPath(restricted)) || await isPathUnder(this.processPath(restricted), this.processPath(fresh))) throw new FsError(`cannot write "${target.displayPath}": Coordinator-owned record is read-only for this session; changing sandbox mode does not override ownership`, "FS_READ_ONLY_PATH");
++			}
++			target = fresh;
++		}
+ 		if (mode === "danger-full-access") return target;
+ 		if (mode === "read-only") throw new FsError(`cannot write "${target.displayPath}": file access denied under read-only mode`, "FS_SANDBOX_DENIED");
+ 		const fresh = await this.resolve(target.displayPath);
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -47,6 +47,7 @@
+  */
+ export declare class SandboxedFileSystem extends LocalFileSystem {
+     static inject: string[];
++    readonly supportsReadOnlyPaths: true;
+     private readonly defaultMode;
+     constructor(ctx: Context, config: Config);
+     /** The deployment default mode — the capability fact the tool layer reads to advertise escalation. */

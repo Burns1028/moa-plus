@@ -10,7 +10,7 @@ import { MoAAgents } from "../../packages/project-mode/src/host/moa/agents.ts";
 it.skipIf(process.platform !== "darwin")(
   "prepares nested isolated workspaces under actual project confinement and refuses an external common Git directory",
   async () => {
-    const f = await fixture();
+    const f = await fixture(undefined, { sandboxMode: "workspace-write" });
     const external = await mkdtemp(join(tmpdir(), "moa-foreign-"));
     const release = Promise.withResolvers<void>();
     const git = (cwd: string, ...args: string[]) =>
@@ -39,7 +39,6 @@ it.skipIf(process.platform !== "darwin")(
       const { default: Presets } = await import(
         "@deepseek-ai/dsh-agent-preset-registry"
       );
-      await f.ctx.plugin(SandboxPolicy, { mode: "workspace-write" });
       await f.ctx.plugin(SandboxLocal);
       f.ctx.baseUrl = new URL("./", import.meta.url).href;
       await f.ctx.plugin(Loader);

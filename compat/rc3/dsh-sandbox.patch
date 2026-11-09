@@ -1,0 +1,61 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -267,6 +267,9 @@
+ * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
+ * channel.
+ */
++var ReadOnlyPathUnsupportedError = class extends HarnessError {
++	constructor(detail) { super(`Readonly path policy is unsupported: ${detail}. Session readonly paths remain protected in every sandbox mode.`, "READ_ONLY_PATH_UNSUPPORTED"); }
++};
+ var SandboxUnavailableError = class extends HarnessError {
+ 	constructor(mode, detail) {
+ 		super(`sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL restricted-token runner can start (Windows) — otherwise switch the consumer to danger-full-access.` + (detail === void 0 ? "" : ` Runner failure: ${detail}`), SANDBOX_UNAVAILABLE);
+@@ -286,4 +289,4 @@
+ 	}
+ };
+ //#endregion
+-export { ESCALATION_TARGETS, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
++export { ESCALATION_TARGETS, ReadOnlyPathUnsupportedError, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -27,6 +27,8 @@
+ export interface SandboxExecutionPolicy {
+     /** The file-effect mode this execution runs under. */
+     mode: SandboxMode;
++    /** Host-owned session restrictions; mode escalation never removes these paths. */
++    readonly readOnlyPaths?: readonly string[];
+     /** Absolute root directory `workspace-write` may write under. */
+     workspaceRoot: string;
+     /**
+@@ -54,7 +56,7 @@
+  */
+ export interface SandboxPolicy extends SandboxExecutionPolicy {
+     /** The file-effect mode this execution runs under. */
+-    mode: ConfinedSandboxMode;
++    mode: SandboxMode;
+ }
+ /**
+  * Evidence that identifies a sandbox runner failing before it executes the
+@@ -110,8 +112,12 @@
+  * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
+  * channel.
+  */
++/** A requested readonly path policy cannot be safely enforced by this backend/state. */
++export declare class ReadOnlyPathUnsupportedError extends HarnessError {
++    constructor(detail: string);
++}
+ export declare class SandboxUnavailableError extends HarnessError {
+-    constructor(mode: ConfinedSandboxMode, detail?: string);
++    constructor(mode: SandboxMode, detail?: string);
+ }
+ declare module '@deepseek-ai/cordis' {
+     interface Context {
+@@ -125,6 +131,8 @@
+  * skipped for a sole candidate, whose own refusal remains the fail-closed end.
+  */
+ export declare abstract class SandboxProvider extends Service {
++    /** This provider understands readonly-path policies and fails closed for unsupported dialects. */
++    readonly supportsReadOnlyPaths?: true;
+     constructor(ctx: Context);
+     /**
+      * Wrap `argv` so it executes confined under `policy` on this host; the

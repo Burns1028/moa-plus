@@ -97,7 +97,7 @@ const translations = {
     installTitle: "从 main 体验新运行时。",
     installRequirements: "需要 Node 24.9+、npm 和 Git。",
     installCompatibility:
-      "从 main 安装时，需要匹配的 DSH 0.2.1-rc.3 兼容运行时：涉及 13 个原生包、31 个文件路径。",
+      "从 main 安装时，需要匹配的 DSH 0.2.1-rc.3 兼容运行时：涉及 19 个原生包、43 个文件路径。",
     installIsolation:
       "启动器准备独立的 Web 环境，使用单独的 home、配置与文档目录，不会安装进你的个人 Desktop 应用。",
     firstRunGuide: "首次运行与回滚指南",

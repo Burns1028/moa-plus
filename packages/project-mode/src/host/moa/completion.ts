@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import type { HostAccess } from "../host-access.ts";
 import { waitForTurn } from "../native.ts";
+import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./worker-memory-policy.ts";
 
 declare module "@deepseek-ai/dsh-llm" {
   interface MessageSourceMap {
@@ -18,7 +19,8 @@ const criteriaSchema = z.object({ criteria: z.string().min(1), promise: z.string
 const rubricSchema = z.object({ rubric: z.string().min(1), tests_required: z.boolean() });
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
-const inputSchema = z.object({ taskId: z.string(), turn: z.number(), finished: z.boolean().default(false), requirements: z.array(z.string()), sources: z.record(z.string(), z.string().nullable()), attachments: z.array(z.custom<ContentBlock>()).default([]) });
+const sourceVersionSchema = z.object({ path: z.string(), requirement: z.number().int().positive().nullable(), content: z.string().nullable() });
+const inputSchema = z.object({ taskId: z.string(), turn: z.number(), finished: z.boolean().default(false), requirements: z.array(z.string()), sources: z.record(z.string(), z.string().nullable()), sourceVersions: z.array(sourceVersionSchema).default([]), attachments: z.array(z.custom<ContentBlock>()).default([]) });
 const boundSchema = criteriaSchema.extend({ taskId: z.string(), turn: z.number() });
 type Input = z.infer<typeof inputSchema>;
 const output = { schema: { type: "string" as const }, render: (_: unknown, value: string) => [{ type: "text" as const, text: value }] };
@@ -28,7 +30,7 @@ function lastText(agent: Agent, from = 0): string {
   const event = agent.session.snapshotEvents().slice(from).filter((e) => e.type === "assistant/message").at(-1);
   return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
-interface Helpers { builder: AgentHandle; verifier: AgentHandle; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string> }
+interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal): () => void }
 
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
 export function bindCompletion(host: HostAccess): (agent: Agent) => void {
@@ -44,7 +46,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const record = recordFor(agent.id);
     return record?.project.mode === "enabled" && (record.project.coordinatorSessionId === agent.id || record.workers.some(worker => worker.id === agent.id && (worker.lifecycle === "active" || worker.lifecycle === "provisioning")));
   };
-  const close = async (pair: Helpers) => { await Promise.all([pair.builder.dispose(), pair.verifier.dispose()]); };
+  const close = async (pair: Helpers) => { await Promise.all([pair.builder.dispose(), pair.verifier.dispose().finally(pair.verifierMemoryPolicy.dispose)]); };
   const retire = (pair: Helpers) => {
     const pending = close(pair);
     retired.add(pending);
@@ -58,14 +60,25 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const root = host.record(parent.id)!.project.workspacePath;
     const fs = filesystem(parent);
     const sources = { ...input.sources };
+    // Old saved tasks have only the original source map; retain those snapshots
+    // without inventing an exact human-message anchor for them.
+    const sourceVersions = input.sourceVersions.length ? [...input.sourceVersions] : Object.entries(sources).map(([path, content]) => ({ path, requirement: null, content }));
     const requirements = added.map(text);
     // Explicit Markdown links and quoted paths retain spaces. Plain paths are
     // accepted too; only named sources are read, never implementation outputs.
-    const paths = new Set<string>();
-    for (const body of requirements) {
+    for (const [index, body] of requirements.entries()) {
+      const paths = new Set<string>();
       for (const match of body.matchAll(/`([^`\n]+\.[\w]+)`|\]\(([^)\n]+)\)|"([^"\n]+\.[\w]+)"|(?:^|\s)((?:\/?[\w.\-\u0080-\uffff]+\/)*[\w.\-\u0080-\uffff]+\.(?:md|txt|pdf|json|ya?ml))(?=$|\s|[.,;])/g)) {
         const path = match[1] ?? match[2] ?? match[3] ?? match[4];
         if (path && !/^[\w+.-]+:\/\//.test(path)) paths.add(path);
+      }
+      for (const token of paths) {
+        let content: string | null = null;
+        try {
+          content = await fs.readText(await fs.resolve(token, { cwd: root, signal }), signal);
+        } catch { signal.throwIfAborted(); /* Only an explicit human reference captures a source version. */ }
+        sources[token] = content;
+        sourceVersions.push({ path: token, requirement: input.requirements.length + index + 1, content });
       }
     }
     const attachments = added.flatMap(message => message.content.filter(block => block.type === "file" || block.type === "image"));
@@ -79,14 +92,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         if (path) sources[label] = await fs.readText(await fs.resolve(path, { signal }), signal);
       } catch { signal.throwIfAborted(); /* Binary/unavailable attachments remain explicit references. */ }
     }
-    for (const token of paths) {
-      if (Object.hasOwn(sources, token)) continue;
-      sources[token] = null;
-      try {
-        sources[token] = await fs.readText(await fs.resolve(token, { cwd: root, signal }), signal);
-      } catch { signal.throwIfAborted(); /* Preserve unavailable sources; never reread an output later. */ }
-    }
-    return { ...input, requirements: [...input.requirements, ...requirements], sources, attachments: [...input.attachments, ...attachments] };
+    return { ...input, requirements: [...input.requirements, ...requirements], sources, sourceVersions, attachments: [...input.attachments, ...attachments] };
   };
   const create = async (parent: Agent, input: Input, signal: AbortSignal): Promise<Helpers> => {
     const record = host.record(parent.id)!;
@@ -96,6 +102,12 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     generations.set(parent, generation);
     let rubric: string | undefined;
     let submitted: z.infer<typeof rubricSchema> | undefined;
+    let candidate: { answer: string; signal: AbortSignal } | undefined;
+    const freezeCandidate = (answer: string, signal: AbortSignal) => {
+      const snapshot = { answer, signal };
+      candidate = snapshot;
+      return () => { if (candidate === snapshot) candidate = undefined; };
+    };
     const read = async (signal: AbortSignal) => {
       const fs = filesystem(parent);
       const actual = await fs.readText(await fs.resolve(rubricPath, { cwd: root, signal }), signal);
@@ -142,27 +154,39 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
           ctx.tools.guard(exec => exec.name === "submit_rubric" ? undefined : "Rubric Builder cannot access execution tools or implementation outputs");
         } else {
           ctx.tools.register(defineTool({ name: "read_rubric", description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
+          ctx.tools.register(defineTool({ name: "read_candidate", description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.", parameters: {}, output, execute: async () => {
+            if (!candidate) throw new Error("No active candidate review");
+            candidate.signal.throwIfAborted();
+            return candidate.answer;
+          } }));
         }
         // Standard installs its own per-Agent delegation variant after setup.
         ctx.tools.suppress({ deny: hiddenDelegation });
       },
     });
     const builder = await make("builder");
-    let verifier: AgentHandle;
-    try { verifier = await make("verifier"); } catch (error) { await builder.dispose(); throw error; }
-    builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive task-deliverable acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Read the requirements in chronological order: later clarifications supersede conflicting earlier instructions. An instruction governing subsequent actions applies from its arrival unless the user explicitly makes it retroactive; do not turn it into a restriction on earlier actions. Preserve all other explicit deliverable, artifact, build and test requirements. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation.
+    let verifier: AgentHandle | undefined;
+    let verifierMemoryPolicy: WorkerMemoryPolicyBinding | undefined;
+    try {
+      verifier = await make("verifier");
+      verifierMemoryPolicy = bindWorkerMemoryPolicy(host.ctx, verifier.agent, record.project.paths);
+      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive task-deliverable acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Read the requirements in chronological order: later clarifications supersede conflicting earlier instructions. sourceVersions records each explicit human source reference with its 1-based requirements position; a null position denotes a legacy snapshot captured before version tracking. sources contains the latest captured content for each path. Apply a revised source from its associated requirement while preserving unaffected earlier requirements. An instruction governing subsequent actions applies from its arrival unless the user explicitly makes it retroactive; do not turn it into a restriction on earlier actions. Preserve all other explicit deliverable, artifact, build and test requirements. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation.
 
 You are part of a pre-end completion gate. The parent turn is still open while the Builder and Verifier run; a passing review allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Do not require this review's own completed record or the subsequent parent turn/end as already-existing task deliverables.
 
 Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${JSON.stringify({ ...input, attachments: undefined })}` }, ...input.attachments] }));
-    const build = builder.agent.whenIdle().then(async () => {
-      if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
-      rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
-      await publish(signal);
-      return submitted.tests_required;
-    });
-    void build.catch(() => {});
-    return { builder, verifier, build, rubricPath, publish, read };
+      const build = builder.agent.whenIdle().then(async () => {
+        if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
+        rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
+        await publish(signal);
+        return submitted.tests_required;
+      });
+      void build.catch(() => {});
+      return { builder, verifier, verifierMemoryPolicy, build, rubricPath, publish, read, freezeCandidate };
+    } catch (error) {
+      await Promise.all([builder.dispose(), verifier?.dispose().finally(() => verifierMemoryPolicy?.dispose())]);
+      throw error;
+    }
   };
   const mount = (agent: Agent) => {
     if (!participant(agent)) {
@@ -200,7 +224,7 @@ Submit the completed Markdown rubric by calling submit_rubric. Set tests_require
     if (!start || start.type !== "turn/start") throw new Error("Missing turn identity");
     const priorCompleted = prior.success && events.some(event => event.type === "turn/end" && event.data.turn === prior.data.turn && event.data.reason.kind === "completed");
     const continuation = prior.success && !prior.data.finished && !priorCompleted;
-    const base: Input = continuation ? { ...prior.data, turn: start.data.turn } : { taskId: randomUUID(), turn: start.data.turn, finished: false, requirements: [], sources: {}, attachments: [] };
+    const base: Input = continuation ? { ...prior.data, turn: start.data.turn } : { taskId: randomUUID(), turn: start.data.turn, finished: false, requirements: [], sources: {}, sourceVersions: [], attachments: [] };
     const input = await capture(agent, base, human, signal);
     await host.update(agent.id, (r) => ({ ...r, operations: { ...r.operations, [sourceKey]: z.json().parse(input) } }));
     const old = helpers.get(agent);
@@ -231,6 +255,7 @@ Submit the completed Markdown rubric by calling submit_rubric. Set tests_require
     const control = AbortSignal.any([signal, host.closing.signal, wake.signal]);
     let active: Helpers | undefined;
     let stopEvidence: (() => void) | undefined;
+    let clearCandidate: (() => void) | undefined;
     try {
       listener();
       let pending = running.get(agent);
@@ -257,11 +282,12 @@ Submit the completed Markdown rubric by calling submit_rubric. Set tests_require
         const call = pair.verifier.agent.session.snapshotEvents().filter(event => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
         if (call) successfulBash.add(call.seq);
       });
+      clearCandidate = pair.freezeCandidate(answer, control);
       pair.verifier.agent.followup(msg(`Independently verify actual deliverables against this rubric. Interpret the anchored requirements chronologically: later clarifications supersede conflicting earlier instructions, and instructions about subsequent actions apply from their arrival unless explicitly retroactive.
 
 This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
 
-Inspect artifacts with available native tools and personally run relevant Bash/build/tests where applicable. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection; do not accept claims as evidence. Use read_rubric to read the rubric from disk. Rubric file: ${pair.rubricPath}`));
+Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require Bash merely to inspect it. Inspect file artifacts with available native tools and personally run relevant Bash/build/tests where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Rubric file: ${pair.rubricPath}`));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       await pair.read(control);
       const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
@@ -279,6 +305,7 @@ Inspect artifacts with available native tools and personally run relevant Bash/b
         agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
       }
     } finally {
+      clearCandidate?.();
       stopEvidence?.();
       host.listeners.delete(listener);
       if (control.aborted && active?.verifier.agent.status === "running") active.verifier.agent.cancel({ kind: "parent" });

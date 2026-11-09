@@ -16,4 +16,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm ci --prefix runtime/rc3 --workspaces=false --ignore-scripts --no-audit --no-fund
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - run: node scripts/apply-native-compat.mjs --backup "$RUNNER_TEMP/moa-native-backup"
       - run: npm run test:launcher
+      - run: npx --no-install vitest run tests/native-contract/moa-memory-readonly.spec.ts --maxWorkers=1

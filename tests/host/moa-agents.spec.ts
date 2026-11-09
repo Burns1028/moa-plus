@@ -767,9 +767,8 @@ it("ProjectContext writes only inside the shared context using the acting sandbo
   const { default: Presets } = await import(
     "@deepseek-ai/dsh-agent-preset-registry"
   );
-  const f = await fixture();
+  const f = await fixture(undefined, { sandboxMode: "workspace-write" });
   try {
-    await f.ctx.plugin(Policy, { mode: "workspace-write" });
     f.ctx.baseUrl = new URL("./", import.meta.url).href;
     await f.ctx.plugin(Loader);
     f.ctx.loader.builtins.group = Group;

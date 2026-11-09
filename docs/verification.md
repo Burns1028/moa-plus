@@ -2,7 +2,13 @@
 
 ## Current main: unreleased MoA runtime
 
-The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **13 native packages / 31 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
+The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
+
+### Independent whitepaper review corrections
+
+The follow-up corrects final-chat-answer inspection, chronological same-path source revisions, explicit QueryAgent waits, and native notes/archive ownership, and removes duplicate active Coordinator policy injection. Ownership applies to managed Workers and the hidden execution-capable Verifier; it retains ordinary output/Context writes and joined cleanup. Its [separately reviewed contract](native-memory-ownership-contract.md) documents backend requirements and unsupported states.
+
+Fresh local evidence: **59 files / 332 tests passed**, including Host, Client, integration and native-contract suites; production build, both typechecks, and **19 launcher tests with zero skips** passed. The readonly suite uses stock filesystem/Bash tools and actual macOS Seatbelt. The CI matrix also runs actual bubblewrap on Ubuntu; Linux CI, fresh package consumers and real-model/UI acceptance are tracked separately and must pass before this follow-up is considered complete. Earlier runtime evidence below remains attached to its original revisions.
 
 This is the unreleased runtime on main; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
 
