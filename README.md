@@ -51,7 +51,7 @@ Workers remain available between assignments. Each real ended turn returns its *
 
 The runtime also provides isolated/shared workspaces, slow-tool background execution with automatic result return, reusable context, and independent completion review. The Coordinator keeps its ordinary execution tools and decides how to divide work. Nested delegation is explicitly enabled when needed. See the [roles and operating flow][roles] and [Tool API][tools].
 
-## Stay in the conversation
+## See it in action
 
 MoA+ keeps the native DSH interface:
 
