@@ -26,3 +26,5 @@ export declare function nativeAdmissionRejection(error: unknown): {
 export declare function ordinarySessionResolver(ctx: Context): Pick<SessionController, "resolveAgent"> | undefined;
 /** Preserve native ownership/domain failures; this never admits model input. */
 export declare function resolveOrdinaryAgent(ctx: Context, sessionId: SessionId): Promise<Agent | undefined>;
+/** Refuse a partial rc.3 installation before installing MOA execution policy. */
+export declare function requireNativeBackground(ctx: Context, agent: Agent): import("@deepseek-ai/dsh-jobs").JobRegistry;

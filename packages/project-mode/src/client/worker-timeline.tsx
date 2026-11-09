@@ -37,7 +37,7 @@ function Timestamp({ time }: { time: number }) {
     </time>
   );
 }
-function MessagePreview({
+export function MessagePreview({
   text,
   labels,
 }: Pick<React.ComponentProps<typeof MarkdownText>, "text" | "labels">) {
@@ -78,12 +78,15 @@ export function WorkersPanel({
   const axisRef = React.useRef<HTMLElement>(null);
   const workers = (project?.workers ?? []).filter(isVisibleWorker),
     worker = workers.find((w) => w.workerId === chosen) ?? workers[0];
+  const nativeReady =
+    worker?.lifecycle === "active" && worker.availability === "live";
   const [windowSize, setWindowSize] = React.useState(10),
     [retry, setRetry] = React.useState(0);
   const [state, setState] = React.useState<{
     workerId: SessionId;
     page?: WorkerTimelinePage;
     error?: string;
+    readyWhenFailed?: boolean;
   }>();
   const labels = React.useMemo(
     () => ({
@@ -111,6 +114,7 @@ export function WorkersPanel({
           setState({
             workerId: worker.workerId,
             error: error instanceof Error ? error.message : String(error),
+            readyWhenFailed: nativeReady,
           });
       } finally {
         stream.dispose();
@@ -132,6 +136,12 @@ export function WorkersPanel({
   ]);
   const current = state?.workerId === worker?.workerId ? state : undefined,
     page = current?.page;
+  React.useEffect(() => {
+    // A creation-time observation can fail before native activation. Reopen
+    // only when that failed attempt gains readiness; healthy streams stay put.
+    if (current?.error && current.readyWhenFailed === false && nativeReady)
+      setRetry((value) => value + 1);
+  }, [worker?.workerId, current?.error, current?.readyWhenFailed, nativeReady]);
   if (!workers.length)
     return (
       <div className="pm-workers-panel pm-workers-panel-empty">
@@ -157,7 +167,9 @@ export function WorkersPanel({
           >
             <span className="pm-panel-worker-icon">
               <WorkerIcon workerId={w.workerId} />
-              {(w.phase === "working" || w.phase === "starting") && (
+              {(w.phase === "working" ||
+                w.phase === "starting" ||
+                w.phase === "stopping") && (
                 <StateDot
                   state="ongoing"
                   size={22}
@@ -171,7 +183,6 @@ export function WorkersPanel({
             </span>
           </button>
         ))}
-        {!workers.length && <p className="pm-axis-empty">{t("noWorkers")}</p>}
       </nav>
       <section
         ref={axisRef}
@@ -185,7 +196,9 @@ export function WorkersPanel({
               type="button"
               onClick={() =>
                 open({
-                  parentSessionId: project!.project.coordinatorSessionId,
+                  parentSessionId:
+                    worker.parentSessionId ??
+                    project!.project.coordinatorSessionId,
                   childSessionId: worker.workerId,
                   mode: "continuable",
                 })
@@ -195,7 +208,6 @@ export function WorkersPanel({
             </button>
           </header>
         )}
-        {!worker && <p className="pm-axis-empty">{t("selectWorker")}</p>}
         {worker && !page && !current?.error && (
           <p className="pm-axis-empty">{t("loadingTimeline")}</p>
         )}
@@ -220,11 +232,13 @@ export function WorkersPanel({
                 {t(
                   turn.outcome === null
                     ? "working"
-                    : turn.outcome === "completed"
-                      ? "completed"
-                      : turn.outcome === "aborted"
-                        ? "stopped"
-                        : "failed",
+                    : turn.outcome === "handoff"
+                      ? "continued"
+                      : turn.outcome === "completed"
+                        ? "completed"
+                        : turn.outcome === "aborted"
+                          ? "stopped"
+                          : "failed",
                 )}
               </span>
             </div>
@@ -236,7 +250,9 @@ export function WorkersPanel({
                   {t(
                     message.actor === "coordinator"
                       ? "fromCoordinator"
-                      : "fromUser",
+                      : message.actor === "agent"
+                        ? "fromAgent"
+                        : "fromUser",
                   )}
                   <MessagePreview text={message.text} labels={labels} />
                 </div>

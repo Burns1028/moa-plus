@@ -6,7 +6,7 @@ export interface WorkerCapsule {
   key: string;
   workerId: SessionId;
   name: string;
-  status: WorkerView["phase"] | "completed" | "deleted";
+  status: WorkerView["phase"] | "completed" | "deleted" | "continued";
   text?: string;
   queueLength: number | null;
   address: SubagentAddress;
@@ -149,11 +149,11 @@ export class ProjectStore {
             key: `${sessionId}:${turn}:${m.segmentStartSeq === undefined ? "" : `${m.segmentStartSeq}:`}${m.workerId}`,
             workerId: m.workerId,
             name: w?.name ?? m.workerId,
-            status: closed ? outcome!.status : w!.phase,
-            text: closed ? outcome!.summary : w!.progressText,
-            queueLength: closed ? null : w!.queueLength,
+            status: closed && outcome!.status !== "continued" ? outcome!.status : w.phase,
+            text: closed && outcome!.status !== "continued" ? outcome!.summary : w.progressText,
+            queueLength: closed && outcome!.status !== "continued" ? null : w.queueLength,
             address: {
-              parentSessionId: sessionId,
+              parentSessionId: w?.parentSessionId ?? sessionId,
               childSessionId: m.workerId,
               mode: "continuable" as const,
             },

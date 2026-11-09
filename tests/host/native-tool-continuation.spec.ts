@@ -11,14 +11,18 @@ function toolCalls(id: string, actions: object[]): StreamChunk[] {
   return [
     ...actions.flatMap((action, index): StreamChunk[] => {
       const callId = `${id}-${index}`;
-      const args = JSON.stringify(action);
+      const input = action as { action: string; name?: string; task?: string; worker_id?: string; message?: string; delivery?: string };
+      const name = input.action === "spawn" ? "Task" : "SendMessage";
+      const args = JSON.stringify(input.action === "spawn"
+        ? { tasks: [{ name: input.name, task: input.task, role: "General-purpose", workspace: "shared" }] }
+        : { target: input.worker_id, message: input.message, delivery: input.delivery });
       return [
         { type: "block-start", index, blockType: "tool-call" },
         {
           type: "tool-call-delta",
           index,
           id: callId,
-          name: "control_workers",
+          name,
           argumentsDelta: args,
         },
         {
@@ -27,7 +31,7 @@ function toolCalls(id: string, actions: object[]): StreamChunk[] {
           block: {
             type: "tool-call",
             id: callId,
-            name: "control_workers",
+            name,
             arguments: args,
           },
         },
@@ -75,7 +79,7 @@ it("continues real native tool results with no new inbox messages, then queues a
             message.role === "tool" && message.source.callId === "spawn-0",
         );
         expect(receipt).toBeDefined();
-        const { accepted, workerId } = JSON.parse(textOf(receipt!));
+        const [{ accepted, workerId }] = JSON.parse(textOf(receipt!));
         expect(accepted).toBe(true);
         expect(workerId).toBeTruthy();
         return toolCalls("continue", [

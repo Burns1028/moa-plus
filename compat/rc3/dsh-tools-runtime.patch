@@ -1,6 +1,81 @@
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -2720,6 +2720,7 @@
+@@ -4,6 +4,7 @@
+ import { HarnessError, createUserMessage } from "@deepseek-ai/dsh-llm";
+ import { assertNever, deepFreeze, isJsonValue, snapshotJsonValue } from "@deepseek-ai/dsh-util-values";
+ import { brandString } from "@deepseek-ai/dsh-brand";
++import { appendPluginRecord } from "@deepseek-ai/dsh-session";
+ import { ESCALATION_TARGETS, approveEscalation, validateEscalationArgs } from "@deepseek-ai/dsh-sandbox";
+ //#region lib/types/json-schema.js
+ /**
+@@ -861,6 +862,9 @@
+ 				return userPresentationMeta(args, value);
+ 			} } : {}
+ 		},
++		...options.nativeOnly === true ? { nativeOnly: true } : {},
++		...options.backgroundOnMessage === true ? { backgroundOnMessage: true } : {},
++		...options.supportsBackgroundProducer === true ? { supportsBackgroundProducer: true } : {},
+ 		...options.deferLoading === true ? { deferLoading: options.deferLoading } : {},
+ 		...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
+ 		async execute(args, exec) {
+@@ -1248,6 +1252,12 @@
+ 		async execute(args, exec) {
+ 			if (args.description.trim().length === 0) throw new Error("invalid description: expected a non-empty string");
+ 			const runtime = requireRuntime();
++			const appendDispatch = (type, data) => {
++				const session = exec.agent?.session;
++				if (!session) return;
++				if (exec.background?.detached) appendPluginRecord(session, `plugin:tools/${type.slice(5)}`, data);
++				else session.append(type, data);
++			};
+ 			const run = async (callSignal) => {
+ 				validateEscalationArgs(args.sandbox_permissions, args.justification);
+ 				if (args.timeoutMs !== void 0 && runtime.timeout === void 0) throw new Error("timeoutMs is not available for this PTC runtime");
+@@ -1372,6 +1382,7 @@
+ 						schema,
+ 						arguments: normalized.dispatched,
+ 						...exec.agent ? { agent: exec.agent } : {},
++						background: exec.background,
+ 						parent: exec.token,
+ 						signal: runController.signal
+ 					};
+@@ -1397,7 +1408,7 @@
+ 									isError: result.isError,
+ 									content: result.content
+ 								});
+-								agent.session.append("tool/ptc-dispatch", {
++								appendDispatch("tool/ptc-dispatch", {
+ 									rootCallId: exec.rootCallId,
+ 									parentCallId: exec.callId,
+ 									subCallId,
+@@ -1421,7 +1432,7 @@
+ 								reject(/* @__PURE__ */ new Error(`run_code run is over (${String(runController.signal.reason)}); ${name} tool call abandoned`));
+ 							},
+ 							async start() {
+-								exec.agent?.session.append("tool/ptc-dispatch-start", {
++								appendDispatch("tool/ptc-dispatch-start", {
+ 									rootCallId: exec.rootCallId,
+ 									parentCallId: exec.callId,
+ 									subCallId,
+@@ -1470,7 +1481,7 @@
+ 				};
+ 				const functions = Object.create(null);
+ 				for (const schema of registry.schemas(exec.agent)) {
+-					if (schema.name === "run_code") continue;
++					if (schema.name === "run_code" || registry.get(schema.name, exec.agent)?.nativeOnly === true) continue;
+ 					Object.defineProperty(functions, schema.name, {
+ 						enumerable: true,
+ 						value: binding(deepFreeze(schema))
+@@ -2611,7 +2622,7 @@
+ * (the call fails) and the route (inside the program), because a rule the
+ * model can only discover by being denied is one it corrects too late.
+ */
+-const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`;
++const PTC_ONLY_INSTRUCTION = `Use \`${RUN_CODE_NAME}\` for capabilities declared in the program SDK. Tools supplied as separate native schemas must be called directly and are not available inside the program.`;
+ const SDK_RENDERERS = {
+ 	typescript: renderToolsSdk,
+ 	python: renderToolsSdkPy
+@@ -2720,6 +2731,7 @@
  var ToolLayer = class {
  	tools;
  	restrictions = new AnonymousEntries();
@@ -8,7 +83,7 @@
  	guards = new AnonymousEntries();
  	/**
  	* Presentation this scope's agent declared for itself, shadowing the
-@@ -2732,7 +2733,7 @@
+@@ -2732,7 +2744,7 @@
  	}
  	/** Whether every contribution table in this aggregate layer is empty. */
  	isEmpty() {
@@ -17,7 +92,28 @@
  	}
  	/** Whether every compiled restriction in this layer admits a global tool name. */
  	admits(name) {
-@@ -3014,6 +3015,15 @@
+@@ -2765,7 +2777,8 @@
+ 	});
+ 	/** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
+ 	[TOOL_RUNTIME_SCHEDULER] = {
+-		prepare: (exec) => this.prepareScheduledExecution(exec),
++		prepare: (exec, options) => this.prepareScheduledExecution(exec, options),
++		start: (exec) => this.startScheduledActivity(exec),
+ 		dispatch: (exec) => this.dispatchScheduledExecution(exec),
+ 		finalize: (exec, result) => this.finalizeScheduledExecution(exec, result),
+ 		finish: (exec, result) => this.finishScheduledExecution(exec, result)
+@@ -2938,8 +2951,8 @@
+ 		};
+ 		this.requirePtcRuntime(mode);
+ 		return {
+-			schemas: [...view.visible.values()].map((definition) => this.schemaOf(definition, false)).filter((schema) => schema.name === RUN_CODE_NAME),
+-			knownNames: [RUN_CODE_NAME]
++			schemas: [...view.visible.values()].filter((definition) => definition.name === RUN_CODE_NAME || definition.nativeOnly === true).map((definition) => this.schemaOf(definition, false)),
++			knownNames: [RUN_CODE_NAME, ...view.nativeOnlyNames]
+ 		};
+ 	}
+ 	/**
+@@ -3014,6 +3027,15 @@
  	* @param guard - synchronous check; a returned string denies the execution.
  	* @returns the exact disposer that unregisters the guard.
  	*/
@@ -33,14 +129,136 @@
  	guard(guard) {
  		return this.layers.effect(this.ctx, (layer) => layer.guards.append(guard), {
  			label: "tools.guard()",
-@@ -3071,6 +3081,10 @@
+@@ -3063,20 +3085,29 @@
+ 		const visible = /* @__PURE__ */ new Map();
+ 		const knownNames = /* @__PURE__ */ new Set();
+ 		const restrictableNames = /* @__PURE__ */ new Set();
++		const nativeOnlyNames = /* @__PURE__ */ new Set();
+ 		for (const [name, definition] of inherited) {
++			if (definition.nativeOnly === true) nativeOnlyNames.add(name);
+ 			knownNames.add(name);
+ 			restrictableNames.add(name);
+ 			if (layers.every((layer) => layer.admits(name))) visible.set(name, definition);
+ 		}
  		if (own !== void 0) for (const [name, definition] of own.tools.entries()) {
++			if (definition.nativeOnly === true) nativeOnlyNames.add(name);
++			else nativeOnlyNames.delete(name);
  			knownNames.add(name);
  			visible.set(name, definition);
-+		}
+ 		}
 +		// Intentionally exact-scope: a coordinator's mask must not constrain workers.
 +		if (own !== void 0) for (const names of own.suppressions.values()) {
 +			for (const name of names) visible.delete(name);
- 		}
++		}
  		if (this.modeFor(scope) !== "native") visible.set(RUN_CODE_NAME, this.requirePtcTransport());
  		return {
+ 			visible,
+ 			knownNames,
+-			restrictableNames
++			restrictableNames,
++			nativeOnlyNames
+ 		};
+ 	}
+ 	/**
+@@ -3121,7 +3152,7 @@
+ 	}
+ 	/** Project visible callable tools onto the generated PTC mode SDK contract. */
+ 	sdkSchemas(scope) {
+-		return [...this.view(scope).visible.values()].filter((definition) => definition.name !== RUN_CODE_NAME).map((definition) => {
++		return [...this.view(scope).visible.values()].filter((definition) => definition.name !== RUN_CODE_NAME && definition.nativeOnly !== true).map((definition) => {
+ 			const output = snapshotJsonValue(definition.output.schema);
+ 			/* v8 ignore next -- registration already validated and retained this schema as lossless JSON. */
+ 			if (output === void 0) throw new Error(`tool "${definition.name}" output schema must be lossless JSON before SDK projection`);
+@@ -3193,6 +3224,7 @@
+ 	* @param nested - whether the call is a transport sub-dispatch, not a model-direct call.
+ 	*/
+ 	collapses(name, scope, nested) {
++		if (this.get(name, scope)?.nativeOnly === true) return nested;
+ 		return !nested && this.modeFor(scope) === "ptc" && name !== "run_code";
+ 	}
+ 	/**
+@@ -3224,7 +3256,7 @@
+ 			default: return assertNever(prepared, "scheduled tool preparation");
+ 		}
+ 	}
+-	createExecution(exec) {
++	createExecution(exec, options) {
+ 		const deferredContexts = [];
+ 		const token = createExecutionToken();
+ 		const callId = exec.callId;
+@@ -3232,7 +3264,14 @@
+ 		const name = exec.name;
+ 		const agent = exec.agent;
+ 		const parent = exec.parent;
+-		const signal = exec.signal;
++		const controller = options?.transferable ? new AbortController() : undefined;
++		const relay = () => controller.abort(exec.signal.reason);
++		if (controller) {
++			exec.signal.addEventListener("abort", relay, { once: true });
++			if (exec.signal.aborted) relay();
++		}
++		const signal = controller?.signal ?? exec.signal;
++		const releaseCaller = () => exec.signal.removeEventListener("abort", relay);
+ 		const visible = this.get(name, agent);
+ 		const collapsed = visible !== void 0 && this.collapses(name, agent, parent !== void 0);
+ 		const concludingExecutions = this.concludingExecutions;
+@@ -3240,6 +3279,8 @@
+ 			token,
+ 			callId,
+ 			rootCallId,
++			background: options?.background ?? exec.background,
++			backgroundOnMessage: visible?.backgroundOnMessage === true,
+ 			name,
+ 			signal,
+ 			...agent !== void 0 ? { agent } : {},
+@@ -3266,6 +3307,7 @@
+ 			this.contentFinalizers.set(execution, finalizerFor());
+ 			if (!collapsed) this.contentProjectors.set(execution, capturedProjector);
+ 			this.cancellationStates.set(execution, {
++				controller, releaseCaller,
+ 				callerSignal: signal,
+ 				bodyInvoked: false
+ 			});
+@@ -3278,7 +3320,7 @@
+ 				return {
+ 					kind: "final-result",
+ 					exec: execution,
+-					result: toolErrorResult(new ToolNotFoundError(name, `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`))
++					result: toolErrorResult(new ToolNotFoundError(name, visible.nativeOnly === true ? `\`${name}\` must be called directly; it is not available inside a \`${RUN_CODE_NAME}\` program` : `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`))
+ 				};
+ 			}
+ 			return {
+@@ -3304,11 +3346,21 @@
+ 	* @returns the prepared execution plus the next scheduler stage.
+ 	* @internal
+ 	*/
+-	async prepareScheduledExecution(input) {
+-		return this.prepareExecution(input, (prepared) => prepared);
++	async prepareScheduledExecution(input, options) {
++		return this.prepareExecution(input, (prepared) => prepared, options);
+ 	}
+-	async prepareExecution(input, next) {
+-		const created = this.createExecution(input);
++	startScheduledActivity(exec) {
++		const state = this.cancellationStates.get(exec);
++		const dispatch = this.dispatchScheduledExecution(exec);
++		return {
++			dispatch,
++			exited: dispatch.then(() => undefined),
++			cancel: (reason) => state.controller?.abort(reason),
++			releaseCaller: state.releaseCaller
++		};
++	}
++	async prepareExecution(input, next, options) {
++		const created = this.createExecution(input, options);
+ 		if (created.kind !== "ready") return next(created);
+ 		const exec = created.exec;
+ 		if (this.callerCancelled(exec)) return next({
+@@ -3488,6 +3540,7 @@
+ 		} catch (error) {
+ 			finalResult = this.materializeFinalResult(toolErrorResult(error));
+ 		}
++		this.cancellationStates.get(exec)?.releaseCaller?.();
+ 		this.notifyResult(exec, finalResult);
+ 		return finalResult;
+ 	}

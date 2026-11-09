@@ -62,6 +62,7 @@ const expected = [
   "catalog",
   "control",
   "follow",
+  "followWorkerParent",
   "history",
   "mode",
   "setEnabled",

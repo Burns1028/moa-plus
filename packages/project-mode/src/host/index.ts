@@ -1,4 +1,23 @@
 import { bindAgentEvents } from "./agent-events.ts";
+import { judgeInterrupt } from "./moa/judge.ts";
+import { bindBackground } from "./moa/background.ts";
+import { bindCompletion } from "./moa/completion.ts";
+import { MoAAgents, type AgentDescriptor } from "./moa/agents.ts";
+import {
+  createTaskTool,
+  createForkTool,
+  createQueryAgentTool,
+  createKillAgentTool,
+  createProjectContextTool,
+} from "./moa/tools.ts";
+import { applyRoleRestrictions } from "./moa/roles.ts";
+import { withManagedAgent } from "./moa/residency.ts";
+import { followWorkerParent } from "./worker-parent-retention.ts";
+import {
+  createNativeMessageBroker,
+  createSendMessageTool,
+  type MoAMessageBroker,
+} from "./moa/messages.ts";
 import { buildProjectSnapshot } from "./project-views.ts";
 import { ProjectLifecycle, hasOwnTurn } from "./project-lifecycle.ts";
 import { isVisibleWorker } from "../shared/worker-membership.ts";
@@ -14,11 +33,10 @@ import type { HostAccess } from "./host-access.ts";
 import { Context, Service } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { createWorkerControlTool, historySchema } from "./control.ts";
+import { historySchema } from "./control.ts";
 import {
   resolveOrdinaryAgent,
   registerProjection,
-  projected,
   abortableChange,
   observeForTurn,
 } from "./native.ts";
@@ -45,11 +63,13 @@ import {
 import type {
   ControlWorkersRequest,
   ControlResult,
+  ControlReceipt,
   ProjectSnapshot,
   ProjectFrame,
   WorkerView,
   WorkerHistoryPage,
   WorkerTimelinePage,
+  WorkerParentReady,
   SessionModeView,
 } from "../shared/index.ts";
 export { Config } from "./config.ts";
@@ -63,12 +83,16 @@ declare module "@deepseek-ai/dsh-llm" {
       completionId: string;
       workerId: SessionId;
       workerTurn: number;
+      senderSessionId?: string;
+      senderName?: string;
     };
     "project-mode-assignment": {
       kind: "project-mode-assignment";
       form: "relay";
       operationId: string;
       coordinatorSessionId: SessionId;
+      senderSessionId?: string;
+      senderName?: string;
     };
     "project-mode-notice": {
       kind: "project-mode-notice";
@@ -92,6 +116,7 @@ export default class ProjectMode extends TypertRemoteService {
     "sessionProjections",
     "sessions",
     "subagents",
+    "jobs",
     "sessionQuery",
     "storage",
     "storageDomain",
@@ -102,6 +127,12 @@ export default class ProjectMode extends TypertRemoteService {
   private outbox!: CompletionOutbox;
   private workers!: WorkerOperations;
   private turns!: TurnCoordination;
+  private messages!: MoAMessageBroker;
+  private moa!: MoAAgents;
+  private moaTools!: ReturnType<typeof defineTool>[];
+  private contextTool!: ReturnType<typeof createProjectContextTool>;
+  private completionAttach?: (agent: Agent) => void;
+  private messageTool!: ReturnType<typeof createSendMessageTool>;
   private lifecycle!: ProjectLifecycle;
   private get access(): HostAccess {
     return {
@@ -118,22 +149,30 @@ export default class ProjectMode extends TypertRemoteService {
       inspect: (worker, signal, details) =>
         this.inspect(worker, signal, details),
       readHistory: (...args) => this.readHistory(...args),
-      enqueue: (work) => this.enqueue(work),
+      enqueue: (id, work) => this.enqueue(id, work),
       notify: () => this.notify(),
       ingest: (id) => this.ingest(id),
-      settledJobs: () => this.jobs,
+      settledJobs: (id) => this.projectJobs.get(id) ?? Promise.resolve(),
+      admitWorkerMessage: (agent, request, operationId, signal, admit) =>
+        this.workers.controlForAgent(agent, request, operationId, signal, admit),
+      stopManagedWorker: (agent, request, operationId, signal) =>
+        this.stopManagedWorker(agent, request, operationId, signal),
+      // Worker views can become idle after a new result was queued for ingestion.
       pendingOperations: (id) =>
         [...this.workers.operations.keys()].filter(
           (key) => JSON.parse(key)[0] === id,
-        ).length,
+        ).length + Number(this.projectJobs.has(id)),
     };
   }
 
   private mounted = new Map<Agent, { key: string; dispose: () => void }>();
   private reconcilingTools = false;
   private toolsChangedDuringReconciliation = false;
-  private controlTool!: ReturnType<typeof defineTool>;
-  private jobs: Promise<void> = Promise.resolve();
+  private backgroundBindings = new Map<Agent, Promise<() => Promise<void>>>();
+  private projectJobs = new Map<SessionId, Promise<void>>();
+  private get jobs(): Promise<void> {
+    return Promise.all([...this.projectJobs.values()]).then(() => {});
+  }
   private listeners = new Set<() => void>();
   private progress = new Map<SessionId, string>();
   private workerInputSnapshots = new Map<SessionId, string>();
@@ -157,10 +196,30 @@ export default class ProjectMode extends TypertRemoteService {
     );
     this.outbox = new CompletionOutbox(this.access);
     this.workers = new WorkerOperations(this.access);
+    this.moa = new MoAAgents(this.access, this.workers);
+    this.moaTools = [
+      createTaskTool(this.moa),
+      createForkTool(this.moa),
+      createQueryAgentTool(this.moa),
+      createKillAgentTool(this.moa),
+    ];
+    this.contextTool = createProjectContextTool(this.moa);
     this.turns = new TurnCoordination(this.access);
+    this.messages = createNativeMessageBroker(
+      this.access,
+      (agent, messages, description, signal) =>
+        judgeInterrupt(
+          this.ctx,
+          agent,
+          messages,
+          { kind: "request", description },
+          signal,
+        ),
+    );
+    this.messageTool = createSendMessageTool(this.messages);
     this.lifecycle = new ProjectLifecycle(this.access, {
       put: (id, record) => this.domain.table("projects").put(id, record),
-      attach: (agent) => this.attach(agent),
+      attach: (agent) => this.prepareAgent(agent),
       recover: (id) => this.recover(id),
     });
     await registerProjection(this.ctx);
@@ -173,7 +232,7 @@ export default class ProjectMode extends TypertRemoteService {
       "system-prompt/assemble",
       async (_assembly, { agent }, next) => {
         const prompt = await next();
-        if (!agent || this.record(agent.id)?.project.mode !== "enabled")
+        if (!agent || !this.participant(agent))
           return prompt;
         return {
           ...prompt,
@@ -213,9 +272,6 @@ export default class ProjectMode extends TypertRemoteService {
           ? coordinatorPrompt
           : "",
     });
-    this.controlTool = createWorkerControlTool((...args) =>
-      this.controlForAgent(...args),
-    );
     bindAgentEvents(this.access, {
       outbox: this.outbox,
       workers: this.workers,
@@ -228,17 +284,34 @@ export default class ProjectMode extends TypertRemoteService {
         this.mounted.delete(agent);
       },
       recover: (id) => this.recover(id),
-      guardTurn: (agent, turn, signal) => this.guardTurn(agent, turn, signal),
+      guardTurn: (agent, signal) => this.guardTurn(agent, signal),
       freezeTurn: (id, turn, reason) => this.freezeTurn(id, turn, reason),
       refreshWorkersForInput: (agent, ids, signal) =>
         this.refreshWorkersForInput(agent, ids, signal),
     });
+    // Native creation awaits serial listeners before admitting a first prompt.
+    // Background tools must exist before the loop assembles its tool schema.
+    this.ctx.on("agent/created", async ({ agent }) => {
+      await this.prepareAgent(agent);
+      return undefined;
+    });
+    this.ctx.on("agent/disposed", async ({ agent }) => {
+      await this.releaseBackground(agent);
+      return undefined;
+    });
+    if (this.config.completionVerification) this.completionAttach = bindCompletion(this.access);
     this.ctx.effect(
       () => async () => {
         this.available = false;
         this.closing.abort();
         this.notify();
         this.outbox.dispose();
+        this.messages.dispose();
+        await Promise.all(
+          [...this.backgroundBindings.keys()].map((agent) =>
+            this.releaseBackground(agent),
+          ),
+        );
         // The coordinator survives this plugin. drainDescendants permanently
         // closes its native admission scope until Agent disposal, so release
         // only our selected children after local in-flight admissions settle.
@@ -249,22 +322,27 @@ export default class ProjectMode extends TypertRemoteService {
             if (record)
               await this.ctx.subagents.drainChildren(
                 parent,
-                record.workers.map((worker) => SessionId(worker.id)),
+                record.workers
+                  .filter((worker) =>
+                    (this.moa.descriptor(SessionId(worker.id))?.creatorId ?? parent.id) === parent.id,
+                  )
+                  .map((worker) => SessionId(worker.id)),
               );
           }),
         );
-        await this.jobs;
+        while (this.projectJobs.size) await this.jobs;
         for (const value of this.mounted.values()) value.dispose();
         this.mounted.clear();
+        this.moa.dispose();
         await archives.dispose();
         await this.domain.close();
       },
       "project-mode.lifecycle",
     );
     this.available = true;
-    for (const agent of this.ctx.agents.list()) this.attach(agent);
+    for (const agent of this.ctx.agents.list()) await this.prepareAgent(agent);
     for (const [id] of this.domain.table("projects").entries())
-      this.enqueue(() => this.recover(SessionId(id)));
+      this.enqueue(SessionId(id), () => this.recover(SessionId(id)));
   }
   private async recover(parentId: SessionId) {
     {
@@ -288,9 +366,9 @@ export default class ProjectMode extends TypertRemoteService {
     const r = this.record(parentId)!;
     if (
       !parent &&
-      r.assignments.some(
+      (r.assignments.some(
         (a) => a.admission === "prepared" || a.admission === "unknown",
-      )
+      ) || r.workers.some((worker) => worker.lifecycle === "deleting") || this.moa.needsRecovery(r))
     ) {
       parent = await resolveOrdinaryAgent(this.ctx, parentId);
     }
@@ -300,7 +378,12 @@ export default class ProjectMode extends TypertRemoteService {
           await this.reconcileAssignment(parent, a.id);
       for (const w of r.workers)
         if (w.lifecycle === "deleting") {
-          await this.ctx.subagents.drainChildren(parent, [SessionId(w.id)]);
+          const descriptor = this.moa.descriptor(SessionId(w.id));
+          const creatorId = SessionId(descriptor?.creatorId ?? parentId);
+          const creator = this.ctx.agents.get(creatorId);
+          if (creator) await this.ctx.subagents.drainChildren(creator, [SessionId(w.id)]);
+          else if (creatorId === parentId || !this.record(parentId)!.workers.some((member) => member.id === creatorId && member.lifecycle === "deleted"))
+            await withManagedAgent(this.access, creatorId, this.closing.signal, (active) => this.ctx.subagents.drainChildren(active, [SessionId(w.id)]));
           await this.update(parentId, (state) => ({
             ...state,
             workers: state.workers.map((worker) =>
@@ -310,7 +393,9 @@ export default class ProjectMode extends TypertRemoteService {
             ),
           }));
         }
+      await this.moa.recover(parent, this.closing.signal);
     }
+    await this.messages.recover(parentId);
     for (const w of this.record(parentId)!.workers)
       if (w.lifecycle === "active" || w.lifecycle === "deleted")
         await this.ingest(SessionId(w.id));
@@ -340,33 +425,89 @@ export default class ProjectMode extends TypertRemoteService {
     }
     for (const agent of this.ctx.agents.list()) this.attach(agent);
   }
+  private participant(agent: Agent): boolean {
+    const owner = this.owner(agent.id);
+    return (
+      this.record(agent.id)?.project.mode === "enabled" ||
+      (owner?.project.mode === "enabled" &&
+        owner.workers.some(
+          (worker) =>
+            worker.id === agent.id &&
+            (worker.lifecycle === "active" || worker.lifecycle === "provisioning"),
+        ))
+    );
+  }
+  private async prepareAgent(agent: Agent): Promise<void> {
+    this.attach(agent);
+    this.completionAttach?.(agent);
+    if (!this.participant(agent)) {
+      await this.releaseBackground(agent);
+      return;
+    }
+    let binding = this.backgroundBindings.get(agent);
+    if (!binding) {
+      binding = bindBackground(this.ctx, agent, this.config);
+      this.backgroundBindings.set(agent, binding);
+    }
+    try {
+      await binding;
+    } catch (error) {
+      if (this.backgroundBindings.get(agent) === binding)
+        this.backgroundBindings.delete(agent);
+      throw error;
+    }
+  }
+  private async releaseBackground(agent: Agent): Promise<void> {
+    const binding = this.backgroundBindings.get(agent);
+    this.backgroundBindings.delete(agent);
+    if (binding) await (await binding)();
+  }
   private attach(agent: Agent) {
     const enabled = this.record(agent.id)?.project.mode === "enabled";
+    const participant = this.participant(agent);
+    const descriptor = this.owner(agent.id)?.operations[
+      `moa:agent:${agent.id}`
+    ] as unknown as AgentDescriptor | undefined;
+    const controls = enabled || descriptor?.nested === true;
     if (this.reconcilingTools || this.closing.signal.aborted) return;
-    const deny = enabled
-      ? [...new Set(this.config.coordinatorHiddenTools)].sort()
+    const deny = participant
+      ? [
+          ...new Set([
+            ...this.config.coordinatorHiddenTools,
+            "send_message",
+            "control_workers",
+          ]),
+        ].sort()
       : [];
-    const key = JSON.stringify([enabled, deny]);
+    const key = JSON.stringify([enabled, participant, controls, descriptor?.role, deny]);
     const old = this.mounted.get(agent);
     if (old?.key === key) return;
     this.reconcilingTools = true;
     try {
       this.mounted.delete(agent);
       old?.dispose();
-      if (enabled) {
+      if (participant) {
         const restrictions = deny.length
           ? agent.ctx.tools.suppress({ deny })
           : () => {};
+        const tools: (() => void)[] = [];
         try {
-          const tool = agent.ctx.tools.register(this.controlTool);
+          if (controls)
+            for (const tool of this.moaTools)
+              tools.push(agent.ctx.tools.register(tool));
+          tools.push(agent.ctx.tools.register(this.messageTool));
+          tools.push(agent.ctx.tools.register(this.contextTool));
+          if (descriptor)
+            tools.push(applyRoleRestrictions(this.ctx, agent, descriptor.role));
           this.mounted.set(agent, {
             key,
             dispose: () => {
-              tool();
+              for (const off of tools.reverse()) off();
               restrictions();
             },
           });
         } catch (error) {
+          for (const off of tools.reverse()) off();
           restrictions();
           throw error;
         }
@@ -388,19 +529,25 @@ export default class ProjectMode extends TypertRemoteService {
       return `${coordinatorPrompt}\nPaths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}`;
     const parent = this.owner(agent.id);
     return parent
-      ? `${workerPrompt}\nCoordinator: ${parent.project.coordinatorSessionId}\nPaths: ${JSON.stringify({ ...parent.project.paths, contextIndex: contextIndexPath(parent.project.paths) })}`
+      ? parent.operations[`moa:agent:${agent.id}`]
+        ? workerPrompt
+        : `${workerPrompt}\nPaths: ${JSON.stringify({ ...parent.project.paths, contextIndex: contextIndexPath(parent.project.paths) })}`
       : "";
   }
   private notify() {
     for (const fn of [...this.listeners]) fn();
   }
-  private enqueue(work: () => Promise<void>) {
-    this.jobs = this.jobs
+  private enqueue(id: SessionId, work: () => Promise<void>) {
+    const job = (this.projectJobs.get(id) ?? Promise.resolve())
       .then(work)
       .catch((error) => {
         this.ctx.logger.warn(String(error));
       })
-      .then(() => this.notify());
+      .then(() => {
+        if (this.projectJobs.get(id) === job) this.projectJobs.delete(id);
+        this.notify();
+      });
+    this.projectJobs.set(id, job);
   }
   private async update(id: SessionId, fn: (r: RecordState) => RecordState) {
     await this.domain.table("projects").update(id, (r) => {
@@ -437,6 +584,28 @@ export default class ProjectMode extends TypertRemoteService {
     signal: AbortSignal,
   ): Promise<ControlResult> {
     return this.workers.controlForAgent(agent, request, operationId, signal);
+  }
+  /** Legacy delete keeps its receipt/serialization while cleaning MoA-owned resources. */
+  private async stopManagedWorker(
+    agent: Agent,
+    request: Extract<ControlWorkersRequest, { action: "delete" }>,
+    operationId: string,
+    signal: AbortSignal,
+  ): Promise<ControlReceipt> {
+    const record = this.requireCoordinator(agent);
+    const saved = record.operations[operationId];
+    if (saved) return saved as unknown as ControlReceipt;
+    const worker = this.worker(record, request.worker_id);
+    if (worker.lifecycle !== "deleted") {
+      const descriptor = this.moa.descriptor(request.worker_id)!;
+      const creatorId = SessionId(descriptor.creatorId);
+      const destroy = (creator: Agent) => this.moa.kill(creator, request.worker_id, signal, { destroy: true, operationId });
+      if (creatorId === agent.id) await destroy(agent);
+      else await withManagedAgent(this.access, creatorId, signal, destroy);
+    }
+    const receipt = { operationId, workerId: request.worker_id, accepted: true, lifecycle: "deleted", historyRetained: true } as const;
+    await this.update(agent.id, (current) => ({ ...current, operations: { ...current.operations, [operationId]: receipt } }));
+    return receipt;
   }
   private reconcileAssignment(agent: Agent, assignmentId: string) {
     return this.workers.reconcileAssignment(agent, assignmentId);
@@ -506,15 +675,17 @@ export default class ProjectMode extends TypertRemoteService {
     let status: WorkerView["status"] = null,
       availability: WorkerView["availability"] = "unavailable",
       queueLength: number | null = null,
-      pendingSteerCount: number | null = null;
+      pendingSteerCount: number | null = null,
+      parentSessionId = agent?.session.header.parentSession;
     try {
       if (agent) {
-        status = agent.status === "running" ? "busy" : "idle";
+        status = agent.status === "running" || agent.moaHasPendingBackground ? "busy" : "idle";
         availability = "live";
         queueLength = agent.inbox.nextTurn.length;
         pendingSteerCount = agent.inbox.nextStep.length;
       } else {
         using observed = await observeForTurn(this.ctx, id, signal);
+        parentSessionId = observed.header.parentSession;
         const inbox = observed.projections?.values.inbox;
         if (!inbox) throw new Error("inbox unavailable");
         status = "idle";
@@ -537,8 +708,10 @@ export default class ProjectMode extends TypertRemoteService {
             .map((b) => b.text)
             .join("")
         : undefined);
+    const execution = agent ? this.moa.lifecycle(agent) : undefined;
     return {
       workerId: id,
+      ...(parentSessionId ? { parentSessionId } : {}),
       name: worker.name,
       lifecycle: worker.lifecycle,
       status,
@@ -550,6 +723,10 @@ export default class ProjectMode extends TypertRemoteService {
           ? "failed"
           : worker.lifecycle === "provisioning"
             ? "starting"
+            : execution === "Aborting"
+              ? "stopping"
+              : execution === "Waiting"
+                ? "waiting-user"
             : availability === "unavailable"
               ? "disconnected"
               : status === "busy"
@@ -568,14 +745,11 @@ export default class ProjectMode extends TypertRemoteService {
   private ingest(id: SessionId) {
     return this.outbox.ingest(id);
   }
-  private consume(id: SessionId, messageId: string) {
-    return this.outbox.consume(id, messageId);
-  }
   private deliver(id: SessionId) {
     return this.outbox.deliver(id);
   }
-  private guardTurn(agent: Agent, turn: number, signal: AbortSignal) {
-    return this.turns.guardTurn(agent, turn, signal);
+  private guardTurn(agent: Agent, signal: AbortSignal) {
+    return this.turns.guardTurn(agent, signal);
   }
   private freezeTurn(id: SessionId, turn: number, reason: string) {
     return this.turns.freezeTurn(id, turn, reason);
@@ -583,7 +757,7 @@ export default class ProjectMode extends TypertRemoteService {
   @Remote("snapshot")
   async snapshot(sessionId: SessionId): Promise<ProjectSnapshot | null> {
     this.authorize(sessionId);
-    await this.jobs;
+    await (this.projectJobs.get(sessionId) ?? Promise.resolve());
     const r = this.record(sessionId);
     if (!r) return null;
     const members = r.workers.filter(isVisibleWorker),
@@ -630,6 +804,16 @@ export default class ProjectMode extends TypertRemoteService {
         iteration.abort();
       }
     }
+  }
+
+  @Remote({ name: "followWorkerParent", mode: "stream" })
+  async *followWorkerParent(
+    sessionId: SessionId,
+    workerId: SessionId,
+    signal: AbortSignal,
+  ): AsyncIterable<WorkerParentReady> {
+    this.authorize(sessionId);
+    yield* followWorkerParent(this.access, sessionId, workerId, signal);
   }
 
   @Remote("catalog")

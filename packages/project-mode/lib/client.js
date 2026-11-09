@@ -30,7 +30,7 @@ window.__ModuleLoader__.load({
 		let zod = require("zod");
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
-		// ../../../../../node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
+		// ../../node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
 		/** Lazy assembly of generated Remote definitions using caller-supplied Zod; no runtime imports. */
 		/**
 		* Retain one generated definition per endpoint without constructing parsers or projections.
@@ -198,7 +198,8 @@ window.__ModuleLoader__.load({
 					"root": zod.z.string(),
 					"context": zod.z.string(),
 					"notes": zod.z.string(),
-					"archived": zod.z.string()
+					"archived": zod.z.string(),
+					"index": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("New index; older records are resolved without rewriting their documents.")
 				}),
 				"mode": zod.z.union([zod.z.literal("enabled"), zod.z.literal("disabled")]),
 				"modeLocked": zod.z.union([
@@ -212,6 +213,7 @@ window.__ModuleLoader__.load({
 			}),
 			"workers": zod.z.array(zod.z.object({
 				"workerId": zod.z.string(),
+				"parentSessionId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Actual native direct parent; older direct-child snapshots omit this field."),
 				"name": zod.z.string(),
 				"lifecycle": zod.z.union([
 					zod.z.literal("provisioning"),
@@ -237,6 +239,7 @@ window.__ModuleLoader__.load({
 					zod.z.literal("starting"),
 					zod.z.literal("working"),
 					zod.z.literal("waiting-user"),
+					zod.z.literal("stopping"),
 					zod.z.literal("failed"),
 					zod.z.literal("stopped"),
 					zod.z.literal("disconnected")
@@ -330,7 +333,8 @@ window.__ModuleLoader__.load({
 					zod.z.literal("deleted"),
 					zod.z.literal("failed"),
 					zod.z.literal("stopped"),
-					zod.z.literal("completed")
+					zod.z.literal("completed"),
+					zod.z.literal("continued")
 				]),
 				"completionIds": zod.z.array(zod.z.string()),
 				"lastResultMessageId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional(),
@@ -405,6 +409,7 @@ window.__ModuleLoader__.load({
 		const dsh_plugin_project_mode_projectMode_control_result$schema = () => dsh_plugin_project_mode_projectMode_control_result$schema$value ??= zod.z.union([
 			zod.z.object({
 				"workerId": zod.z.string(),
+				"parentSessionId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Actual native direct parent; older direct-child snapshots omit this field."),
 				"name": zod.z.string(),
 				"lifecycle": zod.z.union([
 					zod.z.literal("provisioning"),
@@ -430,6 +435,7 @@ window.__ModuleLoader__.load({
 					zod.z.literal("starting"),
 					zod.z.literal("working"),
 					zod.z.literal("waiting-user"),
+					zod.z.literal("stopping"),
 					zod.z.literal("failed"),
 					zod.z.literal("stopped"),
 					zod.z.literal("disconnected")
@@ -498,6 +504,7 @@ window.__ModuleLoader__.load({
 			}),
 			zod.z.array(zod.z.object({
 				"workerId": zod.z.string(),
+				"parentSessionId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Actual native direct parent; older direct-child snapshots omit this field."),
 				"name": zod.z.string(),
 				"lifecycle": zod.z.union([
 					zod.z.literal("provisioning"),
@@ -523,6 +530,7 @@ window.__ModuleLoader__.load({
 					zod.z.literal("starting"),
 					zod.z.literal("working"),
 					zod.z.literal("waiting-user"),
+					zod.z.literal("stopping"),
 					zod.z.literal("failed"),
 					zod.z.literal("stopped"),
 					zod.z.literal("disconnected")
@@ -642,7 +650,8 @@ window.__ModuleLoader__.load({
 						"root": zod.z.string(),
 						"context": zod.z.string(),
 						"notes": zod.z.string(),
-						"archived": zod.z.string()
+						"archived": zod.z.string(),
+						"index": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("New index; older records are resolved without rewriting their documents.")
 					}),
 					"mode": zod.z.union([zod.z.literal("enabled"), zod.z.literal("disabled")]),
 					"modeLocked": zod.z.union([
@@ -656,6 +665,7 @@ window.__ModuleLoader__.load({
 				}),
 				"workers": zod.z.array(zod.z.object({
 					"workerId": zod.z.string(),
+					"parentSessionId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Actual native direct parent; older direct-child snapshots omit this field."),
 					"name": zod.z.string(),
 					"lifecycle": zod.z.union([
 						zod.z.literal("provisioning"),
@@ -681,6 +691,7 @@ window.__ModuleLoader__.load({
 						zod.z.literal("starting"),
 						zod.z.literal("working"),
 						zod.z.literal("waiting-user"),
+						zod.z.literal("stopping"),
 						zod.z.literal("failed"),
 						zod.z.literal("stopped"),
 						zod.z.literal("disconnected")
@@ -774,7 +785,8 @@ window.__ModuleLoader__.load({
 						zod.z.literal("deleted"),
 						zod.z.literal("failed"),
 						zod.z.literal("stopped"),
-						zod.z.literal("completed")
+						zod.z.literal("completed"),
+						zod.z.literal("continued")
 					]),
 					"completionIds": zod.z.array(zod.z.string()),
 					"lastResultMessageId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional(),
@@ -806,6 +818,15 @@ window.__ModuleLoader__.load({
 				"streamEpoch": zod.z.string(),
 				"revision": zod.z.number()
 			})
+		});
+		let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema$value;
+		const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema = () => dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema$value ??= zod.z.string();
+		let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema$value;
+		const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema = () => dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema$value ??= zod.z.string();
+		let dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema$value;
+		const dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema = () => dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema$value ??= zod.z.object({
+			"workerId": zod.z.string(),
+			"parentSessionId": zod.z.string()
 		});
 		let dsh_plugin_project_mode_projectMode_history_parameter_0$schema$value;
 		const dsh_plugin_project_mode_projectMode_history_parameter_0$schema = () => dsh_plugin_project_mode_projectMode_history_parameter_0$schema$value ??= zod.z.string();
@@ -858,7 +879,8 @@ window.__ModuleLoader__.load({
 				"root": zod.z.string(),
 				"context": zod.z.string(),
 				"notes": zod.z.string(),
-				"archived": zod.z.string()
+				"archived": zod.z.string(),
+				"index": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("New index; older records are resolved without rewriting their documents.")
 			})]).optional(),
 			"revision": zod.z.number(),
 			"canToggle": zod.z.boolean(),
@@ -900,7 +922,8 @@ window.__ModuleLoader__.load({
 				"root": zod.z.string(),
 				"context": zod.z.string(),
 				"notes": zod.z.string(),
-				"archived": zod.z.string()
+				"archived": zod.z.string(),
+				"index": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("New index; older records are resolved without rewriting their documents.")
 			})]).optional(),
 			"revision": zod.z.number(),
 			"canToggle": zod.z.boolean(),
@@ -928,7 +951,8 @@ window.__ModuleLoader__.load({
 					"root": zod.z.string(),
 					"context": zod.z.string(),
 					"notes": zod.z.string(),
-					"archived": zod.z.string()
+					"archived": zod.z.string(),
+					"index": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("New index; older records are resolved without rewriting their documents.")
 				}),
 				"mode": zod.z.union([zod.z.literal("enabled"), zod.z.literal("disabled")]),
 				"modeLocked": zod.z.union([
@@ -942,6 +966,7 @@ window.__ModuleLoader__.load({
 			}),
 			"workers": zod.z.array(zod.z.object({
 				"workerId": zod.z.string(),
+				"parentSessionId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Actual native direct parent; older direct-child snapshots omit this field."),
 				"name": zod.z.string(),
 				"lifecycle": zod.z.union([
 					zod.z.literal("provisioning"),
@@ -967,6 +992,7 @@ window.__ModuleLoader__.load({
 					zod.z.literal("starting"),
 					zod.z.literal("working"),
 					zod.z.literal("waiting-user"),
+					zod.z.literal("stopping"),
 					zod.z.literal("failed"),
 					zod.z.literal("stopped"),
 					zod.z.literal("disconnected")
@@ -1060,7 +1086,8 @@ window.__ModuleLoader__.load({
 					zod.z.literal("deleted"),
 					zod.z.literal("failed"),
 					zod.z.literal("stopped"),
-					zod.z.literal("completed")
+					zod.z.literal("completed"),
+					zod.z.literal("continued")
 				]),
 				"completionIds": zod.z.array(zod.z.string()),
 				"lastResultMessageId": zod.z.union([zod.z.undefined(), zod.z.string()]).optional(),
@@ -1123,7 +1150,8 @@ window.__ModuleLoader__.load({
 					"actor": zod.z.union([
 						zod.z.undefined(),
 						zod.z.literal("user"),
-						zod.z.literal("coordinator")
+						zod.z.literal("coordinator"),
+						zod.z.literal("agent")
 					]).optional()
 				})),
 				"outputs": zod.z.array(zod.z.object({
@@ -1134,7 +1162,8 @@ window.__ModuleLoader__.load({
 					"actor": zod.z.union([
 						zod.z.undefined(),
 						zod.z.literal("user"),
-						zod.z.literal("coordinator")
+						zod.z.literal("coordinator"),
+						zod.z.literal("agent")
 					]).optional()
 				})),
 				"artifacts": zod.z.array(zod.z.object({
@@ -1187,6 +1216,10 @@ window.__ModuleLoader__.load({
 		const dsh_plugin_project_mode_projectMode_control_parameter_2_strict$schema = () => dsh_plugin_project_mode_projectMode_control_parameter_2_strict$schema$value ??= zod.z.string();
 		let dsh_plugin_project_mode_projectMode_follow_parameter_0_strict$schema$value;
 		const dsh_plugin_project_mode_projectMode_follow_parameter_0_strict$schema = () => dsh_plugin_project_mode_projectMode_follow_parameter_0_strict$schema$value ??= zod.z.string();
+		let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema$value;
+		const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema = () => dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema$value ??= zod.z.string();
+		let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema$value;
+		const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema = () => dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema$value ??= zod.z.string();
 		let dsh_plugin_project_mode_projectMode_history_parameter_0_strict$schema$value;
 		const dsh_plugin_project_mode_projectMode_history_parameter_0_strict$schema = () => dsh_plugin_project_mode_projectMode_history_parameter_0_strict$schema$value ??= zod.z.string();
 		let dsh_plugin_project_mode_projectMode_history_parameter_1_strict$schema$value;
@@ -1246,7 +1279,11 @@ window.__ModuleLoader__.load({
 													"root": { "type": "string" },
 													"context": { "type": "string" },
 													"notes": { "type": "string" },
-													"archived": { "type": "string" }
+													"archived": { "type": "string" },
+													"index": {
+														"type": "string",
+														"description": "New index; older records are resolved without rewriting their documents."
+													}
 												},
 												"required": [
 													"root",
@@ -1288,6 +1325,10 @@ window.__ModuleLoader__.load({
 											"type": "object",
 											"properties": {
 												"workerId": { "type": "string" },
+												"parentSessionId": {
+													"type": "string",
+													"description": "Actual native direct parent; older direct-child snapshots omit this field."
+												},
 												"name": { "type": "string" },
 												"lifecycle": {
 													"type": "string",
@@ -1329,6 +1370,7 @@ window.__ModuleLoader__.load({
 														"starting",
 														"working",
 														"waiting-user",
+														"stopping",
 														"failed",
 														"stopped",
 														"disconnected"
@@ -1552,7 +1594,8 @@ window.__ModuleLoader__.load({
 														"deleted",
 														"failed",
 														"stopped",
-														"completed"
+														"completed",
+														"continued"
 													]
 												},
 												"completionIds": {
@@ -1658,7 +1701,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 636,
+						"line": 820,
 						"column": 9
 					}
 				},
@@ -1936,7 +1979,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 652,
+						"line": 836,
 						"column": 9
 					}
 				},
@@ -1992,7 +2035,11 @@ window.__ModuleLoader__.load({
 														"root": { "type": "string" },
 														"context": { "type": "string" },
 														"notes": { "type": "string" },
-														"archived": { "type": "string" }
+														"archived": { "type": "string" },
+														"index": {
+															"type": "string",
+															"description": "New index; older records are resolved without rewriting their documents."
+														}
 													},
 													"required": [
 														"root",
@@ -2034,6 +2081,10 @@ window.__ModuleLoader__.load({
 												"type": "object",
 												"properties": {
 													"workerId": { "type": "string" },
+													"parentSessionId": {
+														"type": "string",
+														"description": "Actual native direct parent; older direct-child snapshots omit this field."
+													},
 													"name": { "type": "string" },
 													"lifecycle": {
 														"type": "string",
@@ -2075,6 +2126,7 @@ window.__ModuleLoader__.load({
 															"starting",
 															"working",
 															"waiting-user",
+															"stopping",
 															"failed",
 															"stopped",
 															"disconnected"
@@ -2298,7 +2350,8 @@ window.__ModuleLoader__.load({
 															"deleted",
 															"failed",
 															"stopped",
-															"completed"
+															"completed",
+															"continued"
 														]
 													},
 													"completionIds": {
@@ -2407,7 +2460,63 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 609,
+						"line": 783,
+						"column": 10
+					}
+				},
+				"projectMode/followWorkerParent": {
+					service: "projectMode",
+					mode: "stream",
+					invocation: { kind: "direct" },
+					parameters: [{
+						name: "sessionId",
+						source: "json",
+						codec: {
+							mode: "strict",
+							typeSymbol: "@deepseek-ai/dsh-session/types#SessionId",
+							create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema,
+							jsonSchema: { "type": "string" }
+						},
+						strictCodec: {
+							mode: "strict",
+							typeSymbol: "@deepseek-ai/dsh-session/types#SessionId",
+							create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema,
+							jsonSchema: { "type": "string" }
+						}
+					}, {
+						name: "workerId",
+						source: "json",
+						codec: {
+							mode: "strict",
+							typeSymbol: "@deepseek-ai/dsh-session/types#SessionId",
+							create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema,
+							jsonSchema: { "type": "string" }
+						},
+						strictCodec: {
+							mode: "strict",
+							typeSymbol: "@deepseek-ai/dsh-session/types#SessionId",
+							create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema,
+							jsonSchema: { "type": "string" }
+						}
+					}],
+					cancellation: { parameter: "signal" },
+					result: {
+						mode: "strict",
+						typeSymbol: "dsh-plugin-project-mode/shared#WorkerParentReady",
+						create: dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema,
+						jsonSchema: {
+							"type": "object",
+							"properties": {
+								"workerId": { "type": "string" },
+								"parentSessionId": { "type": "string" }
+							},
+							"required": ["workerId", "parentSessionId"],
+							"additionalProperties": true
+						}
+					},
+					sourceLocation: {
+						"file": "packages/project-mode/src/host/index.ts",
+						"line": 810,
 						"column": 10
 					}
 				},
@@ -2544,7 +2653,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 664,
+						"line": 848,
 						"column": 9
 					}
 				},
@@ -2596,7 +2705,11 @@ window.__ModuleLoader__.load({
 										"root": { "type": "string" },
 										"context": { "type": "string" },
 										"notes": { "type": "string" },
-										"archived": { "type": "string" }
+										"archived": { "type": "string" },
+										"index": {
+											"type": "string",
+											"description": "New index; older records are resolved without rewriting their documents."
+										}
 									},
 									"required": [
 										"root",
@@ -2632,7 +2745,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 718,
+						"line": 902,
 						"column": 3
 					}
 				},
@@ -2734,7 +2847,11 @@ window.__ModuleLoader__.load({
 										"root": { "type": "string" },
 										"context": { "type": "string" },
 										"notes": { "type": "string" },
-										"archived": { "type": "string" }
+										"archived": { "type": "string" },
+										"index": {
+											"type": "string",
+											"description": "New index; older records are resolved without rewriting their documents."
+										}
 									},
 									"required": [
 										"root",
@@ -2770,7 +2887,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 723,
+						"line": 907,
 						"column": 9
 					}
 				},
@@ -2820,7 +2937,11 @@ window.__ModuleLoader__.load({
 												"root": { "type": "string" },
 												"context": { "type": "string" },
 												"notes": { "type": "string" },
-												"archived": { "type": "string" }
+												"archived": { "type": "string" },
+												"index": {
+													"type": "string",
+													"description": "New index; older records are resolved without rewriting their documents."
+												}
 											},
 											"required": [
 												"root",
@@ -2862,6 +2983,10 @@ window.__ModuleLoader__.load({
 										"type": "object",
 										"properties": {
 											"workerId": { "type": "string" },
+											"parentSessionId": {
+												"type": "string",
+												"description": "Actual native direct parent; older direct-child snapshots omit this field."
+											},
 											"name": { "type": "string" },
 											"lifecycle": {
 												"type": "string",
@@ -2903,6 +3028,7 @@ window.__ModuleLoader__.load({
 													"starting",
 													"working",
 													"waiting-user",
+													"stopping",
 													"failed",
 													"stopped",
 													"disconnected"
@@ -3126,7 +3252,8 @@ window.__ModuleLoader__.load({
 													"deleted",
 													"failed",
 													"stopped",
-													"completed"
+													"completed",
+													"continued"
 												]
 											},
 											"completionIds": {
@@ -3231,7 +3358,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 584,
+						"line": 758,
 						"column": 9
 					}
 				},
@@ -3332,7 +3459,11 @@ window.__ModuleLoader__.load({
 														"text": { "type": "string" },
 														"actor": {
 															"type": "string",
-															"enum": ["user", "coordinator"]
+															"enum": [
+																"user",
+																"coordinator",
+																"agent"
+															]
 														}
 													},
 													"required": [
@@ -3355,7 +3486,11 @@ window.__ModuleLoader__.load({
 														"text": { "type": "string" },
 														"actor": {
 															"type": "string",
-															"enum": ["user", "coordinator"]
+															"enum": [
+																"user",
+																"coordinator",
+																"agent"
+															]
 														}
 													},
 													"required": [
@@ -3416,7 +3551,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 687,
+						"line": 871,
 						"column": 10
 					}
 				}
@@ -3508,11 +3643,11 @@ window.__ModuleLoader__.load({
 						key: `${sessionId}:${turn}:${m.segmentStartSeq === void 0 ? "" : `${m.segmentStartSeq}:`}${m.workerId}`,
 						workerId: m.workerId,
 						name: w?.name ?? m.workerId,
-						status: closed ? outcome.status : w.phase,
-						text: closed ? outcome.summary : w.progressText,
-						queueLength: closed ? null : w.queueLength,
+						status: closed && outcome.status !== "continued" ? outcome.status : w.phase,
+						text: closed && outcome.status !== "continued" ? outcome.summary : w.progressText,
+						queueLength: closed && outcome.status !== "continued" ? null : w.queueLength,
 						address: {
-							parentSessionId: sessionId,
+							parentSessionId: w?.parentSessionId ?? sessionId,
 							childSessionId: m.workerId,
 							mode: "continuable"
 						}
@@ -3552,6 +3687,11 @@ window.__ModuleLoader__.load({
 			connectionVersion = 0;
 			constructor(remote) {
 				this.remote = remote;
+			}
+			followWorkerParent(workerId, signal) {
+				const project = this.store.projects().find((project) => project.project.mode === "enabled" && project.workers.some((worker) => worker.workerId === workerId && worker.lifecycle === "active"));
+				if (!project) throw new Error("project-mode/not-owned");
+				return this.remote.followWorkerParent(project.project.coordinatorSessionId, workerId, signal);
 			}
 			subscribeModes = (listener) => {
 				this.modeListeners.add(listener);
@@ -3751,12 +3891,22 @@ window.__ModuleLoader__.load({
 		/** Native child input needs its parent Agent; opening the parent restores it without a prompt. */
 		function bindWorkerParents(client, sessions) {
 			const held = /* @__PURE__ */ new Map();
+			const nested = /* @__PURE__ */ new Map();
+			const releaseNested = (slot) => {
+				slot.abort.abort();
+				slot.stream?.dispose();
+			};
 			const reconcile = () => {
 				const { byId } = sessions.list.getSnapshot();
 				const needed = /* @__PURE__ */ new Set();
+				const neededNested = /* @__PURE__ */ new Set();
 				for (const project of client.store.projects()) {
 					if (project.project.mode !== "enabled") continue;
-					if (project.workers.some((worker) => worker.lifecycle === "active" && Object.entries(byId[worker.workerId]?.retainedBy ?? {}).some(([source, count]) => (source === "mainView" || source === "sidebarChat") && count > 0))) needed.add(project.project.coordinatorSessionId);
+					for (const worker of project.workers) {
+						if (worker.lifecycle !== "active" || !Object.entries(byId[worker.workerId]?.retainedBy ?? {}).some(([source, count]) => (source === "mainView" || source === "sidebarChat") && count > 0)) continue;
+						needed.add(project.project.coordinatorSessionId);
+						if (worker.parentSessionId && worker.parentSessionId !== project.project.coordinatorSessionId) neededNested.add(worker.workerId);
+					}
 				}
 				for (const [id, lease] of held) {
 					if (needed.has(id)) continue;
@@ -3777,16 +3927,43 @@ window.__ModuleLoader__.load({
 						console.error("Project Mode: parent acquisition failed", error);
 					}
 				}
+				for (const [id, slot] of nested) {
+					if (neededNested.has(id) && slot.version === client.connectionVersion) continue;
+					nested.delete(id);
+					releaseNested(slot);
+				}
+				for (const id of neededNested) {
+					if (nested.has(id)) continue;
+					const slot = {
+						abort: new AbortController(),
+						version: client.connectionVersion
+					};
+					nested.set(id, slot);
+					(async () => {
+						try {
+							slot.stream = client.followWorkerParent(id, slot.abort.signal);
+							for await (const _ready of slot.stream) if (slot.abort.signal.aborted) return;
+						} catch (error) {
+							if (!slot.abort.signal.aborted) console.error("MoA+: nested parent opening failed", error);
+						}
+					})();
+				}
 			};
-			const unsubscribe = [client.store.subscribe(reconcile), sessions.list.subscribe(reconcile)];
+			const unsubscribe = [
+				client.store.subscribe(reconcile),
+				sessions.list.subscribe(reconcile),
+				client.subscribeModes(reconcile)
+			];
 			reconcile();
 			return () => {
 				for (const off of unsubscribe) off();
 				for (const lease of held.values()) lease.reference?.release();
 				held.clear();
+				for (const slot of nested.values()) releaseNested(slot);
+				nested.clear();
 			};
 		}
-		// ../../../../../node_modules/@deepseek-ai/dsh-util-workspace-path/lib/index.js
+		// ../../node_modules/@deepseek-ai/dsh-util-workspace-path/lib/index.js
 		/**
 		* The `dsh-resource://file/…` address grammar: how a file is named across the
 		* Sidebar and the resource model, built and parsed without touching a
@@ -3871,7 +4048,7 @@ window.__ModuleLoader__.load({
 				};
 			}
 		}
-		/** A known continuation must establish ownership before enabling its input. */
+		/** Override native input only for established, inactive Project membership. */
 		function composerMatch(owner, client) {
 			const address = owner.session?.subagent?.address;
 			if (!address || address.mode !== "continuable" || !owner.sessionId) return null;
@@ -3881,14 +4058,15 @@ window.__ModuleLoader__.load({
 				id,
 				...readonly
 			};
-			if (projects.find((p) => p.workers.some((w) => w.workerId === id))) return null;
-			const mode = client.mode(id);
-			if (mode.value?.role === "ordinary" || mode.value?.role === "coordinator") return null;
-			return {
+			if (projects.some((p) => p.workers.some((w) => w.workerId === id))) return null;
+			const mode = client.mode(id).value;
+			const project = client.store.project(parent);
+			if (mode?.role === "worker" && mode.coordinatorSessionId === parent && project) return {
 				id,
 				parent,
-				reason: mode.error || client.catalogState === "error" || mode.value?.role === "worker" && client.catalogState === "ready" ? "unavailable" : "pending"
+				reason: project.project.mode === "disabled" ? "disabled" : "deleted"
 			};
+			return null;
 		}
 		// src/shared/worker-membership.ts
 		/** Public membership excludes removed Workers and creation-only placeholders. */
@@ -4142,6 +4320,7 @@ window.__ModuleLoader__.load({
 			const [chosen, choose] = react.useState();
 			const axisRef = react.useRef(null);
 			const workers = (project?.workers ?? []).filter(isVisibleWorker), worker = workers.find((w) => w.workerId === chosen) ?? workers[0];
+			const nativeReady = worker?.lifecycle === "active" && worker.availability === "live";
 			const [windowSize, setWindowSize] = react.useState(10), [retry, setRetry] = react.useState(0);
 			const [state, setState] = react.useState();
 			const labels = react.useMemo(() => ({
@@ -4164,7 +4343,8 @@ window.__ModuleLoader__.load({
 					} catch (error) {
 						if (!signal.aborted) setState({
 							workerId: worker.workerId,
-							error: error instanceof Error ? error.message : String(error)
+							error: error instanceof Error ? error.message : String(error),
+							readyWhenFailed: nativeReady
 						});
 					} finally {
 						stream.dispose();
@@ -4185,6 +4365,14 @@ window.__ModuleLoader__.load({
 				generation
 			]);
 			const current = state?.workerId === worker?.workerId ? state : void 0, page = current?.page;
+			react.useEffect(() => {
+				if (current?.error && current.readyWhenFailed === false && nativeReady) setRetry((value) => value + 1);
+			}, [
+				worker?.workerId,
+				current?.error,
+				current?.readyWhenFailed,
+				nativeReady
+			]);
 			if (!workers.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "pm-workers-panel pm-workers-panel-empty",
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: panelStyles }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
@@ -4196,10 +4384,10 @@ window.__ModuleLoader__.load({
 				className: "pm-workers-panel",
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: panelStyles }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("nav", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("nav", {
 						className: "pm-workers-list",
 						"aria-label": t("workers"),
-						children: [workers.map((w) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+						children: workers.map((w) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 							type: "button",
 							"aria-pressed": w.workerId === worker?.workerId,
 							onClick: () => {
@@ -4210,7 +4398,7 @@ window.__ModuleLoader__.load({
 							title: w.name,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 								className: "pm-panel-worker-icon",
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerIcon, { workerId: w.workerId }), (w.phase === "working" || w.phase === "starting") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerIcon, { workerId: w.workerId }), (w.phase === "working" || w.phase === "starting" || w.phase === "stopping") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
 									state: "ongoing",
 									size: 22,
 									className: "pm-panel-running"
@@ -4225,10 +4413,7 @@ window.__ModuleLoader__.load({
 									children: t(w.phase)
 								})]
 							})]
-						}, w.workerId)), !workers.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-							className: "pm-axis-empty",
-							children: t("noWorkers")
-						})]
+						}, w.workerId))
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						ref: axisRef,
@@ -4238,16 +4423,12 @@ window.__ModuleLoader__.load({
 							worker && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("header", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: worker.name }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								onClick: () => open({
-									parentSessionId: project.project.coordinatorSessionId,
+									parentSessionId: worker.parentSessionId ?? project.project.coordinatorSessionId,
 									childSessionId: worker.workerId,
 									mode: "continuable"
 								}),
 								children: t("openConversation")
 							})] }),
-							!worker && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-								className: "pm-axis-empty",
-								children: t("selectWorker")
-							}),
 							worker && !page && !current?.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								className: "pm-axis-empty",
 								children: t("loadingTimeline")
@@ -4275,7 +4456,7 @@ window.__ModuleLoader__.load({
 											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt }),
 											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 												className: "pm-axis-outcome",
-												children: t(turn.outcome === null ? "working" : turn.outcome === "completed" ? "completed" : turn.outcome === "aborted" ? "stopped" : "failed")
+												children: t(turn.outcome === null ? "working" : turn.outcome === "handoff" ? "continued" : turn.outcome === "completed" ? "completed" : turn.outcome === "aborted" ? "stopped" : "failed")
 											})
 										]
 									}),
@@ -4287,7 +4468,7 @@ window.__ModuleLoader__.load({
 												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time }),
 												" ·",
 												" ",
-												t(message.actor === "coordinator" ? "fromCoordinator" : "fromUser"),
+												t(message.actor === "coordinator" ? "fromCoordinator" : message.actor === "agent" ? "fromAgent" : "fromUser"),
 												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
 													text: message.text,
 													labels
@@ -4451,6 +4632,14 @@ window.__ModuleLoader__.load({
 			}));
 		}
 		// src/client/tail.ts
+		function incoming(event) {
+			if (event.type !== "user/message" || event.surfaceOp !== "append") return;
+			const source = event.data.source;
+			if (source.kind === "moa-message" || source.kind === "project-mode-result" || source.kind === "project-mode-assignment") return {
+				source: event.data.source,
+				content: event.data.content
+			};
+		}
 		/** Human inputs split transcript placement without changing the native turn. */
 		const humanBoundaryDefinition = {
 			kind: "project-mode-human-boundary",
@@ -4470,9 +4659,10 @@ window.__ModuleLoader__.load({
 			kind: "project-mode-workers-tail",
 			target: "chat",
 			match(event) {
-				if (event.type === "user/message" && event.data.source.kind === "project-mode-result") return {
-					id: `result:${event.data.id}`,
-					role: "start"
+				if (event.type === "user/message" && incoming(event)) return {
+					id: `${event.data.source.kind === "project-mode-result" ? "result" : "message"}:${event.data.id}`,
+					role: "start",
+					exclusive: true
 				};
 				if (event.type !== "assistant/live-chunk" && event.type !== "assistant/message" && event.type !== "tool/call" && event.type !== "tool/result") return null;
 				if (!("turn" in event.data) || !("step" in event.data) || typeof event.data.turn !== "number" || typeof event.data.step !== "number") return null;
@@ -4483,6 +4673,7 @@ window.__ModuleLoader__.load({
 			},
 			start: (_context, match, reader) => ({
 				seq: match.event.seq,
+				...incoming(match.event) ? { incoming: incoming(match.event) } : {},
 				segmentStartSeq: reader.previous(humanBoundaryDefinition.kind)?.state.seq ?? (match.location.kind === "turn" || match.location.kind === "step" ? match.location.turn.start?.seq : void 0) ?? 0
 			}),
 			update: (context, match) => ({
@@ -4492,7 +4683,7 @@ window.__ModuleLoader__.load({
 			publication: (match) => match.event.type === "assistant/live-chunk" ? "animation-frame" : "immediate",
 			buildViewNode(context) {
 				const location = [context.start, ...context.matches].find((match) => match?.location.kind === "step")?.location;
-				if (location?.kind !== "step" || !context.state) {
+				if (!context.state || location?.kind !== "step" && !context.state.incoming) {
 					const previous = context.current.get("chat");
 					return previous ? {
 						...previous,
@@ -4505,23 +4696,24 @@ window.__ModuleLoader__.load({
 					kind: "project-mode-workers-tail",
 					target: "chat",
 					anchorSeq: context.state.seq + .2,
-					location: {
+					location: location?.kind === "step" ? {
 						kind: "turn",
 						turn: location.turn
-					},
+					} : context.start?.location ?? { kind: "unresolved" },
 					visibility: "visible",
-					groupTree: "turn",
+					groupTree: context.state.incoming ? "input" : "turn",
 					data: {
-						turn: location.turn.turn,
-						step: location.step.step,
-						segmentStartSeq: context.state.segmentStartSeq
+						turn: location?.kind === "step" ? location.turn.turn : 0,
+						step: location?.kind === "step" ? location.step.step : 0,
+						segmentStartSeq: context.state.segmentStartSeq,
+						...context.state.incoming ? { incoming: context.state.incoming } : {}
 					}
 				};
 			}
 		};
 		/** Pick exactly one native seat at the bottom of each human transcript segment. */
 		function segmentTail(snapshot, node) {
-			if (node.visibility !== "visible") return null;
+			if (node.visibility !== "visible" || node.data.turn === 0) return null;
 			const { turn, segmentStartSeq } = node.data;
 			return snapshot.nodes.values().filter((candidate) => candidate.kind === "project-mode-workers-tail" && candidate.visibility === "visible" && candidate.data.turn === turn && candidate.data.segmentStartSeq === segmentStartSeq).reduce((latest, candidate) => !latest || candidate.anchorSeq > latest.anchorSeq ? candidate : latest, void 0)?.key === node.key ? {
 				turn,
@@ -4553,6 +4745,11 @@ window.__ModuleLoader__.load({
 .pm-capsules{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0}.pm-capsules>li{display:flex;min-width:0;max-width:100%}.pm-capsule{box-sizing:border-box;display:inline-flex;min-width:0;max-width:min(100%,240px);height:28px;gap:6px;align-items:center;text-align:left;border:1px solid var(--dsw-alias-border-l4);border-radius:999px;padding:4px 8px;font-size:12px;line-height:18px}.pm-capsule strong{min-width:0;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.pm-progress{min-width:0;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary)}
 .pm-worker-icon{display:block;flex:0 0 auto;width:24px;height:24px}
 .pm-capsule .pm-worker-icon{width:16px;height:16px}
+.pm-agent-message{margin:12px 0;color:var(--dsw-alias-label-primary);font:inherit;min-width:0}
+.pm-agent-message>header{color:var(--dsw-alias-label-secondary);font-size:12px;margin-bottom:6px}
+.pm-agent-message .pm-axis-preview{margin-top:4px}.pm-agent-message .pm-axis-preview>summary{display:block;list-style:none;cursor:pointer}.pm-agent-message .pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-agent-message .pm-axis-preview>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;border-radius:3px}
+.pm-agent-message .pm-axis-preview:not([open])>summary{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--dsw-alias-label-secondary,#999)}
+.pm-agent-empty{color:var(--dsw-alias-label-tertiary)}
 `;
 		// src/client/components.tsx
 		function WorkerCapsuleList({ client, sessionId, turn, closed, segmentStartSeq, open, t }) {
@@ -4652,8 +4849,9 @@ window.__ModuleLoader__.load({
 		/** Add only the disclosure and children; DSH renders every row and the browser. */
 		function ProjectBranch(p) {
 			const archived = p.useWorkspaces((state) => state.archivedSessionIds);
-			const workers = useSelected(p.client.store.subscribe, () => (p.client.store.project(p.sessionId)?.workers ?? []).filter((w) => isVisibleWorker(w) && !archived.includes(w.workerId)).map(({ workerId, name, phase }) => ({
+			const workers = useSelected(p.client.store.subscribe, () => (p.client.store.project(p.sessionId)?.workers ?? []).filter((w) => isVisibleWorker(w) && !archived.includes(w.workerId)).map(({ workerId, parentSessionId, name, phase }) => ({
 				workerId,
+				parentSessionId,
 				name,
 				phase
 			})));
@@ -4727,7 +4925,7 @@ window.__ModuleLoader__.load({
 							title: w.name,
 							icon: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 								className: "pm-worker-identity",
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerIcon, { workerId: w.workerId }), (w.phase === "working" || w.phase === "starting") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerIcon, { workerId: w.workerId }), (w.phase === "working" || w.phase === "starting" || w.phase === "stopping") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
 									state: "ongoing",
 									size: 22,
 									className: "pm-worker-running"
@@ -4736,7 +4934,7 @@ window.__ModuleLoader__.load({
 							trailing: p.t(w.phase),
 							selected: p.currentSessionId === w.workerId,
 							onOpen: () => p.open({
-								parentSessionId: p.sessionId,
+								parentSessionId: w.parentSessionId ?? p.sessionId,
 								childSessionId: w.workerId,
 								mode: "continuable"
 							})
@@ -4786,7 +4984,11 @@ window.__ModuleLoader__.load({
 			timelineOutputs: "Output",
 			timelineArtifacts: "Artifacts",
 			fromCoordinator: "Coordinator",
+			fromAgent: "Agent",
 			fromUser: "User",
+			messageFrom: "From {name}",
+			messageContent: "Message content",
+			truncatedContent: "… {count} characters",
 			awaitingReply: "Awaiting a reply…",
 			emptyReply: "No AI reply in this turn",
 			noArtifacts: "No recorded artifacts",
@@ -4795,29 +4997,29 @@ window.__ModuleLoader__.load({
 			copy: "Copy",
 			copied: "Copied",
 			footnotes: "Footnotes",
-			project: "Project",
-			enabling: "Updating Project…",
-			loading: "Loading Project…",
+			project: "MoA+",
+			enabling: "Updating MoA+…",
+			loading: "Loading MoA+…",
 			parent: "Back",
-			readonlyPending: "Loading worker ownership…",
-			readonlyUnavailable: "Worker ownership is unavailable. Retry to continue.",
 			readonlyDeleted: "This worker was deleted. Its conversation history is retained.",
-			readonlyDisabled: "Project is disabled. This worker is read-only.",
+			readonlyDisabled: "MoA+ is disabled. This worker is read-only.",
 			"blocked.agent-running": "Wait for the current turn to finish.",
-			"blocked.session-mode-locked": "This conversation keeps Project mode after starting.",
+			"blocked.session-mode-locked": "This conversation keeps MoA+ mode after starting.",
 			"blocked.workers-active": "Workers are still active.",
 			"blocked.results-pending": "Worker results are awaiting review.",
 			"blocked.worker-session": "Workers belong to their coordinator.",
-			"blocked.runtime-unavailable": "Project runtime is unavailable.",
+			"blocked.runtime-unavailable": "MoA+ runtime is unavailable.",
 			error: "Could not complete the action: {message}",
 			working: "Working",
 			starting: "Starting",
-			"waiting-user": "Waiting for input",
+			"waiting-user": "Waiting",
+			stopping: "Stopping",
 			idle: "Idle",
 			failed: "Failed",
 			stopped: "Stopped",
 			disconnected: "Disconnected",
 			completed: "Completed",
+			continued: "Continued",
 			deleted: "Deleted",
 			queued: "Queued: {count}",
 			openWorker: "Open worker: {name}",
@@ -4875,7 +5077,11 @@ window.__ModuleLoader__.load({
 			timelineOutputs: "输出",
 			timelineArtifacts: "产物",
 			fromCoordinator: "Coordinator",
+			fromAgent: "Agent",
 			fromUser: "用户",
+			messageFrom: "来自 {name}",
+			messageContent: "消息内容",
+			truncatedContent: "… {count} 字符",
 			awaitingReply: "等待回复…",
 			emptyReply: "本轮没有 AI 回复",
 			noArtifacts: "未记录产物",
@@ -4884,29 +5090,29 @@ window.__ModuleLoader__.load({
 			copy: "复制",
 			copied: "已复制",
 			footnotes: "脚注",
-			project: "Project",
-			enabling: "正在更新 Project…",
-			loading: "正在加载 Project…",
+			project: "MoA+",
+			enabling: "正在更新 MoA+…",
+			loading: "正在加载 MoA+…",
 			parent: "Back",
-			readonlyPending: "正在确认 worker 归属…",
-			readonlyUnavailable: "暂时无法确认 worker 归属，请重试。",
 			readonlyDeleted: "此 worker 已删除，对话历史仍然保留。",
-			readonlyDisabled: "Project 已关闭，此 worker 仅可查看历史。",
+			readonlyDisabled: "MoA+ 已关闭，此 worker 仅可查看历史。",
 			"blocked.agent-running": "请等待当前轮次结束。",
-			"blocked.session-mode-locked": "该会话已启动，将始终保持 Project 模式。",
+			"blocked.session-mode-locked": "该会话已启动，将始终保持 MoA+ 模式。",
 			"blocked.workers-active": "仍有 worker 正在运行。",
 			"blocked.results-pending": "worker 结果尚待处理。",
 			"blocked.worker-session": "worker 由主会话管理。",
-			"blocked.runtime-unavailable": "Project 运行环境暂不可用。",
+			"blocked.runtime-unavailable": "MoA+ 运行环境暂不可用。",
 			error: "操作失败：{message}",
 			working: "正在处理",
 			starting: "正在启动",
-			"waiting-user": "等待用户输入",
+			"waiting-user": "等待中",
+			stopping: "正在停止",
 			idle: "空闲",
 			failed: "失败",
 			stopped: "已中止",
 			disconnected: "连接不可用",
 			completed: "已完成",
+			continued: "已续接",
 			deleted: "已删除",
 			queued: "排队：{count}",
 			openWorker: "打开 worker：{name}",
@@ -4953,6 +5159,69 @@ window.__ModuleLoader__.load({
 			selected: "已选中",
 			running: "运行中：{count}"
 		};
+		// src/client/agent-message.tsx
+		/** Remove only the transport wrapper we authored; the delivered message stays unchanged. */
+		function messageBody(message) {
+			const source = message.source;
+			const first = message.content[0];
+			if (first?.type !== "text") return message.content;
+			if (source.kind === "moa-message") {
+				const prefix = `${typeof source.requestId === "string" ? `Request ID: ${source.requestId}\n` : ""}${typeof source.replyTo === "string" ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+				if (first.text.startsWith(prefix)) return [{
+					...first,
+					text: first.text.slice(prefix.length)
+				}, ...message.content.slice(1)];
+			}
+			if (source.kind === "project-mode-result" && typeof source.completionId === "string" && first.text.startsWith("Worker ") && first.text.includes(` (${source.workerId}), turn ${source.workerTurn}, outcome `) && first.text.includes(`Completion ${source.completionId}. `)) return message.content.slice(1);
+			return message.content;
+		}
+		/** The same incoming message row is used in Coordinator and Worker conversations. */
+		function AgentMessage({ message, client, t }) {
+			const source = message.source;
+			const id = [
+				source.senderSessionId,
+				source.senderId,
+				source.workerId,
+				source.coordinatorSessionId
+			].find((value) => typeof value === "string" && value !== "");
+			const name = useSelected(client.store.subscribe, () => {
+				if (typeof source.senderName === "string" && source.senderName) return source.senderName;
+				for (const project of client.store.projects()) {
+					const worker = project.workers.find((worker) => worker.workerId === id);
+					if (worker) return worker.name;
+					if (project.project.coordinatorSessionId === id) return t("fromCoordinator");
+				}
+				return id === source.rootId || source.kind === "project-mode-assignment" ? t("fromCoordinator") : t("fromAgent");
+			});
+			const labels = react.useMemo(() => ({
+				code: {
+					copyLabel: t("copy"),
+					copiedLabel: t("copied")
+				},
+				footnotes: t("footnotes")
+			}), [t]);
+			const content = messageBody(message);
+			const sender = t("messageFrom", { name });
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+				className: "pm-agent-message",
+				"data-moa-message": true,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("header", { children: sender }),
+					content.length ? content.map((block, index) => block.type === "text" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
+						text: block.text,
+						labels
+					}, index) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.JsonBlock, {
+						label: t("messageContent"),
+						payload: block,
+						truncatedLabel: (count) => t("truncatedContent", { count })
+					}, index)) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: "pm-agent-empty",
+						children: t("emptyReply")
+					})
+				]
+			});
+		}
 		// src/client/index.tsx
 		const inject = [
 			"remote",
@@ -5054,12 +5323,16 @@ window.__ModuleLoader__.load({
 					historyReady
 				]);
 				const closed = p.useChat((s) => s.timeline.turns.get(p.node.data.turn)?.end !== void 0);
-				return p.useChat((s) => segmentTail(s, p.node) !== null) ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerCapsuleList, {
+				const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [p.node.data.incoming && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(AgentMessage, {
+					...p,
+					message: p.node.data.incoming
+				}), selected && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerCapsuleList, {
 					...p,
 					turn: p.node.data.turn,
 					segmentStartSeq: p.node.data.segmentStartSeq,
 					closed
-				}) : null;
+				})] });
 			}));
 			ctx.slots.inject("sidebar.workspaces.session.branch", () => bindProjectBranches(ctx, client, open));
 			ctx.slots.inject("conversation.composer", () => {
@@ -5072,7 +5345,16 @@ window.__ModuleLoader__.load({
 							...match
 						}] : [];
 					}));
-					const key = JSON.stringify(readonly) + client.modeVersion + client.catalogState;
+					const membership = client.store.projects().map((p) => ({
+						parent: p.project.coordinatorSessionId,
+						mode: p.project.mode,
+						workers: p.workers.map((w) => w.workerId)
+					}));
+					const key = JSON.stringify([
+						readonly,
+						membership,
+						client.modeVersion
+					]);
 					if (key === previous) return;
 					previous = key;
 					dispose();
@@ -5086,15 +5368,7 @@ window.__ModuleLoader__.load({
 						className: "pm-readonly",
 						children: [
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: p.t(p.matched.reason === "deleted" ? "readonlyDeleted" : p.matched.reason === "disabled" ? "readonlyDisabled" : p.matched.reason === "pending" ? "readonlyPending" : "readonlyUnavailable") }),
-							p.matched.reason === "unavailable" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-								type: "button",
-								onClick: () => {
-									client.refreshMode(p.matched.id);
-									client.loadCatalog();
-								},
-								children: p.t("retry")
-							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: p.t(p.matched.reason === "deleted" ? "readonlyDeleted" : "readonlyDisabled") }),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								onClick: () => p.open(p.matched.parent),

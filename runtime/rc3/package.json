@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pinned standalone Web runtime for the Project Mode preview",
+  "description": "Pinned isolated Web runtime for the MoA+ developer preview",
   "engines": {
     "node": ">=24.9.0"
   },
@@ -47,7 +47,18 @@
     "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@deepseek-ai/dsh-agent-loop": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-jobs": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-jobs-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-jobs": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-bash": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-shell": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-bash-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-bash-sandbox": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-subprocess": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-shell-env": "0.2.1-rc.3"
   },
   "dsh": {
     "profile": {

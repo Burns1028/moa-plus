@@ -5,6 +5,8 @@ export interface ProjectPaths {
   context: string;
   notes: string;
   archived: string;
+  /** New index; older records are resolved without rewriting their documents. */
+  index?: string;
 }
 /** Public Project metadata, not the full persisted Host aggregate. */
 export interface ProjectRecord {
@@ -42,6 +44,8 @@ export interface SessionModeView {
 /** Derived observation for tools/UI; lifecycle is membership, status is native activity. */
 export interface WorkerView {
   workerId: SessionId;
+  /** Actual native direct parent; older direct-child snapshots omit this field. */
+  parentSessionId?: SessionId;
   name: string;
   lifecycle:
     | "provisioning"
@@ -57,6 +61,7 @@ export interface WorkerView {
     | "starting"
     | "working"
     | "waiting-user"
+    | "stopping"
     | "idle"
     | "failed"
     | "stopped"
@@ -65,6 +70,11 @@ export interface WorkerView {
   updatedAt: number;
   /** Present on list/get; null means native activity could not be observed. */
   activity?: WorkerActivity | null;
+}
+/** Readiness only; the Remote stream lifetime owns native parent residency. */
+export interface WorkerParentReady {
+  workerId: SessionId;
+  parentSessionId: SessionId;
 }
 export interface WorkerInputView {
   messageId: string;
@@ -105,7 +115,7 @@ export interface TurnWorkerOutcomeView {
   coordinatorTurn: number;
   segmentStartSeq?: number;
   workerId: SessionId;
-  status: "completed" | "failed" | "stopped" | "deleted";
+  status: "completed" | "failed" | "stopped" | "deleted" | "continued";
   completionIds: string[];
   lastResultMessageId?: string;
   lastResultSeq?: number;
@@ -185,7 +195,7 @@ export interface WorkerTimelineMessage {
   seq: number;
   time: number;
   text: string;
-  actor?: "user" | "coordinator";
+  actor?: "user" | "coordinator" | "agent";
 }
 export interface WorkerArtifact {
   path: string;

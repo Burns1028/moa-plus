@@ -10,7 +10,7 @@ afterEach(cleanup);
 const t = (key: keyof typeof en) => en[key];
 
 it.each([true, false])(
-  "renders a fixed Project identity without a checkbox when running=%s",
+  "renders a fixed MoA+ identity without a checkbox when running=%s",
   async (running) => {
     const client = new ProjectClient({
       mode: async () => ({
@@ -37,7 +37,7 @@ it.each([true, false])(
           t={t as any}
         />,
       );
-      expect(screen.getByText("Project")).toBeTruthy();
+      expect(screen.getByText("MoA+")).toBeTruthy();
       expect(screen.queryByRole("checkbox")).toBeNull();
       expect(screen.getByTitle(en["blocked.session-mode-locked"])).toBeTruthy();
     } finally {

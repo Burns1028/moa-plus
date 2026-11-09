@@ -17,23 +17,27 @@ export function bindWorkerParents(
   sessions: ISessions,
 ): () => void {
   const held = new Map<SessionId, { reference?: SessionReference }>();
+  const nested = new Map<SessionId, {
+    abort: AbortController;
+    stream?: ReturnType<ProjectClient["followWorkerParent"]>;
+    version: number;
+  }>();
+  const releaseNested = (slot: { abort: AbortController; stream?: ReturnType<ProjectClient["followWorkerParent"]> }) => {
+    slot.abort.abort();
+    slot.stream?.dispose();
+  };
   const reconcile = () => {
     const { byId } = sessions.list.getSnapshot();
     const needed = new Set<SessionId>();
+    const neededNested = new Set<SessionId>();
     for (const project of client.store.projects()) {
       if (project.project.mode !== "enabled") continue;
-      if (
-        project.workers.some(
-          (worker) =>
-            worker.lifecycle === "active" &&
-            Object.entries(byId[worker.workerId]?.retainedBy ?? {}).some(
-              ([source, count]) =>
-                (source === "mainView" || source === "sidebarChat") &&
-                count > 0,
-            ),
-        )
-      )
+      for (const worker of project.workers) {
+        if (worker.lifecycle !== "active" || !Object.entries(byId[worker.workerId]?.retainedBy ?? {}).some(([source, count]) => (source === "mainView" || source === "sidebarChat") && count > 0)) continue;
         needed.add(project.project.coordinatorSessionId);
+        if (worker.parentSessionId && worker.parentSessionId !== project.project.coordinatorSessionId)
+          neededNested.add(worker.workerId);
+      }
     }
     for (const [id, lease] of held) {
       if (needed.has(id)) continue;
@@ -59,15 +63,38 @@ export function bindWorkerParents(
         console.error("Project Mode: parent acquisition failed", error);
       }
     }
+    for (const [id, slot] of nested) {
+      if (neededNested.has(id) && slot.version === client.connectionVersion) continue;
+      nested.delete(id);
+      releaseNested(slot);
+    }
+    for (const id of neededNested) {
+      if (nested.has(id)) continue;
+      const slot: { abort: AbortController; stream?: ReturnType<ProjectClient["followWorkerParent"]>; version: number } = { abort: new AbortController(), version: client.connectionVersion };
+      nested.set(id, slot);
+      void (async () => {
+        try {
+          slot.stream = client.followWorkerParent(id, slot.abort.signal);
+          for await (const _ready of slot.stream) {
+            if (slot.abort.signal.aborted) return;
+          }
+        } catch (error) {
+          if (!slot.abort.signal.aborted) console.error("MoA+: nested parent opening failed", error);
+        }
+      })();
+    }
   };
   const unsubscribe = [
     client.store.subscribe(reconcile),
     sessions.list.subscribe(reconcile),
+    client.subscribeModes(reconcile),
   ];
   reconcile();
   return () => {
     for (const off of unsubscribe) off();
     for (const lease of held.values()) lease.reference?.release();
     held.clear();
+    for (const slot of nested.values()) releaseNested(slot);
+    nested.clear();
   };
 }

@@ -77,7 +77,7 @@ it("fixes Project at turn start and rejects downgrade while running and after id
     await expect(
       f.ctx.projectMode.setEnabled(agent.id, false, mode.revision, "idle-off"),
     ).rejects.toThrow("project-mode/session-mode-locked");
-    expect(f.ctx.tools.get("control_workers", agent)).toBeDefined();
+    expect(f.ctx.tools.get("Task", agent)).toBeDefined();
   } finally {
     gate.resolve();
     await f.dispose();
@@ -128,7 +128,7 @@ it("recovers legacy enabled history as fixed mode without waking it", async () =
     const before = agent.session.snapshotEvents();
     const requests = f.adapter.requests.length;
     await f.plugin.dispose();
-    await f.ctx.plugin(ProjectMode, {});
+    await f.ctx.plugin(ProjectMode, { completionVerification: false });
     await f.ctx.projectMode.snapshot(agent.id);
     expect(f.ctx.projectMode.mode(agent.id)).toMatchObject({
       modeLocked: true,
@@ -159,7 +159,7 @@ it.each(["draft", "disabled-history"] as const)(
         return { ...r, project };
       });
       await f.plugin.dispose();
-      await f.ctx.plugin(ProjectMode, {});
+      await f.ctx.plugin(ProjectMode, { completionVerification: false });
       await f.ctx.projectMode.snapshot(agent.id);
       const mode = f.ctx.projectMode.mode(agent.id);
       expect(mode).toMatchObject({

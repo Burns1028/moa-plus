@@ -8,7 +8,7 @@ import type { HostAccess } from "./host-access.ts";
 export class TurnCoordination {
   readonly waiting = new Set<string>();
   constructor(private host: HostAccess) {}
-  async guardTurn(agent: Agent, turn: number, signal: AbortSignal) {
+  async guardTurn(agent: Agent, signal: AbortSignal) {
     const lifetime = AbortSignal.any([signal, this.host.closing.signal]);
     const inputReady = new AbortController();
     const control = AbortSignal.any([lifetime, inputReady.signal]);
@@ -31,7 +31,7 @@ export class TurnCoordination {
         );
         try {
           void change.catch(() => {});
-          await waitForTurn(this.host.settledJobs(), control);
+          await waitForTurn(this.host.settledJobs(agent.id), control);
           control.throwIfAborted();
           if (agent.inbox.nextStep.length) return;
           const r = this.host.record(agent.id)!,
@@ -62,14 +62,15 @@ export class TurnCoordination {
                 (w) => w.id === a.workerId && w.lifecycle !== "deleted",
               ),
           );
-          const uncertain = r.assignments.find(
-            (a) => a.admission === "unknown",
-          );
+          const uncertain = pending.find((a) => a.admission === "unknown");
           if (uncertain)
             throw new Error(
               `project-mode/admission-uncertain: ${uncertain.operationId}`,
             );
-          const failed = r.deliveries.find(
+          const results = r.deliveries.filter(
+            (d) => d.state !== "consumed" && d.state !== "suppressed",
+          );
+          const failed = results.find(
             (d) =>
               d.lastError && d.attempts > this.host.config.retryMaxAttempts,
           );
@@ -77,9 +78,6 @@ export class TurnCoordination {
             throw new Error(
               `project-mode/result-admission-failed: ${failed.completionId}: ${failed.lastError}`,
             );
-          const results = r.deliveries.filter(
-            (d) => d.state !== "consumed" && d.state !== "suppressed",
-          );
           if (
             !pending.length &&
             !results.length &&
@@ -205,7 +203,8 @@ export class TurnCoordination {
                 a.admission !== "rejected" &&
                 !completed.some((c) => c.assignmentIds.includes(a.id)),
             );
-            const interrupted = parentReason !== "completed" || pending;
+            const continued = parentReason === "handoff" && (pending || !last);
+            const interrupted = parentReason !== "completed" && parentReason !== "handoff" || pending;
             return {
               coordinatorSessionId: parentId,
               coordinatorTurn: turn,
@@ -216,6 +215,8 @@ export class TurnCoordination {
               status:
                 worker.lifecycle === "deleted"
                   ? ("deleted" as const)
+                  : continued
+                    ? ("continued" as const)
                   : interrupted
                     ? ("stopped" as const)
                     : last?.outcome === "completed"
@@ -224,7 +225,7 @@ export class TurnCoordination {
                         ? ("stopped" as const)
                         : ("failed" as const),
               completionIds: completed.map((c) => c.id),
-              ...(interrupted
+              ...(interrupted && !continued
                 ? {
                     summary:
                       "Coordinator turn interrupted; worker work may continue.",

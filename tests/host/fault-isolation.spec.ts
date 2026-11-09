@@ -4,7 +4,7 @@ import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { fixture, response } from "./fixture.ts";
 
 type RecoveryProbe = {
-  enqueue(work: () => Promise<void>): void;
+  enqueue(id: ReturnType<typeof SessionId>, work: () => Promise<void>): void;
   recover(id: ReturnType<typeof SessionId>): Promise<void>;
   jobs: Promise<void>;
 };
@@ -35,7 +35,7 @@ async function failRecoveryOnce(f: Fixture, id: ReturnType<typeof SessionId>) {
         : observe(sessionId, options),
     );
   try {
-    host.enqueue(() => host.recover(id));
+    host.enqueue(id, () => host.recover(id));
     await host.jobs;
   } finally {
     spy.mockRestore();

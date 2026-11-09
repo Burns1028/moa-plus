@@ -1,12 +1,18 @@
 import type { ConversationNodeDefinition } from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type { ChatNode, ChatSnapshot } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type { TurnWorkerMembership } from "../shared/index.ts";
+import type { UserMessage } from "@deepseek-ai/dsh-llm/types";
+export interface IncomingAgentMessage {
+    source: UserMessage["source"];
+    content: UserMessage["content"];
+}
 declare module "@deepseek-ai/dsh-client-ui-chat/client" {
     interface ChatNodeDataMap {
         "project-mode-workers-tail": {
             turn: number;
             step: number;
             segmentStartSeq: number;
+            incoming?: IncomingAgentMessage;
         };
     }
 }
@@ -21,6 +27,7 @@ export declare const humanBoundaryDefinition: ConversationNodeDefinition<{
 export declare const workerTailDefinition: ConversationNodeDefinition<{
     seq: number;
     segmentStartSeq: number;
+    incoming?: IncomingAgentMessage;
 }>;
 /** Pick exactly one native seat at the bottom of each human transcript segment. */
 export declare function segmentTail(snapshot: ChatSnapshot, node: ChatNode<"project-mode-workers-tail">): {

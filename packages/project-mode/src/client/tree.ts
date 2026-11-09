@@ -37,9 +37,9 @@ export function workerReadOnly(
 export interface ComposerMatch {
   id: SessionId;
   parent: SessionId;
-  reason: "deleted" | "disabled" | "pending" | "unavailable";
+  reason: "deleted" | "disabled";
 }
-/** A known continuation must establish ownership before enabling its input. */
+/** Override native input only for established, inactive Project membership. */
 export function composerMatch(
   owner: import("@deepseek-ai/dsh-client-ui-conversation/client").ComposerChainProps,
   client: import("./runtime.ts").ProjectClient,
@@ -52,21 +52,19 @@ export function composerMatch(
     projects = client.store.projects();
   const readonly = workerReadOnly(projects, id);
   if (readonly) return { id, ...readonly };
-  const project = projects.find((p) =>
-    p.workers.some((w) => w.workerId === id),
-  );
-  if (project) return null;
-  const mode = client.mode(id);
-  if (mode.value?.role === "ordinary" || mode.value?.role === "coordinator")
+  if (projects.some((p) => p.workers.some((w) => w.workerId === id)))
     return null;
-  return {
-    id,
-    parent,
-    reason:
-      mode.error ||
-      client.catalogState === "error" ||
-      (mode.value?.role === "worker" && client.catalogState === "ready")
-        ? "unavailable"
-        : "pending",
-  };
+  const mode = client.mode(id).value;
+  const project = client.store.project(parent);
+  if (
+    mode?.role === "worker" &&
+    mode.coordinatorSessionId === parent &&
+    project
+  )
+    return {
+      id,
+      parent,
+      reason: project.project.mode === "disabled" ? "disabled" : "deleted",
+    };
+  return null;
 }

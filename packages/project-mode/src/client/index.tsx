@@ -31,6 +31,7 @@ import { workerReadOnly, composerMatch } from "./tree.ts";
 import { en, zh } from "./locales.ts";
 import { styles } from "./styles.ts";
 import { useSelected } from "./hooks.ts";
+import { AgentMessage } from "./agent-message.tsx";
 export const inject = [
   "remote",
   "sessions",
@@ -184,14 +185,17 @@ function applyProjectClient(ctx: Context) {
           (s) => s.timeline.turns.get(p.node.data.turn)?.end !== undefined,
         );
         const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
-        return selected ? (
-          <WorkerCapsuleList
-            {...p}
-            turn={p.node.data.turn}
-            segmentStartSeq={p.node.data.segmentStartSeq}
-            closed={closed}
-          />
-        ) : null;
+        return (
+          <>
+            {p.node.data.incoming && <AgentMessage {...p} message={p.node.data.incoming} />}
+            {selected && <WorkerCapsuleList
+              {...p}
+              turn={p.node.data.turn}
+              segmentStartSeq={p.node.data.segmentStartSeq}
+              closed={closed}
+            />}
+          </>
+        );
       },
     ),
   );
@@ -211,8 +215,12 @@ function applyProjectClient(ctx: Context) {
           return match ? [{ id: w.workerId, ...match }] : [];
         }),
       );
-      const key =
-        JSON.stringify(readonly) + client.modeVersion + client.catalogState;
+      const membership = client.store.projects().map((p) => ({
+        parent: p.project.coordinatorSessionId,
+        mode: p.project.mode,
+        workers: p.workers.map((w) => w.workerId),
+      }));
+      const key = JSON.stringify([readonly, membership, client.modeVersion]);
       if (key === previous) return;
       previous = key;
       dispose();
@@ -231,7 +239,7 @@ function applyProjectClient(ctx: Context) {
               matched: {
                 id: SessionId;
                 parent: SessionId;
-                reason: "deleted" | "disabled" | "pending" | "unavailable";
+                reason: "deleted" | "disabled";
               };
             },
         ) => (
@@ -241,24 +249,9 @@ function applyProjectClient(ctx: Context) {
               {p.t(
                 p.matched.reason === "deleted"
                   ? "readonlyDeleted"
-                  : p.matched.reason === "disabled"
-                    ? "readonlyDisabled"
-                    : p.matched.reason === "pending"
-                      ? "readonlyPending"
-                      : "readonlyUnavailable",
+                  : "readonlyDisabled",
               )}
             </p>
-            {p.matched.reason === "unavailable" && (
-              <button
-                type="button"
-                onClick={() => {
-                  void client.refreshMode(p.matched.id);
-                  void client.loadCatalog();
-                }}
-              >
-                {p.t("retry")}
-              </button>
-            )}
             <button type="button" onClick={() => p.open(p.matched.parent)}>
               {p.t("parent")}
             </button>

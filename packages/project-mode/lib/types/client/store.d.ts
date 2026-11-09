@@ -5,7 +5,7 @@ export interface WorkerCapsule {
     key: string;
     workerId: SessionId;
     name: string;
-    status: WorkerView["phase"] | "completed" | "deleted";
+    status: WorkerView["phase"] | "completed" | "deleted" | "continued";
     text?: string;
     queueLength: number | null;
     address: SubagentAddress;

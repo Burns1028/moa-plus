@@ -1,6 +1,4 @@
-import type { Agent } from "@deepseek-ai/dsh-agent";
 import { z } from "zod";
-import type { ControlResult, ControlWorkersRequest } from "../shared/index.ts";
 import { SessionId } from "@deepseek-ai/dsh-session";
 export declare const historySchema: z.ZodObject<{
     action: z.ZodLiteral<"history">;
@@ -39,5 +37,3 @@ export declare const controlSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     offset: z.ZodNumber;
     limit: z.ZodNumber;
 }, z.core.$strip>], "action">;
-/** Tool definition is separate from Agent-scoped registration and suppression. */
-export declare function createWorkerControlTool(control: (agent: Agent, request: ControlWorkersRequest, operationId: string, signal: AbortSignal) => Promise<ControlResult>): import("@deepseek-ai/dsh-tools").ToolDefinition;

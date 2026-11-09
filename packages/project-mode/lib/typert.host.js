@@ -16,6 +16,7 @@ const dsh_plugin_project_mode_projectMode_catalog_result$schema = () => (dsh_plu
   'context': z.string(),
   'notes': z.string(),
   'archived': z.string(),
+  'index': z.union([z.undefined(), z.string()]).optional().describe('New index; older records are resolved without rewriting their documents.'),
 }),
   'mode': z.union([z.literal("enabled"), z.literal("disabled")]),
   'modeLocked': z.union([z.undefined(), z.literal(false), z.literal(true)]).optional().describe('Project identity becomes permanent when this Session starts a turn.'),
@@ -25,13 +26,14 @@ const dsh_plugin_project_mode_projectMode_catalog_result$schema = () => (dsh_plu
 }),
   'workers': z.array(z.object({
   'workerId': z.string(),
+  'parentSessionId': z.union([z.undefined(), z.string()]).optional().describe('Actual native direct parent; older direct-child snapshots omit this field.'),
   'name': z.string(),
   'lifecycle': z.union([z.literal("provisioning"), z.literal("active"), z.literal("deleting"), z.literal("deleted"), z.literal("provision-failed")]),
   'status': z.union([z.literal(null), z.literal("busy"), z.literal("idle")]),
   'availability': z.union([z.literal("live"), z.literal("cold"), z.literal("unavailable")]),
   'queueLength': z.union([z.literal(null), z.number()]),
   'pendingSteerCount': z.union([z.literal(null), z.number()]),
-  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
+  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("stopping"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
   'progressText': z.union([z.undefined(), z.string()]).optional(),
   'updatedAt': z.number(),
   'activity': z.union([z.undefined(), z.literal(null), z.object({
@@ -84,7 +86,7 @@ const dsh_plugin_project_mode_projectMode_catalog_result$schema = () => (dsh_plu
   'coordinatorTurn': z.number(),
   'segmentStartSeq': z.union([z.undefined(), z.number()]).optional(),
   'workerId': z.string(),
-  'status': z.union([z.literal("deleted"), z.literal("failed"), z.literal("stopped"), z.literal("completed")]),
+  'status': z.union([z.literal("deleted"), z.literal("failed"), z.literal("stopped"), z.literal("completed"), z.literal("continued")]),
   'completionIds': z.array(z.string()),
   'lastResultMessageId': z.union([z.undefined(), z.string()]).optional(),
   'lastResultSeq': z.union([z.undefined(), z.number()]).optional(),
@@ -143,13 +145,14 @@ const dsh_plugin_project_mode_projectMode_control_parameter_2$schema = () => (ds
 let dsh_plugin_project_mode_projectMode_control_result$schema$value
 const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plugin_project_mode_projectMode_control_result$schema$value ??= z.union([z.object({
   'workerId': z.string(),
+  'parentSessionId': z.union([z.undefined(), z.string()]).optional().describe('Actual native direct parent; older direct-child snapshots omit this field.'),
   'name': z.string(),
   'lifecycle': z.union([z.literal("provisioning"), z.literal("active"), z.literal("deleting"), z.literal("deleted"), z.literal("provision-failed")]),
   'status': z.union([z.literal(null), z.literal("busy"), z.literal("idle")]),
   'availability': z.union([z.literal("live"), z.literal("cold"), z.literal("unavailable")]),
   'queueLength': z.union([z.literal(null), z.number()]),
   'pendingSteerCount': z.union([z.literal(null), z.number()]),
-  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
+  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("stopping"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
   'progressText': z.union([z.undefined(), z.string()]).optional(),
   'updatedAt': z.number(),
   'activity': z.union([z.undefined(), z.literal(null), z.object({
@@ -185,13 +188,14 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
 })]).optional().describe('Present on list/get; null means native activity could not be observed.'),
 }), z.array(z.object({
   'workerId': z.string(),
+  'parentSessionId': z.union([z.undefined(), z.string()]).optional().describe('Actual native direct parent; older direct-child snapshots omit this field.'),
   'name': z.string(),
   'lifecycle': z.union([z.literal("provisioning"), z.literal("active"), z.literal("deleting"), z.literal("deleted"), z.literal("provision-failed")]),
   'status': z.union([z.literal(null), z.literal("busy"), z.literal("idle")]),
   'availability': z.union([z.literal("live"), z.literal("cold"), z.literal("unavailable")]),
   'queueLength': z.union([z.literal(null), z.number()]),
   'pendingSteerCount': z.union([z.literal(null), z.number()]),
-  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
+  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("stopping"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
   'progressText': z.union([z.undefined(), z.string()]).optional(),
   'updatedAt': z.number(),
   'activity': z.union([z.undefined(), z.literal(null), z.object({
@@ -269,6 +273,7 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
   'context': z.string(),
   'notes': z.string(),
   'archived': z.string(),
+  'index': z.union([z.undefined(), z.string()]).optional().describe('New index; older records are resolved without rewriting their documents.'),
 }),
   'mode': z.union([z.literal("enabled"), z.literal("disabled")]),
   'modeLocked': z.union([z.undefined(), z.literal(false), z.literal(true)]).optional().describe('Project identity becomes permanent when this Session starts a turn.'),
@@ -278,13 +283,14 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
 }),
   'workers': z.array(z.object({
   'workerId': z.string(),
+  'parentSessionId': z.union([z.undefined(), z.string()]).optional().describe('Actual native direct parent; older direct-child snapshots omit this field.'),
   'name': z.string(),
   'lifecycle': z.union([z.literal("provisioning"), z.literal("active"), z.literal("deleting"), z.literal("deleted"), z.literal("provision-failed")]),
   'status': z.union([z.literal(null), z.literal("busy"), z.literal("idle")]),
   'availability': z.union([z.literal("live"), z.literal("cold"), z.literal("unavailable")]),
   'queueLength': z.union([z.literal(null), z.number()]),
   'pendingSteerCount': z.union([z.literal(null), z.number()]),
-  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
+  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("stopping"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
   'progressText': z.union([z.undefined(), z.string()]).optional(),
   'updatedAt': z.number(),
   'activity': z.union([z.undefined(), z.literal(null), z.object({
@@ -337,7 +343,7 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
   'coordinatorTurn': z.number(),
   'segmentStartSeq': z.union([z.undefined(), z.number()]).optional(),
   'workerId': z.string(),
-  'status': z.union([z.literal("deleted"), z.literal("failed"), z.literal("stopped"), z.literal("completed")]),
+  'status': z.union([z.literal("deleted"), z.literal("failed"), z.literal("stopped"), z.literal("completed"), z.literal("continued")]),
   'completionIds': z.array(z.string()),
   'lastResultMessageId': z.union([z.undefined(), z.string()]).optional(),
   'lastResultSeq': z.union([z.undefined(), z.number()]).optional(),
@@ -360,6 +366,15 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
   'streamEpoch': z.string(),
   'revision': z.number(),
 }),
+}))
+let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema$value
+const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema = () => (dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema$value ??= z.string())
+let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema$value
+const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema = () => (dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema$value ??= z.string())
+let dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema$value
+const dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema = () => (dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema$value ??= z.object({
+  'workerId': z.string(),
+  'parentSessionId': z.string(),
 }))
 let dsh_plugin_project_mode_projectMode_history_parameter_0$schema$value
 const dsh_plugin_project_mode_projectMode_history_parameter_0$schema = () => (dsh_plugin_project_mode_projectMode_history_parameter_0$schema$value ??= z.string())
@@ -401,6 +416,7 @@ const dsh_plugin_project_mode_projectMode_mode_result$schema = () => (dsh_plugin
   'context': z.string(),
   'notes': z.string(),
   'archived': z.string(),
+  'index': z.union([z.undefined(), z.string()]).optional().describe('New index; older records are resolved without rewriting their documents.'),
 })]).optional(),
   'revision': z.number(),
   'canToggle': z.boolean(),
@@ -427,6 +443,7 @@ const dsh_plugin_project_mode_projectMode_setEnabled_result$schema = () => (dsh_
   'context': z.string(),
   'notes': z.string(),
   'archived': z.string(),
+  'index': z.union([z.undefined(), z.string()]).optional().describe('New index; older records are resolved without rewriting their documents.'),
 })]).optional(),
   'revision': z.number(),
   'canToggle': z.boolean(),
@@ -447,6 +464,7 @@ const dsh_plugin_project_mode_projectMode_snapshot_result$schema = () => (dsh_pl
   'context': z.string(),
   'notes': z.string(),
   'archived': z.string(),
+  'index': z.union([z.undefined(), z.string()]).optional().describe('New index; older records are resolved without rewriting their documents.'),
 }),
   'mode': z.union([z.literal("enabled"), z.literal("disabled")]),
   'modeLocked': z.union([z.undefined(), z.literal(false), z.literal(true)]).optional().describe('Project identity becomes permanent when this Session starts a turn.'),
@@ -456,13 +474,14 @@ const dsh_plugin_project_mode_projectMode_snapshot_result$schema = () => (dsh_pl
 }),
   'workers': z.array(z.object({
   'workerId': z.string(),
+  'parentSessionId': z.union([z.undefined(), z.string()]).optional().describe('Actual native direct parent; older direct-child snapshots omit this field.'),
   'name': z.string(),
   'lifecycle': z.union([z.literal("provisioning"), z.literal("active"), z.literal("deleting"), z.literal("deleted"), z.literal("provision-failed")]),
   'status': z.union([z.literal(null), z.literal("busy"), z.literal("idle")]),
   'availability': z.union([z.literal("live"), z.literal("cold"), z.literal("unavailable")]),
   'queueLength': z.union([z.literal(null), z.number()]),
   'pendingSteerCount': z.union([z.literal(null), z.number()]),
-  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
+  'phase': z.union([z.literal("idle"), z.literal("starting"), z.literal("working"), z.literal("waiting-user"), z.literal("stopping"), z.literal("failed"), z.literal("stopped"), z.literal("disconnected")]),
   'progressText': z.union([z.undefined(), z.string()]).optional(),
   'updatedAt': z.number(),
   'activity': z.union([z.undefined(), z.literal(null), z.object({
@@ -515,7 +534,7 @@ const dsh_plugin_project_mode_projectMode_snapshot_result$schema = () => (dsh_pl
   'coordinatorTurn': z.number(),
   'segmentStartSeq': z.union([z.undefined(), z.number()]).optional(),
   'workerId': z.string(),
-  'status': z.union([z.literal("deleted"), z.literal("failed"), z.literal("stopped"), z.literal("completed")]),
+  'status': z.union([z.literal("deleted"), z.literal("failed"), z.literal("stopped"), z.literal("completed"), z.literal("continued")]),
   'completionIds': z.array(z.string()),
   'lastResultMessageId': z.union([z.undefined(), z.string()]).optional(),
   'lastResultSeq': z.union([z.undefined(), z.number()]).optional(),
@@ -562,14 +581,14 @@ const dsh_plugin_project_mode_projectMode_timeline_result$schema = () => (dsh_pl
   'seq': z.number(),
   'time': z.number(),
   'text': z.string(),
-  'actor': z.union([z.undefined(), z.literal("user"), z.literal("coordinator")]).optional(),
+  'actor': z.union([z.undefined(), z.literal("user"), z.literal("coordinator"), z.literal("agent")]).optional(),
 })),
   'outputs': z.array(z.object({
   'id': z.string(),
   'seq': z.number(),
   'time': z.number(),
   'text': z.string(),
-  'actor': z.union([z.undefined(), z.literal("user"), z.literal("coordinator")]).optional(),
+  'actor': z.union([z.undefined(), z.literal("user"), z.literal("coordinator"), z.literal("agent")]).optional(),
 })),
   'artifacts': z.array(z.object({
   'path': z.string(),
@@ -615,6 +634,10 @@ let dsh_plugin_project_mode_projectMode_control_parameter_2_strict$schema$value
 const dsh_plugin_project_mode_projectMode_control_parameter_2_strict$schema = () => (dsh_plugin_project_mode_projectMode_control_parameter_2_strict$schema$value ??= z.string())
 let dsh_plugin_project_mode_projectMode_follow_parameter_0_strict$schema$value
 const dsh_plugin_project_mode_projectMode_follow_parameter_0_strict$schema = () => (dsh_plugin_project_mode_projectMode_follow_parameter_0_strict$schema$value ??= z.string())
+let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema$value
+const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema = () => (dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema$value ??= z.string())
+let dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema$value
+const dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema = () => (dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema$value ??= z.string())
 let dsh_plugin_project_mode_projectMode_history_parameter_0_strict$schema$value
 const dsh_plugin_project_mode_projectMode_history_parameter_0_strict$schema = () => (dsh_plugin_project_mode_projectMode_history_parameter_0_strict$schema$value ??= z.string())
 let dsh_plugin_project_mode_projectMode_history_parameter_1_strict$schema$value
@@ -654,9 +677,9 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode#projectMode/catalog:result',
         create: dsh_plugin_project_mode_projectMode_catalog_result$schema,
-        jsonSchema: {"type":"array","items":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},
+        jsonSchema: {"type":"array","items":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":636,"column":9},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":820,"column":9},
     },
     'projectMode/control': {
       service: 'projectMode',
@@ -718,7 +741,7 @@ const $remote = createTypertRemoteInfo({
         create: dsh_plugin_project_mode_projectMode_control_result$schema,
         jsonSchemaError: 'typert tool schema: selected union branches overlap or have no required discriminator',
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":652,"column":9},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":836,"column":9},
     },
     'projectMode/follow': {
       service: 'projectMode',
@@ -747,9 +770,56 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#ProjectFrame',
         create: dsh_plugin_project_mode_projectMode_follow_result$schema,
-        jsonSchema: {"type":"object","properties":{"type":{"type":"string","const":"baseline"},"value":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},"required":["type","value"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"type":{"type":"string","const":"baseline"},"value":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},"required":["type","value"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":609,"column":10},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":783,"column":10},
+    },
+    'projectMode/followWorkerParent': {
+      service: 'projectMode',
+      mode: 'stream',
+      invocation: { kind: 'direct' },
+      parameters: [
+        {
+          name: 'sessionId',
+          source: 'json',
+          codec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
+            create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0$schema,
+            jsonSchema: {"type":"string"},
+          },
+          strictCodec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
+            create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_0_strict$schema,
+            jsonSchema: {"type":"string"},
+          },
+        },
+        {
+          name: 'workerId',
+          source: 'json',
+          codec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
+            create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1$schema,
+            jsonSchema: {"type":"string"},
+          },
+          strictCodec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
+            create: dsh_plugin_project_mode_projectMode_followWorkerParent_parameter_1_strict$schema,
+            jsonSchema: {"type":"string"},
+          },
+        },
+      ],
+      cancellation: { parameter: 'signal' },
+      result: {
+        mode: 'strict',
+        typeSymbol: 'dsh-plugin-project-mode/shared#WorkerParentReady',
+        create: dsh_plugin_project_mode_projectMode_followWorkerParent_result$schema,
+        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string"}},"required":["workerId","parentSessionId"],"additionalProperties":true},
+      },
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":810,"column":10},
     },
     'projectMode/history': {
       service: 'projectMode',
@@ -827,7 +897,7 @@ const $remote = createTypertRemoteInfo({
         create: dsh_plugin_project_mode_projectMode_history_result$schema,
         jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"offset":{"type":"number"},"limit":{"type":"number"},"total":{"type":"number"},"messages":{"type":"array","items":{"type":"object","properties":{"index":{"type":"number","description":"Zero-based position from newest in this observed dialogue."},"id":{"type":"string"},"seq":{"type":"number"},"turn":{"type":"number"},"role":{"type":"string","enum":["user","assistant"]},"text":{"type":"string"}},"required":["index","id","seq","turn","role","text"],"additionalProperties":true}},"observedThroughSeq":{"type":"number"}},"required":["workerId","status","offset","limit","total","messages","observedThroughSeq"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":664,"column":9},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":848,"column":9},
     },
     'projectMode/mode': {
       service: 'projectMode',
@@ -854,9 +924,9 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#SessionModeView',
         create: dsh_plugin_project_mode_projectMode_mode_result$schema,
-        jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"role":{"type":"string","enum":["coordinator","ordinary","worker"]},"enabled":{"type":"boolean"},"modeLocked":{"type":"boolean","enum":[false,true]},"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"}},"required":["root","context","notes","archived"],"additionalProperties":true},"revision":{"type":"number"},"canToggle":{"type":"boolean"},"toggleBlockedReason":{"type":"string","enum":["session-mode-locked","agent-running","workers-active","results-pending","worker-session","runtime-unavailable"]}},"required":["sessionId","role","enabled","revision","canToggle"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"role":{"type":"string","enum":["coordinator","ordinary","worker"]},"enabled":{"type":"boolean"},"modeLocked":{"type":"boolean","enum":[false,true]},"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"revision":{"type":"number"},"canToggle":{"type":"boolean"},"toggleBlockedReason":{"type":"string","enum":["session-mode-locked","agent-running","workers-active","results-pending","worker-session","runtime-unavailable"]}},"required":["sessionId","role","enabled","revision","canToggle"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":718,"column":3},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":902,"column":3},
     },
     'projectMode/setEnabled': {
       service: 'projectMode',
@@ -931,9 +1001,9 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#SessionModeView',
         create: dsh_plugin_project_mode_projectMode_setEnabled_result$schema,
-        jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"role":{"type":"string","enum":["coordinator","ordinary","worker"]},"enabled":{"type":"boolean"},"modeLocked":{"type":"boolean","enum":[false,true]},"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"}},"required":["root","context","notes","archived"],"additionalProperties":true},"revision":{"type":"number"},"canToggle":{"type":"boolean"},"toggleBlockedReason":{"type":"string","enum":["session-mode-locked","agent-running","workers-active","results-pending","worker-session","runtime-unavailable"]}},"required":["sessionId","role","enabled","revision","canToggle"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"role":{"type":"string","enum":["coordinator","ordinary","worker"]},"enabled":{"type":"boolean"},"modeLocked":{"type":"boolean","enum":[false,true]},"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"revision":{"type":"number"},"canToggle":{"type":"boolean"},"toggleBlockedReason":{"type":"string","enum":["session-mode-locked","agent-running","workers-active","results-pending","worker-session","runtime-unavailable"]}},"required":["sessionId","role","enabled","revision","canToggle"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":723,"column":9},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":907,"column":9},
     },
     'projectMode/snapshot': {
       service: 'projectMode',
@@ -960,9 +1030,9 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode#projectMode/snapshot:result',
         create: dsh_plugin_project_mode_projectMode_snapshot_result$schema,
-        jsonSchema: {"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}]},
+        jsonSchema: {"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}]},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":584,"column":9},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":758,"column":9},
     },
     'projectMode/timeline': {
       service: 'projectMode',
@@ -1023,9 +1093,9 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#WorkerTimelinePage',
         create: dsh_plugin_project_mode_projectMode_timeline_result$schema,
-        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"cwd":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"total":{"type":"number"},"hasMore":{"type":"boolean"},"observedThroughSeq":{"type":"number"},"turns":{"type":"array","items":{"type":"object","properties":{"turn":{"type":"number"},"startedAt":{"type":"number"},"finishedAt":{"type":"number"},"outcome":{"oneOf":[{"type":"null","const":null},{"type":"string"}]},"inputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"outputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"artifacts":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"description":{"type":"string"},"kind":{"type":"string","enum":["presented","changed"]},"seq":{"type":"number"},"time":{"type":"number"}},"required":["path","kind","seq","time"],"additionalProperties":true}}},"required":["turn","startedAt","outcome","inputs","outputs","artifacts"],"additionalProperties":true}}},"required":["workerId","status","total","hasMore","observedThroughSeq","turns"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"cwd":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"total":{"type":"number"},"hasMore":{"type":"boolean"},"observedThroughSeq":{"type":"number"},"turns":{"type":"array","items":{"type":"object","properties":{"turn":{"type":"number"},"startedAt":{"type":"number"},"finishedAt":{"type":"number"},"outcome":{"oneOf":[{"type":"null","const":null},{"type":"string"}]},"inputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","agent"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"outputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","agent"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"artifacts":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"description":{"type":"string"},"kind":{"type":"string","enum":["presented","changed"]},"seq":{"type":"number"},"time":{"type":"number"}},"required":["path","kind","seq","time"],"additionalProperties":true}}},"required":["turn","startedAt","outcome","inputs","outputs","artifacts"],"additionalProperties":true}}},"required":["workerId","status","total","hasMore","observedThroughSeq","turns"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":687,"column":10},
+      sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":871,"column":10},
     },
   },
 }, z)
@@ -1063,6 +1133,11 @@ export const TYPERT = {
           },
           {
             "kind": "method",
+            "name": "followWorkerParent",
+            "signature": "@Remote({ name: \"followWorkerParent\", mode: \"stream\" }) async *followWorkerParent( sessionId: SessionId, workerId: SessionId, signal: AbortSignal, ): AsyncIterable<WorkerParentReady>"
+          },
+          {
+            "kind": "method",
             "name": "catalog",
             "signature": "@Remote(\"catalog\") async catalog(): Promise<ProjectSnapshot[]>"
           },
@@ -1095,7 +1170,7 @@ export const TYPERT = {
         "types": [
           {
             "name": "Agent",
-            "declaration": "export interface Agent {\n    readonly id: SessionId;\n    readonly options: AgentOptions;\n    readonly session: Session;\n    readonly inbox: Inbox;\n    readonly status: AgentStatus;\n    readonly ctx: Context;\n    cancel(cause: AgentCancelCause, options?: CancelOptions): void;\n    whenIdle(): Promise<void>;\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n    send(message: UserMessage, target: InboxTarget, wakeup: boolean): void;\n    followup(message: UserMessage): void;\n    steer(message: UserMessage): void;\n    inject(message: UserMessage): void;\n}"
+            "declaration": "export interface Agent {\n    readonly id: SessionId;\n    readonly options: AgentOptions;\n    readonly session: Session;\n    readonly inbox: Inbox;\n    readonly status: AgentStatus;\n    readonly ctx: Context;\n    cancel(cause: AgentCancelCause, options?: CancelOptions): void;\n    cancelAndJoin(cause: AgentCancelCause, options?: { continuation?: UserMessage; }): Promise<void>;\n    enableToolBackground(options?: { readonly hasPendingResult?: () => boolean; }): () => void;\n    readonly moaStopped: boolean;\n    readonly moaAborting: boolean;\n    readonly moaHasPendingBackground: boolean;\n    whenIdle(): Promise<void>;\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n    send(message: UserMessage, target: InboxTarget, wakeup: boolean): void;\n    followup(message: UserMessage): void;\n    steer(message: UserMessage): void;\n    inject(message: UserMessage): void;\n}"
           },
           {
             "name": "AgentCancelCause",
@@ -1140,6 +1215,14 @@ export const TYPERT = {
           {
             "name": "AttachmentId",
             "declaration": "export type AttachmentId = Branded<'AttachmentId'>;"
+          },
+          {
+            "name": "BackgroundCause",
+            "declaration": "export type BackgroundCause = { readonly kind: 'after-seconds' | 'producer-promotion'; } | { readonly kind: 'new-message' | 'llm-judge'; readonly messageIds: readonly import('@deepseek-ai/dsh-llm/types').MessageId[]; };"
+          },
+          {
+            "name": "BackgroundReceipt",
+            "declaration": "export interface BackgroundReceipt extends ToolActivityIdentity {\n    readonly jobId: import('@deepseek-ai/dsh-jobs/brand').JobId;\n    readonly cause: BackgroundCause;\n}"
           },
           {
             "name": "Branded",
@@ -1238,6 +1321,30 @@ export const TYPERT = {
             "declaration": "export type InboxTarget = 'next-turn' | 'next-step';"
           },
           {
+            "name": "JobId",
+            "declaration": "export type JobId = Branded<'JobId'>;"
+          },
+          {
+            "name": "JobOutcome",
+            "declaration": "export interface JobOutcome {\n    status: 'completed' | 'killed' | 'failed';\n    detail?: string;\n    result?: string;\n}"
+          },
+          {
+            "name": "JobRegisteredData",
+            "declaration": "export interface JobRegisteredData {\n    readonly jobId: JobId;\n    readonly owner: SessionId;\n    readonly kind: string;\n    readonly label: string;\n    readonly startedAt: number;\n    readonly toolCall?: JobToolCall;\n}"
+          },
+          {
+            "name": "JobSettleCause",
+            "declaration": "export type JobSettleCause = 'producer' | 'kill' | 'teardown';"
+          },
+          {
+            "name": "JobSettledData",
+            "declaration": "export interface JobSettledData extends JobRegisteredData {\n    readonly finishedAt: number;\n    readonly status: JobOutcome['status'];\n    readonly cause: JobSettleCause;\n    readonly producerReported: boolean;\n    readonly detail?: string;\n}"
+          },
+          {
+            "name": "JobToolCall",
+            "declaration": "export interface JobToolCall {\n    readonly callId: SessionEventMap['tool/call']['callId'];\n    readonly rootCallId: SessionEventMap['tool/call']['callId'];\n}"
+          },
+          {
             "name": "JsonValue",
             "declaration": "export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue; };"
           },
@@ -1283,7 +1390,7 @@ export const TYPERT = {
           },
           {
             "name": "MessageSourceMap",
-            "declaration": "export interface MessageSourceMap {\n    user: { kind: 'user'; };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    'system-prompt': SystemPromptMessageSource;\n    'model-selection': { kind: 'model-selection'; } & ContextFormed;\n    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'user-approval': { kind: 'user-approval'; } & ContextFormed;\n    'ptc-mode': { kind: 'ptc-mode'; };\n    'tool-registry': { kind: 'tool-registry'; };\n    'agent-message': AgentMessageSource;\n    'subagent-settled': SubagentSettledMessageSource;\n    'working-directory': { kind: 'working-directory'; };\n    'project-mode-result': { kind: \"project-mode-result\"; form: \"relay\"; completionId: string; workerId: SessionId; workerTurn: number; };\n    'project-mode-assignment': { kind: \"project-mode-assignment\"; form: \"relay\"; operationId: string; coordinatorSessionId: SessionId; };\n    'project-mode-notice': { kind: \"project-mode-notice\"; form: \"notice\"; summary: string; };\n}"
+            "declaration": "export interface MessageSourceMap {\n    user: { kind: 'user'; };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    'system-prompt': SystemPromptMessageSource;\n    'user-approval': { kind: 'user-approval'; } & ContextFormed;\n    'ptc-mode': { kind: 'ptc-mode'; };\n    'tool-registry': { kind: 'tool-registry'; };\n    'model-selection': { kind: 'model-selection'; } & ContextFormed;\n    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal; };\n    'agent-message': AgentMessageSource;\n    'subagent-settled': SubagentSettledMessageSource;\n    'moa-notes': { kind: \"moa-notes\"; coordinatorSessionId: string; };\n    'moa-background-result': { kind: \"moa-background-result\"; tool_call_id: string; };\n    'moa-completion': { kind: \"moa-completion\"; form: \"notice\"; summary: string; };\n    'moa-message': { kind: \"moa-message\"; form: \"relay\"; rootId: string; senderId: string; senderSessionId?: string; senderName?: string; operationId: string; requestId?: string; replyTo?: string; };\n    'working-directory': { kind: 'working-directory'; };\n    'project-mode-result': { kind: \"project-mode-result\"; form: \"relay\"; completionId: string; workerId: SessionId; workerTurn: number; senderSessionId?: string; senderName?: string; };\n    'project-mode-assignment': { kind: \"project-mode-assignment\"; form: \"relay\"; operationId: string; coordinatorSessionId: SessionId; senderSessionId?: string; senderName?: string; };\n    'project-mode-notice': { kind: \"project-mode-notice\"; form: \"notice\"; summary: string; };\n}"
           },
           {
             "name": "ModelMessageSource",
@@ -1315,7 +1422,7 @@ export const TYPERT = {
           },
           {
             "name": "ProjectPaths",
-            "declaration": "export interface ProjectPaths {\n    root: string;\n    context: string;\n    notes: string;\n    archived: string;\n}"
+            "declaration": "export interface ProjectPaths {\n    root: string;\n    context: string;\n    notes: string;\n    archived: string;\n    index?: string;\n}"
           },
           {
             "name": "ProjectRecord",
@@ -1371,7 +1478,7 @@ export const TYPERT = {
           },
           {
             "name": "SessionEventMap",
-            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'session/title': SessionTitleEventData;\n    'model/selection': ModelSelection;\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'subagent/catalog': SubagentCatalogEvent;\n    'subagent/descriptor': SubagentDescriptorData;\n    'agent-preset/selected': { agentPreset: string; };\n    'deliverables/presented': { turn: number; callId: ToolCallId; files: PresentedFile[]; };\n    'working-directory/change': { cwd: string; };\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n}"
+            "declaration": "export interface SessionEventMap {\n    'turn/start': { turn: number; };\n    'turn/end': { turn: number; reason: TurnEndReason; };\n    'step/start': { turn: number; step: number; };\n    'step/end': { turn: number; step: number; };\n    'user/message': UserMessage;\n    'developer/message': { turn: number; step: number; message: DeveloperMessage; headerSeq?: SessionSeq; };\n    'system/message': { turn: number; step: number; message: SystemMessage; };\n    'assistant/message': { turn: number; step: number; message: AssistantMessage; stream: AssistantStreamRecord[]; usage?: TokenUsage; interrupted?: true; };\n    'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[]; };\n    'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string; };\n    'tool/result': { turn: number; step: number; message: ToolResultMessage; error?: { name: string; code: string; reason?: string; }; meta?: JsonValue; };\n    'request/header': { header: EpochHeader; reason: RequestHeaderReason; startsSeries?: true; };\n    'request/context': RequestContext;\n    'session/end-seed': { inherited?: true; };\n    'agent/inbox/spliced': { target: InboxTarget; start: number; removedCount?: number; inserted: UserMessage[]; outcome?: 'canceled'; };\n    'tool/ptc-dispatch-start': PtcDispatchStartEventData;\n    'tool/ptc-dispatch': PtcDispatchEventData;\n    'approval/asked': { id: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string; };\n    'approval/decided': { id: ApprovalRequestId; outcome: ApprovalOutcome; };\n    'approval/policy': { policy: ApprovalPolicy; source?: 'delegation'; };\n    'job/registered': JobRegisteredData;\n    'job/settled': JobSettledData;\n    'session/title': SessionTitleEventData;\n    'model/selection': ModelSelection;\n    'subagent/catalog': SubagentCatalogEvent;\n    'subagent/descriptor': SubagentDescriptorData;\n    'agent-preset/selected': { agentPreset: string; };\n    'deliverables/presented': { turn: number; callId: ToolCallId; files: PresentedFile[]; };\n    'working-directory/change': { cwd: string; };\n    'sandbox/mode': { mode: SandboxMode; source?: 'delegation'; };\n}"
           },
           {
             "name": "SessionEventType",
@@ -1474,6 +1581,10 @@ export const TYPERT = {
             "declaration": "export interface TokenUsage {\n    inputTokens: number;\n    outputTokens: number;\n    totalTokens?: number;\n    cacheReadTokens?: number;\n    cacheWriteTokens?: number;\n    reasoningTokens?: number;\n}"
           },
           {
+            "name": "ToolActivityIdentity",
+            "declaration": "export interface ToolActivityIdentity {\n    readonly owner: SessionId;\n    readonly turn: number;\n    readonly step: number;\n    readonly callSeq: SessionSeq;\n    readonly callId: import('@deepseek-ai/dsh-llm/types').ToolCallId;\n    readonly rootCallId: import('@deepseek-ai/dsh-llm/types').ToolCallId;\n}"
+          },
+          {
             "name": "ToolAdditionBlock",
             "declaration": "export interface ToolAdditionBlock {\n    type: 'tool-addition';\n    toolName: string;\n    tool?: never;\n}"
           },
@@ -1519,7 +1630,7 @@ export const TYPERT = {
           },
           {
             "name": "TurnEndReasonMap",
-            "declaration": "export interface TurnEndReasonMap {\n    completed: { kind: 'completed'; };\n    aborted: { kind: 'aborted'; reason: TurnEndCancelCause; };\n    blocked: { kind: 'blocked'; };\n    error: { kind: 'error'; error: LlmFailure; };\n    'max-tokens': { kind: 'max-tokens'; };\n    interrupted: { kind: 'interrupted'; };\n    forked: { kind: 'forked'; };\n}"
+            "declaration": "export interface TurnEndReasonMap {\n    handoff: { kind: 'handoff'; cause: 'background-message'; calls: readonly BackgroundReceipt[]; triggeringMessageIds: readonly import('@deepseek-ai/dsh-llm/types').MessageId[]; };\n    completed: { kind: 'completed'; };\n    aborted: { kind: 'aborted'; reason: TurnEndCancelCause; };\n    blocked: { kind: 'blocked'; };\n    error: { kind: 'error'; error: LlmFailure; };\n    'max-tokens': { kind: 'max-tokens'; };\n    interrupted: { kind: 'interrupted'; };\n    forked: { kind: 'forked'; };\n}"
           },
           {
             "name": "TurnWorkerMembership",
@@ -1527,7 +1638,7 @@ export const TYPERT = {
           },
           {
             "name": "TurnWorkerOutcomeView",
-            "declaration": "export interface TurnWorkerOutcomeView {\n    coordinatorSessionId: SessionId;\n    coordinatorTurn: number;\n    segmentStartSeq?: number;\n    workerId: SessionId;\n    status: \"completed\" | \"failed\" | \"stopped\" | \"deleted\";\n    completionIds: string[];\n    lastResultMessageId?: string;\n    lastResultSeq?: number;\n    summary?: string;\n}"
+            "declaration": "export interface TurnWorkerOutcomeView {\n    coordinatorSessionId: SessionId;\n    coordinatorTurn: number;\n    segmentStartSeq?: number;\n    workerId: SessionId;\n    status: \"completed\" | \"failed\" | \"stopped\" | \"deleted\" | \"continued\";\n    completionIds: string[];\n    lastResultMessageId?: string;\n    lastResultSeq?: number;\n    summary?: string;\n}"
           },
           {
             "name": "UserMessage",
@@ -1554,8 +1665,12 @@ export const TYPERT = {
             "declaration": "export interface WorkerInputView {\n    messageId: string;\n    actor: \"user\" | \"coordinator\" | \"other\";\n    text: string;\n    truncated: boolean;\n    state: \"committed\" | \"pending-steer\" | \"pending-queue\";\n    seq: number;\n    time: number;\n}"
           },
           {
+            "name": "WorkerParentReady",
+            "declaration": "export interface WorkerParentReady {\n    workerId: SessionId;\n    parentSessionId: SessionId;\n}"
+          },
+          {
             "name": "WorkerTimelineMessage",
-            "declaration": "export interface WorkerTimelineMessage {\n    id: string;\n    seq: number;\n    time: number;\n    text: string;\n    actor?: \"user\" | \"coordinator\";\n}"
+            "declaration": "export interface WorkerTimelineMessage {\n    id: string;\n    seq: number;\n    time: number;\n    text: string;\n    actor?: \"user\" | \"coordinator\" | \"agent\";\n}"
           },
           {
             "name": "WorkerTimelinePage",
@@ -1567,7 +1682,7 @@ export const TYPERT = {
           },
           {
             "name": "WorkerView",
-            "declaration": "export interface WorkerView {\n    workerId: SessionId;\n    name: string;\n    lifecycle: \"provisioning\" | \"active\" | \"deleting\" | \"deleted\" | \"provision-failed\";\n    status: \"busy\" | \"idle\" | null;\n    availability: \"live\" | \"cold\" | \"unavailable\";\n    queueLength: number | null;\n    pendingSteerCount: number | null;\n    phase: \"starting\" | \"working\" | \"waiting-user\" | \"idle\" | \"failed\" | \"stopped\" | \"disconnected\";\n    progressText?: string;\n    updatedAt: number;\n    activity?: WorkerActivity | null;\n}"
+            "declaration": "export interface WorkerView {\n    workerId: SessionId;\n    parentSessionId?: SessionId;\n    name: string;\n    lifecycle: \"provisioning\" | \"active\" | \"deleting\" | \"deleted\" | \"provision-failed\";\n    status: \"busy\" | \"idle\" | null;\n    availability: \"live\" | \"cold\" | \"unavailable\";\n    queueLength: number | null;\n    pendingSteerCount: number | null;\n    phase: \"starting\" | \"working\" | \"waiting-user\" | \"stopping\" | \"idle\" | \"failed\" | \"stopped\" | \"disconnected\";\n    progressText?: string;\n    updatedAt: number;\n    activity?: WorkerActivity | null;\n}"
           }
         ]
       }

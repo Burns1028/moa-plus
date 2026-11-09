@@ -242,8 +242,9 @@ void [list, descriptor, plugin, snapshot];
       run(process.execPath, ["smoke.mjs"], consumer).trim(),
     );
     console.log(
-      `${result.label}: unpatched refusal, explicit native compatibility, actual install, Host import, browser factory, native Loader auto discovery (8 endpoints), Client Gateway roundtrip and disposal passed`,
+      `${result.label}: unpatched refusal, explicit native compatibility, actual install, Host import, browser factory, native Loader auto discovery (9 endpoints), Client Gateway roundtrip and disposal passed`,
     );
+    await rm(consumer, { recursive: true, force: true });
   }
   if (gitRef) {
     const checkout = join(temp, "clean-checkout");

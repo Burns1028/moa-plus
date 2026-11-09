@@ -1,5 +1,33 @@
 import type { RecordState } from "./state.ts";
 
+/** Handoff preserves a seat; only that seat's real assignments can finish it. */
+export function settleContinuedOutcomes(record: RecordState): RecordState {
+  let changed = false;
+  const outcomes = record.outcomes.map((outcome) => {
+    if (outcome.status !== "continued") return outcome;
+    const assignments = record.assignments.filter((assignment) =>
+      assignment.workerId === outcome.workerId &&
+      assignment.coordinatorTurn === outcome.coordinatorTurn &&
+      assignment.segmentStartSeq === outcome.segmentStartSeq &&
+      assignment.admission !== "rejected",
+    );
+    const completed = record.completions.filter((completion) =>
+      completion.workerId === outcome.workerId &&
+      (outcome.completionIds.includes(completion.id) || completion.assignmentIds.some((id) => assignments.some((assignment) => assignment.id === id))),
+    );
+    if (!completed.length || assignments.some((assignment) => !completed.some((completion) => completion.assignmentIds.includes(assignment.id)))) return outcome;
+    const last = completed.at(-1)!;
+    changed = true;
+    return {
+      ...outcome,
+      status: last.outcome === "completed" ? "completed" as const : last.outcome === "aborted" ? "stopped" as const : "failed" as const,
+      completionIds: completed.map((completion) => completion.id),
+      ...(last.lastAssistant ? { lastResultMessageId: last.lastAssistant.messageId, lastResultSeq: last.lastAssistant.seq } : {}),
+    };
+  });
+  return changed ? { ...record, outcomes } : record;
+}
+
 export interface CapsuleAnchor {
   coordinatorTurn: number;
   segmentStartSeq: number;
@@ -223,7 +251,8 @@ export function repairCapsuleOwnership(
     )
       continue;
 
-    // A later worker completion is not evidence about an earlier closed turn.
+    // A later completion cannot rewrite an ordinarily closed turn. Handoff seats
+    // remain continued and are settled separately against their own assignments.
     // Only canonical coordinator receipts before this turn/end can contribute
     // result status or assistant-message metadata to the recovered outcome.
     const receipts = results.filter(
@@ -273,13 +302,16 @@ export function repairCapsuleOwnership(
             completion.assignmentIds.includes(assignment.id),
           ),
       );
-    const interrupted = closing.data.reason.kind !== "completed" || pending;
+    const continued = closing.data.reason.kind === "handoff" && (pending || !last);
+    const interrupted = closing.data.reason.kind !== "completed" && closing.data.reason.kind !== "handoff" || pending;
     outcomes.push({
       coordinatorSessionId: membership.coordinatorSessionId,
       coordinatorTurn: membership.coordinatorTurn,
       segmentStartSeq: membership.segmentStartSeq,
       workerId: membership.workerId,
-      status: interrupted
+      status: continued
+        ? "continued"
+        : interrupted
         ? "stopped"
         : last?.outcome === "completed"
           ? "completed"
@@ -287,7 +319,7 @@ export function repairCapsuleOwnership(
             ? "stopped"
             : "failed",
       completionIds: completed.map((completion) => completion.id),
-      ...(interrupted
+      ...(interrupted && !continued
         ? { summary: "Coordinator turn interrupted; worker work may continue." }
         : {}),
       ...(last?.lastAssistant
@@ -298,7 +330,7 @@ export function repairCapsuleOwnership(
         : {}),
     });
   }
-  repaired = { ...repaired, outcomes };
+  repaired = settleContinuedOutcomes({ ...repaired, outcomes });
   return JSON.stringify(repaired) === JSON.stringify(record)
     ? record
     : repaired;

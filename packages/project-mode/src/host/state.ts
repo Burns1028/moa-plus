@@ -18,6 +18,7 @@ export const pathsSchema = z.object({
   context: id,
   notes: id,
   archived: id,
+  index: id.optional(),
 });
 export const projectSchema = z.object({
   version: z.literal(1),
@@ -120,6 +121,8 @@ const nativeReceiptSchema = z.object({
 export type NativeReceipt = z.infer<typeof nativeReceiptSchema>;
 export const deliverySchema = z.object({
   completionId: id,
+  // Legacy deliveries target the owning Coordinator.
+  targetId: id.optional(),
   message: messageSchema,
   state: z.enum(["pending", "admitted", "consumed", "suppressed"]),
   attempts: z.number().int(),
@@ -144,7 +147,7 @@ export const outcomeSchema = z.object({
   coordinatorTurn: z.number().int(),
   segmentStartSeq: z.number().int().nonnegative().optional(),
   workerId: id,
-  status: z.enum(["completed", "failed", "stopped", "deleted"]),
+  status: z.enum(["completed", "failed", "stopped", "deleted", "continued"]),
   completionIds: z.array(id),
   lastResultMessageId: id.optional(),
   lastResultSeq: z.number().int().optional(),
@@ -184,6 +187,7 @@ const finishedSchema = z.object({
 });
 export const projectionSchema = z.object({
   turn: z.number().int(),
+  inheritedEventCount: z.number().int().nonnegative().default(0),
   segmentStartSeq: z.number().int().nonnegative().default(0),
   lastSeq: z.number().int().nonnegative().default(0),
   resultAnchors: z
@@ -197,6 +201,7 @@ export const projectionSchema = z.object({
     )
     .default({}),
   messageIds: z.array(id),
+  handoffMessageIds: z.array(id).default([]),
   lastAssistant: assistantSchema.optional(),
   finished: z.array(finishedSchema),
   consumed: z.array(id),
@@ -212,18 +217,21 @@ export const projection: ProjectionDefinition<
   Projection
 > = {
   key: "project-mode-results",
-  stateVersion: 2,
+  stateVersion: 4,
   stateSchema: projectionSchema,
-  init: () => ({
+  init: (_header, inheritedEventCount) => ({
     turn: 0,
+    inheritedEventCount,
     segmentStartSeq: 0,
     lastSeq: 0,
     resultAnchors: {},
     messageIds: [],
+    handoffMessageIds: [],
     finished: [],
     consumed: [],
   }),
   apply(state, event) {
+    if (event.seq < state.inheritedEventCount) return state;
     switch (event.type) {
       case "turn/start":
         return {
@@ -231,7 +239,7 @@ export const projection: ProjectionDefinition<
           lastSeq: event.seq,
           turn: event.data.turn,
           segmentStartSeq: event.seq,
-          messageIds: [],
+          messageIds: state.handoffMessageIds,
           lastAssistant: undefined,
         };
       case "user/message":
@@ -269,9 +277,16 @@ export const projection: ProjectionDefinition<
               },
             };
       case "turn/end":
+        if (event.data.reason.kind === "handoff")
+          return {
+            ...state,
+            lastSeq: event.seq,
+            handoffMessageIds: state.messageIds,
+          };
         return {
           ...state,
           lastSeq: event.seq,
+          handoffMessageIds: [],
           finished: [
             ...state.finished,
             {

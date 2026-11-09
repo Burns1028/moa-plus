@@ -94,8 +94,8 @@ it.each([false, true])(
       expect(request).toBeDefined();
       const schemas = f.ctx.tools.schemas(agent).map((tool) => tool.name);
       const routedNames = request.tools?.map((tool) => tool.name) ?? [];
-      expect(schemas).toContain("control_workers");
-      expect(routedNames).toContain("control_workers");
+      expect(schemas).toContain("Task");
+      expect(routedNames).toContain("Task");
       for (const name of names) {
         expect.soft(schemas, `native schemas: ${name}`).not.toContain(name);
         expect
@@ -117,7 +117,7 @@ it.each([false, true])(
       expect(worker).toBeDefined();
       expect(f.ctx.agentPresets.composedPreset(worker.ctx)).toBe("standard");
       for (const name of names)
-        expect(f.ctx.tools.get(name, worker), `worker ${name}`).toBeDefined();
+        expect(f.ctx.tools.get(name, worker), `worker ${name}`).toBeUndefined();
       release();
       await worker.whenIdle();
       await f.ctx.projectMode.snapshot(agent.id);
@@ -135,7 +135,7 @@ it.each([false, true])(
         expect(f.ctx.tools.get(name, agent), `unloaded ${name}`).toBe(
           before.get(name),
         );
-      expect(f.ctx.tools.get("control_workers", agent)).toBeUndefined();
+      expect(f.ctx.tools.get("Task", agent)).toBeUndefined();
     } finally {
       release();
       await f.dispose();

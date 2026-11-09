@@ -67,7 +67,7 @@ it("owns native tool restrictions independently of an earlier mask and restores 
     prior();
     for (const name of names)
       expect(f.ctx.tools.get(name, agent), name).toBeUndefined();
-    expect(f.ctx.tools.get("control_workers", agent)).toBeDefined();
+    expect(f.ctx.tools.get("Task", agent)).toBeDefined();
     await f.ctx.projectMode.setEnabled(
       agent.id,
       false,
@@ -100,17 +100,17 @@ it("reconciles all six late native tools synchronously through registration, rem
       expect(f.ctx.tools.get(name, agent), name).toBeUndefined();
     }
     expect(
-      f.ctx.tools.schemas(agent).filter((t) => t.name === "control_workers"),
+      f.ctx.tools.schemas(agent).filter((t) => t.name === "Task"),
     ).toHaveLength(1);
     await f.plugin.dispose();
     for (const name of names)
       expect(f.ctx.tools.get(name, agent)).toBeDefined();
-    expect(f.ctx.tools.get("control_workers", agent)).toBeUndefined();
-    await f.ctx.plugin(ProjectMode, {});
+    expect(f.ctx.tools.get("Task", agent)).toBeUndefined();
+    await f.ctx.plugin(ProjectMode, { completionVerification: false });
     for (const name of names)
       expect(f.ctx.tools.get(name, agent)).toBeUndefined();
     expect(
-      f.ctx.tools.schemas(agent).filter((t) => t.name === "control_workers"),
+      f.ctx.tools.schemas(agent).filter((t) => t.name === "Task"),
     ).toHaveLength(1);
     await f.ctx.projectMode.setEnabled(
       agent.id,
@@ -162,7 +162,7 @@ it("native Stop releases an unrelated queued job wait while its worker and nativ
           "queue",
           new AbortController().signal,
         );
-        host.enqueue(async () => {
+        host.enqueue(agent.id, async () => {
           entered.resolve();
           await jobGate.promise;
           await host.update(other.id, (r: any) => ({
@@ -369,7 +369,7 @@ it("reconciles a native registration made reentrantly during its own tools/chang
     });
     let registered = false;
     f.ctx.on("tools/change", () => {
-      if (!registered && f.ctx.tools.get("control_workers", agent)) {
+      if (!registered && f.ctx.tools.get("Task", agent)) {
         registered = true;
         f.ctx.tools.register(tool("subagent"));
       }
@@ -378,7 +378,7 @@ it("reconciles a native registration made reentrantly during its own tools/chang
     expect(registered).toBe(true);
     expect(f.ctx.tools.get("subagent", agent)).toBeUndefined();
     expect(
-      f.ctx.tools.schemas(agent).filter((t) => t.name === "control_workers"),
+      f.ctx.tools.schemas(agent).filter((t) => t.name === "Task"),
     ).toHaveLength(1);
   } finally {
     await f.dispose();
@@ -525,7 +525,7 @@ it("native steer reaches the next step in the same turn before an unrelated job 
           "queued",
           signal,
         );
-        host.enqueue(async () => {
+        host.enqueue(agent.id, async () => {
           entered.resolve();
           await jobGate.promise;
           await host.update(other.id, (r: any) => ({

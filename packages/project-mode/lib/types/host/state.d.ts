@@ -6,6 +6,7 @@ export declare const pathsSchema: z.ZodObject<{
     context: z.ZodString;
     notes: z.ZodString;
     archived: z.ZodString;
+    index: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export declare const projectSchema: z.ZodObject<{
     version: z.ZodLiteral<1>;
@@ -18,6 +19,7 @@ export declare const projectSchema: z.ZodObject<{
         context: z.ZodString;
         notes: z.ZodString;
         archived: z.ZodString;
+        index: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>;
     mode: z.ZodEnum<{
         enabled: "enabled";
@@ -108,6 +110,7 @@ declare const nativeReceiptSchema: z.ZodObject<{
 export type NativeReceipt = z.infer<typeof nativeReceiptSchema>;
 export declare const deliverySchema: z.ZodObject<{
     completionId: z.ZodString;
+    targetId: z.ZodOptional<z.ZodString>;
     message: z.ZodPipe<z.ZodUnknown, z.ZodTransform<UserMessage, unknown>>;
     state: z.ZodEnum<{
         pending: "pending";
@@ -151,6 +154,7 @@ export declare const outcomeSchema: z.ZodObject<{
         completed: "completed";
         failed: "failed";
         stopped: "stopped";
+        continued: "continued";
     }>;
     completionIds: z.ZodArray<z.ZodString>;
     lastResultMessageId: z.ZodOptional<z.ZodString>;
@@ -169,6 +173,7 @@ export declare const recordSchema: z.ZodObject<{
             context: z.ZodString;
             notes: z.ZodString;
             archived: z.ZodString;
+            index: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>;
         mode: z.ZodEnum<{
             enabled: "enabled";
@@ -245,6 +250,7 @@ export declare const recordSchema: z.ZodObject<{
     }, z.core.$strip>>;
     deliveries: z.ZodArray<z.ZodObject<{
         completionId: z.ZodString;
+        targetId: z.ZodOptional<z.ZodString>;
         message: z.ZodPipe<z.ZodUnknown, z.ZodTransform<UserMessage, unknown>>;
         state: z.ZodEnum<{
             pending: "pending";
@@ -288,6 +294,7 @@ export declare const recordSchema: z.ZodObject<{
             completed: "completed";
             failed: "failed";
             stopped: "stopped";
+            continued: "continued";
         }>;
         completionIds: z.ZodArray<z.ZodString>;
         lastResultMessageId: z.ZodOptional<z.ZodString>;
@@ -319,6 +326,7 @@ export declare const domainSpec: {
                     context: string;
                     notes: string;
                     archived: string;
+                    index?: string | undefined;
                 };
                 mode: "enabled" | "disabled";
                 revision: number;
@@ -373,6 +381,7 @@ export declare const domainSpec: {
                 message: UserMessage;
                 state: "pending" | "admitted" | "consumed" | "suppressed";
                 attempts: number;
+                targetId?: string | undefined;
                 lastError?: string | undefined;
                 nativeReceipt?: {
                     messageId: string;
@@ -398,7 +407,7 @@ export declare const domainSpec: {
                 coordinatorSessionId: string;
                 coordinatorTurn: number;
                 workerId: string;
-                status: "deleted" | "completed" | "failed" | "stopped";
+                status: "deleted" | "completed" | "failed" | "stopped" | "continued";
                 completionIds: string[];
                 segmentStartSeq?: number | undefined;
                 lastResultMessageId?: string | undefined;
@@ -413,6 +422,7 @@ export declare const domainSpec: {
 };
 export declare const projectionSchema: z.ZodObject<{
     turn: z.ZodNumber;
+    inheritedEventCount: z.ZodDefault<z.ZodNumber>;
     segmentStartSeq: z.ZodDefault<z.ZodNumber>;
     lastSeq: z.ZodDefault<z.ZodNumber>;
     resultAnchors: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodObject<{
@@ -421,6 +431,7 @@ export declare const projectionSchema: z.ZodObject<{
         participationSeq: z.ZodNumber;
     }, z.core.$strip>>>;
     messageIds: z.ZodArray<z.ZodString>;
+    handoffMessageIds: z.ZodDefault<z.ZodArray<z.ZodString>>;
     lastAssistant: z.ZodOptional<z.ZodObject<{
         messageId: z.ZodString;
         seq: z.ZodNumber;

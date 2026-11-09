@@ -29,7 +29,8 @@ export async function readHistory(
         ? event.data.message
         : event.type === "user/message" &&
             (event.data.source.kind === "user" ||
-              event.data.source.kind === "project-mode-assignment")
+              event.data.source.kind === "project-mode-assignment" ||
+              event.data.source.kind === "moa-message")
           ? event.data
           : undefined;
     if (!message) continue;

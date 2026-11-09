@@ -22,7 +22,12 @@ async function originalRuntime() {
   const manifest = JSON.parse(
     await readFile(join(root, "compat/rc3/manifest.json"), "utf8"),
   );
-  const variants = manifest.filter((entry: any) => entry.variant !== "desktop");
+  // The first package variant is the published npm preimage; later variants
+  // accept an already released compatibility build of that same package.
+  const variants = manifest.filter((entry: any, index: number) =>
+    entry.variant !== "desktop" &&
+    manifest.findIndex((other: any) => other.package === entry.package) === index,
+  );
   for (const entry of variants) {
     const packageRoot = join(modules, entry.package);
     await mkdir(packageRoot, { recursive: true });
@@ -41,7 +46,7 @@ async function originalRuntime() {
       );
       expect(hash(await readFile(target))).toBe(file.after);
     }
-    execFileSync("git", [
+    if (entry.files.some((file: any) => file.file.endsWith(".js"))) execFileSync("git", [
       "apply",
       "--reverse",
       "--unsafe-paths",
@@ -93,7 +98,7 @@ it("rejects an unknown second runtime before changing the first", async () => {
   try {
     const second = f.variants[1];
     await writeFile(
-      join(f.modules, second.package, "lib/client.js"),
+      join(f.modules, second.package, second.files.find((file: any) => file.file.endsWith(".js")).file),
       "unknown release",
     );
     expect(() =>

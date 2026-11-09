@@ -79,7 +79,7 @@ function readyFixture(t, { stock = false } = {}) {
     copyFileSync(join(root, "runtime/rc3", name), join(profile, name));
   const manifest = JSON.parse(
     readFileSync(join(root, "compat/rc3/manifest.json"), "utf8"),
-  ).filter((entry) => entry.variant !== "desktop");
+  ).filter((entry, index, entries) => entry.variant !== "desktop" && entries.findIndex(other => other.package === entry.package) === index);
   const source = stock
     ? join(root, "runtime/rc3/node_modules")
     : join(root, "node_modules");

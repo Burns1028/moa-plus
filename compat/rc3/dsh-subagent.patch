@@ -1,0 +1,212 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -856,6 +856,7 @@
+ * @internal
+ */
+ const deliverSubagentPrompt = Symbol.for("dsh.subagent.deliverPrompt");
++const withResidentChild = Symbol.for("dsh.subagent.withResidentChild");
+ //#endregion
+ //#region lib/types/structured.js
+ /**
+@@ -1844,7 +1845,9 @@
+ 			ancestry: new WeakSet(resource.kind === "external" ? parentLineage : [resource.handle.agent, ...parentLineage]),
+ 			ownedChildren: /* @__PURE__ */ new Set(),
+ 			observer,
+-			announced: false
++			announced: false,
++			quiet: inputs.quiet === true,
++			hostUsers: 0
+ 		};
+ 		activation.result.promise.catch(() => void 0);
+ 		this.resident.set(childId, activation);
+@@ -1858,11 +1861,22 @@
+ 			};
+ 			if (activation.kind === "local") {
+ 				observeLocalFailure(activation, wakeSettlement);
+-				activation.handle.agent.ctx.on("agent/inbox/inserted", wakeSettlement);
++				activation.handle.agent.ctx.on("agent/inbox/inserted", () => {
++					if (activation.quiet) {
++						activation.quiet = false;
++						activation.observer.start(activation.handle.agent);
++						this.announce(activation);
++					}
++					wakeSettlement();
++				});
+ 				activation.handle.agent.ctx.on("agent/inbox/claimed", wakeSettlement);
+ 				activation.handle.agent.ctx.on("agent/inbox/discarded", wakeSettlement);
++				activation.handle.agent.ctx.on("agent/tool-activity-started", ({ finished }) => {
++					void finished.then(wakeSettlement, wakeSettlement);
++				});
++				activation.handle.agent.ctx.on("agent/tool-background-result", wakeSettlement);
+ 			}
+-			observer.start(activationAgent(activation));
++			if (!activation.quiet) observer.start(activationAgent(activation));
+ 		} catch (error) {
+ 			/* v8 ignore next -- rollback failure must not mask the admission failure
+ 			* that prevented this operation from returning an accepted message id. */
+@@ -1970,7 +1984,7 @@
+ 		if (activation.closing !== void 0) return "closed";
+ 		if (activation.poke !== observation) return "retry";
+ 		const inbox = activation.handle.agent.inbox;
+-		if (activation.ownedChildren.size > 0) return "wait";
++		if (activation.hostUsers > 0 || activation.ownedChildren.size > 0 || activation.handle.agent.moaHasPendingBackground) return "wait";
+ 		if (activation.failureAt === void 0 && (inbox.nextTurn.length > 0 || inbox.nextStep.length > 0)) return "wait";
+ 		return "ready";
+ 	}
+@@ -2039,14 +2053,14 @@
+ 		};
+ 		this.notifySettlement(activation, result);
+ 		this.releaseOwnership(childId);
+-		activation.observer.settle(terminal);
++		if (!activation.quiet) activation.observer.settle(terminal);
+ 		if (resultFailure === void 0) activation.result.resolve(result);
+ 		else activation.result.reject(resultFailure.error);
+ 		if (failure !== void 0) throw failure;
+ 	}
+ 	/** Deliver the captured execution result to the durable direct parent after cleanup. */
+ 	notifySettlement(activation, terminal) {
+-		if (!activation.announced || activation.delivery === "caller") return;
++		if (activation.quiet || !activation.announced || activation.delivery === "caller") return;
+ 		try {
+ 			const parent = this.ctx.agents.get(activation.parent.id);
+ 			if (parent !== activation.parent) return;
+@@ -2134,11 +2148,50 @@
+ 			throw new SubagentError("direct parent is not live; the message was not delivered", "PARENT_UNAVAILABLE", { cause: error });
+ 		}
+ 	}
++	/** Borrow one exact native residency for a Host callback, without a prompt. */
++	async withResidentChild(parent, childId, signal, use) {
++		this.assertAdmitting(parent);
++		this.assertLiveParent(parent, childId);
++		const releaseHold = this.holdOwnership(parent, childId);
++		let activation;
++		try {
++			while (!activation) {
++				signal.throwIfAborted();
++				const candidate = await this.locks.run(childId, async () => {
++					this.assertAdmitting(parent);
++					this.assertLiveParent(parent, childId);
++					let current = this.resident.get(childId);
++					if (current?.closing) return { closing: current.closing };
++					if (!current) current = await this.restoreLocal(parent, childId, { signal }, true);
++					requireLocalActivation(current);
++					this.authorizeLineage(parent, childId, current.parent.id);
++					current.hostUsers++;
++					return { activation: current };
++				});
++				if (candidate.closing) await Promise.allSettled([candidate.closing]);
++				else activation = candidate.activation;
++			}
++			signal.throwIfAborted();
++			return await use(requireLocalActivation(activation).handle.agent);
++		} finally {
++			if (activation) await this.locks.run(childId, async () => {
++				activation.hostUsers--;
++				this.announce(activation);
++				this.wake(activation);
++			});
++			releaseHold();
++		}
++	}
+ 	/**
+ 	* Cold-resume a persisted child and submit the waiting turn. The descriptor
+ 	* supplies every reconstruction input; no subagent provider is dispatched.
+ 	*/
+ 	async coldResume(parent, childId, content, options) {
++		const activation = await this.restoreLocal(parent, childId, options);
++		return this.submitMaterialized(activation, content, options, parent);
++	}
++	/** Reconstruct the native child without admitting invented input. */
++	async restoreLocal(parent, childId, options, quiet = false) {
+ 		const env_1 = {
+ 			stack: [],
+ 			error: void 0,
+@@ -2169,6 +2222,8 @@
+ 					childId,
+ 					provider: descriptor.provider,
+ 					parent,
++					quiet,
++					...(quiet ? { delivery: "caller" } : {}),
+ 					agentOptions: {
+ 						...descriptor.agentProvider !== void 0 ? { provider: descriptor.agentProvider } : {},
+ 						...descriptor.agentModel !== void 0 ? { model: descriptor.agentModel } : {},
+@@ -2186,7 +2241,7 @@
+ 				if (error instanceof SubagentError) throw error;
+ 				throw new SubagentError(`subagent "${childId}" is unavailable`, "NOT_RESUMABLE", { cause: error });
+ 			}
+-			return await this.submitMaterialized(activation, content, options, parent);
++			return activation;
+ 		} catch (e_1) {
+ 			env_1.error = e_1;
+ 			env_1.hasError = true;
+@@ -3084,6 +3139,9 @@
+ 		* @param delivery - Queue as a distinct turn or Steer at the nearest step.
+ 		* @returns the accepted message's inbox id.
+ 		*/
++		[withResidentChild](parent, childId, signal, use) {
++			return this.requireManager().withResidentChild(parent, childId, signal, use);
++		}
+ 		[deliverSubagentPrompt](parent, childId, content, source, signal, delivery) {
+ 			return delivery === "steer" ? this.requireManager().steerPrompt(parent, childId, content, source, signal) : this.requireManager().queuePrompt(parent, childId, content, source, signal);
+ 		}
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -1,3 +1,4 @@
++import { withResidentChild } from './internal.ts';
+ /**
+  * Service Definition for the subagent capability seam (`ctx.subagents`): a named-provider registry plus a
+  * capability-validating asynchronous start API. Providers establish a
+@@ -103,6 +104,7 @@
+ }
+ /** Named provider registry with managed activations, durable discovery, and local child messaging. */
+ export declare class SubagentRuntime extends TypertRemoteService {
++    [withResidentChild]<T>(parent: Agent, childId: SessionId, signal: AbortSignal, use: (agent: Agent) => Promise<T>): Promise<T>;
+     private config;
+     static Config: z<Schemastery.ObjectS<NoInfer<{
+         maxDepth: z<number, number, "volatile-defined">;
+--- a/lib/types/manager.d.ts
++++ b/lib/types/manager.d.ts
+@@ -78,6 +78,7 @@
+      * @param childIds - durable direct-child ids to release when resident.
+      */
+     drainChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>;
++    withResidentChild<T>(parent: Agent, childId: SessionId, signal: AbortSignal, use: (agent: Agent) => Promise<T>): Promise<T>;
+     /**
+      * Start one continuable background child and resolve at initial inbox acceptance.
+      * Every earlier failure disposes any created handle and rolls back Activation
+@@ -232,6 +233,7 @@
+      * supplies every reconstruction input; no subagent provider is dispatched.
+      */
+     private coldResume;
++    private restoreLocal;
+     /** Admit a materialized child, commit its creation fact, and release it on failure. */
+     private submitMaterialized;
+     /** Build and submit one message across the final synchronous admission cutoff. */
+--- a/lib/types/internal.d.ts
++++ b/lib/types/internal.d.ts
+@@ -55,4 +55,10 @@
+  * @returns the accepted message's inbox id.
+  */
+ export declare function steerHostSubagentPrompt(runtime: SubagentRuntime, parent: Agent, childId: SessionId, content: ContentBlock[], source: MessageSource, signal: AbortSignal): Promise<MessageId>;
+-//# sourceMappingURL=internal.d.ts.map
+\ No newline at end of file
++//# sourceMappingURL=internal.d.ts.map
++/** Host-only promptless native residency callback. */
++export declare const withResidentChild: unique symbol;
++export interface HostResidentChild {
++    [withResidentChild]<T>(parent: Agent, childId: SessionId, signal: AbortSignal, use: (agent: Agent) => Promise<T>): Promise<T>;
++}
++export declare function withResidentSubagent<T>(runtime: SubagentRuntime, parent: Agent, childId: SessionId, signal: AbortSignal, use: (agent: Agent) => Promise<T>): Promise<T>;
+--- a/lib/types/internal.js
++++ b/lib/types/internal.js
+@@ -55,4 +55,8 @@
+ export function steerHostSubagentPrompt(runtime, parent, childId, content, source, signal) {
+     return runtime[deliverSubagentPrompt](parent, childId, content, source, signal, 'steer');
+ }
+-//# sourceMappingURL=internal.js.map
+\ No newline at end of file
++//# sourceMappingURL=internal.js.map
++export const withResidentChild = Symbol.for("dsh.subagent.withResidentChild");
++export function withResidentSubagent(runtime, parent, childId, signal, use) {
++    return runtime[withResidentChild](parent, childId, signal, use);
++}

@@ -28,7 +28,8 @@ it("restricts only coordinator tools and restores them on disable", async () => 
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     expect(f.ctx.tools.get("subagent", agent)).toBeUndefined();
     expect(f.ctx.tools.get("subagent", ordinary)).toBeDefined();
-    expect(f.ctx.tools.get("control_workers", agent)).toBeDefined();
+    expect(f.ctx.tools.get("Task", agent)).toBeDefined();
+    expect(f.ctx.tools.get("control_workers", agent)).toBeUndefined();
     await f.ctx.projectMode.setEnabled(agent.id, false, 1, "disable");
     expect(f.ctx.tools.get("subagent", agent)).toBeDefined();
   } finally {
@@ -98,7 +99,7 @@ it("creates an owned continuable worker immediately with role context before its
     await new Promise((r) => setTimeout(r, 10));
     expect(
       JSON.stringify(f.adapter.requests.find((r) => r.sessionId === workerId)),
-    ).toContain("Project worker");
+    ).toContain("MoA+ worker");
     expect(f.ctx.tools.get("control_workers", worker)).toBeUndefined();
     expect(
       (await f.ctx.subagents.listChildren(agent.id)).map((c) => c.id),
@@ -175,6 +176,16 @@ it("returns both queued turn finals in full and consumes results inside one coor
     );
     expect(results).toHaveLength(2);
     expect(JSON.stringify(results)).toContain(full);
+    for (const result of results)
+      expect(result.data.source).toMatchObject({ senderSessionId: childId, senderName: "worker" });
+    expect(results.map(result => result.data.content.slice(1))).toEqual([
+      [{ type: "text", text: full }],
+      [{ type: "text", text: "second final" }],
+    ]);
+    using child = await f.ctx.sessionQuery.observeSession(childId!);
+    const assignment = child.events.find(event => event.type === "user/message" && event.data.source.kind === "project-mode-assignment");
+    expect(assignment?.data.source).toMatchObject({ senderSessionId: agent.id, senderName: "Coordinator" });
+    expect(assignment?.data.content).toEqual([{ type: "text", text: "second" }]);
     expect(
       (await f.ctx.projectMode.snapshot(agent.id))?.closedTurnOutcomes,
     ).toHaveLength(1);
@@ -261,9 +272,12 @@ it("keeps preset tools on workers and restores coordinator tools on draft disabl
     expect(f.ctx.agentPresets.composedPreset(child.ctx)).toBe("standard");
     for (const name of nativeNames) {
       expect(f.ctx.tools.get(name, agent), name).toBeUndefined();
-      expect(f.ctx.tools.get(name, child), name).toBeDefined();
+      expect(f.ctx.tools.get(name, child), name).toBeUndefined();
       expect(f.ctx.tools.get(name, ordinary), name).toBeDefined();
     }
+    expect(f.ctx.tools.get("SendMessage", agent)).toBeDefined();
+    expect(f.ctx.tools.get("SendMessage", child)).toBeDefined();
+    expect(f.ctx.tools.get("SendMessage", ordinary)).toBeUndefined();
     expect(f.ctx.tools.get("control_workers", child)).toBeUndefined();
     release();
     await child.whenIdle();
@@ -892,7 +906,7 @@ it("initializes context through the coordinator scoped sandbox filesystem and pr
     expect(await readFile(mode.paths!.notes, "utf8")).toBe("keep my notes");
     const { join } = await import("node:path");
     const { rm, access } = await import("node:fs/promises");
-    const index = join(mode.paths!.context, "context.md");
+    const index = join(mode.paths!.context, "index.md");
     await rm(index, { force: true });
     setSandboxMode(agent.session, "read-only");
     agent.followup(
@@ -1145,11 +1159,9 @@ it("treats a reused provider tool call ID in distinct native turns as distinct d
       const block = {
         type: "tool-call" as const,
         id: ToolCallId("provider-reuses-id"),
-        name: "control_workers",
+        name: "Task",
         arguments: JSON.stringify({
-          action: "spawn",
-          name: "worker",
-          task: "work",
+          tasks: [{ name: "worker", task: "work", role: "General-purpose", workspace: "shared" }],
         }),
       };
       return [

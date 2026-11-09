@@ -85,7 +85,8 @@
     "@deepseek-ai/dsh-scope": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3"
+    "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-jobs": "0.2.1-rc.3"
   },
   "dependencies": {
     "zod": "4.4.3"
@@ -107,7 +108,7 @@
   "engines": {
     "node": ">=24.9.0"
   },
-  "description": "Unofficial Project Mode for DeepSeek Harness: persistent Coordinator, reusable Workers and shared context. Preview; requires patched DSH 0.2.1-rc.3.",
+  "description": "MoA+ for DeepSeek Harness: advancing intelligence through native multi-agent collaboration. Developer preview; requires the reviewed rc.3 compatibility runtime.",
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -115,8 +116,9 @@
     "multi-agent",
     "ai-agents",
     "agent-orchestration",
-    "project-management",
-    "typescript"
+    "typescript",
+    "mixture-of-agents",
+    "shared-memory"
   ],
   "icon": "./assets/icon.svg",
   "dsh": {
@@ -140,10 +142,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Burns1028/dsh-plugin-project-mode.git"
+    "url": "git+https://github.com/Burns1028/moa-plus.git"
   },
-  "homepage": "https://github.com/Burns1028/dsh-plugin-project-mode#readme",
+  "homepage": "https://github.com/Burns1028/moa-plus#readme",
   "bugs": {
-    "url": "https://github.com/Burns1028/dsh-plugin-project-mode/issues"
+    "url": "https://github.com/Burns1028/moa-plus/issues"
   }
 }

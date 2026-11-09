@@ -1,22 +1,53 @@
 # Compatibility
 
-For a first trial, use the [isolated Web setup](quickstart.md). It installs locked dependencies and explicitly applies this same manifest inside a new owned directory, without changing an installed Desktop application.
+Target: **DSH 0.2.1-rc.3, Node 24.9+**. The unreleased MoA runtime in this checkout requires the matching explicit native extensions. Stock rc.3 is incompatible. These are local compatibility extensions, not claims of upstream acceptance.
 
-Target: DSH 0.2.1-rc.3, Node 24.9+. Stock rc.3 is incompatible. These are local compatibility extensions, not claims of upstream acceptance:
+The published **v0.1.23** tag used three earlier extensions: Agent-local tool suppression, per-session steer submission, and native sidebar branches. It does not include the new Agent/background/residency runtime. Keep a plugin checkout, runtime template/lockfile, and compatibility manifest from the same revision. A current branch's existing package version is not proof of a published release.
 
-1. Agent-local `tools.suppress({ deny })`, including tools registered on that Agent, with reversible disposal.
-2. Per-session `conversation.submission.register(sessionId, "steer")`, leaving global preferences untouched.
-3. `sidebar.workspaces.session.branch`, allowing native parent/child row rendering without replacing the workspace browser.
+## Current native boundary
 
-The audited files and before/after SHA-256 hashes live in `compat/rc3/manifest.json`. npm and Desktop client builds have separate variants. `scripts/apply-native-compat.mjs` refuses unknown versions, unknown bytes and mixed states, preflights every patch, requires an explicit backup before changes and rolls back failed application.
+`compat/rc3/manifest.json` is the authoritative file and SHA-256 list. The current manifest covers these **13 packages**, with separate npm/Desktop Client variants and an upgrade variant for the previously published tool-isolation patch:
 
-For this checkout, install dependencies and run the helper explicitly:
+| Native package | Required extension |
+| --- | --- |
+| `dsh-client-ui-conversation` | Per-session native submission choice; MoA Coordinator Enter/Send can steer without changing global preferences. |
+| `dsh-client-ui-workspace` | Native `sidebar.workspaces.session.branch` rendering through original parent/child row callbacks. |
+| `dsh-tools` | Reversible Agent-local suppression, transferable tool execution, background metadata/results, and direct protocol tools alongside PTC. |
+| `dsh-agent` | Typed activity/background events, joined cancellation, and derived native ownership/cleanup facts. |
+| `dsh-agent-loop` | Native tool transfer, same-turn timer continuation versus message handoff, canonical result finalization, and cancellation exit barrier. |
+| `dsh-session` | Typed background handoff/receipt event contracts. |
+| `dsh-jobs` | Native producer/controller types and completion-notice ownership. |
+| `dsh-jobs-local` | Adopt/query/cancel the actual owned native producer with its final result and exit state. |
+| `dsh-tool-jobs` | Preserve the owning controller's result-reporting responsibility rather than emit a duplicate generic notice. |
+| `dsh-tool-bash` | Expose actual foreground/promoted Bash execution for native adoption. |
+| `dsh-shell` | Managed shell resource termination/exit contract. |
+| `dsh-bash-local` | Actual subprocess-backed managed termination and exit observation. |
+| `dsh-subagent` | Host-only promptless borrowing of the true cold parent chain, preserving native restoration, capacity, lineage, and teardown. |
+
+All names in this table have the `@deepseek-ai/` prefix. Some changes are declarations only; runtime-only distributions therefore apply fewer file edits than development installations.
+
+Read the [background/cancellation contract](native-moa-contract.md), [promptless residency contract](native-moa-residency-contract.md), and [protocol presentation contract](native-moa-protocol-presentation-contract.md) before altering these seams. Existing batch-local ordering remains native-owned. There is no universal cross-turn tool lease, alternate scheduler, or bypass for model control calls.
+
+## Prepare explicitly
+
+For a first trial, use the [isolated Web setup](quickstart.md). It installs locked dependencies and applies this manifest inside a new owned directory, with backups. It does not change an installed Desktop application.
+
+For this source checkout:
 
 ```sh
+npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup /absolute/path/to/native-backup
 ```
 
-For a separate unpacked runtime, provide `--modules /absolute/path/to/runtime/node_modules`; add `--runtime-only` only for a distribution that contains JS without declarations. Preserve a full application/runtime backup before changing a Desktop installation. The helper does not locate, unpack, sign, restart or edit an application, profile, conversation or global preference automatically.
+For a separate unpacked matching runtime, add `--modules /absolute/path/to/runtime/node_modules`. Use `--runtime-only` only for a distribution containing runtime JS without matching declaration files.
 
-There are no install/prepare lifecycle hooks. A DSH update requires fresh compatibility review; never blindly apply rc.3 patches to another version. To revert, stop the affected runtime, restore exactly the files from its backup and remove the plugin through its native plugin manager.
+The helper refuses unknown versions, unknown bytes, and mixed patch states. It preflights the entire plan before changes, requires an explicit backup, and rolls back failed application. Reapplication of recognized final bytes is idempotent. Keep the original backup; a later checkout is not a replacement for the original preimage.
+
+There are no install/prepare lifecycle hooks. The helper does not locate, unpack, sign, restart, or modify an installed app/profile automatically. Preparing Desktop manually requires a full runtime/application backup and its matching audited variant. A DSH upgrade requires fresh compatibility review; never apply rc.3 patches blindly to another version.
+
+## Revert
+
+Stop the affected runtime, restore exactly the files in its original backup, and remove the plugin through the native plugin manager. Keep project/session data if it is still needed. For an isolated Web trial, stopping and retaining its separate directory leaves the ordinary Desktop installation untouched.
+
+Package-consumer, native-contract, launcher, and real-model/UI checks are distinct. See [verification](verification.md) for the evidence associated with a version or branch.

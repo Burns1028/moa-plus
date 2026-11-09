@@ -1,9 +1,12 @@
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, freezeMessage } from "@deepseek-ai/dsh-llm";
-import { projected, resolveOrdinaryAgent } from "./native.ts";
+import type { Agent } from "@deepseek-ai/dsh-agent";
+import { withManagedAgent } from "./moa/residency.ts";
+import { projected } from "./native.ts";
 import { projection, type Projection } from "./state.ts";
 import type { HostAccess } from "./host-access.ts";
-import { participatingMemberships } from "./capsule-participation.ts";
+import { participatingMemberships, settleContinuedOutcomes } from "./capsule-participation.ts";
+import type { AgentDescriptor } from "./moa/agents.ts";
 import { consumedNativeReceipts } from "./native-receipt.ts";
 /** Serializes result collection and durable native inbox admission. */
 export class CompletionOutbox {
@@ -81,6 +84,8 @@ export class CompletionOutbox {
           completionId: id,
           workerId,
           workerTurn: finished.turn,
+          senderSessionId: workerId,
+          senderName: this.host.worker(r, workerId).name,
         },
         content: [
           {
@@ -90,13 +95,19 @@ export class CompletionOutbox {
           ...(finished.lastAssistant?.content ?? []),
         ],
       });
-      await this.host.update(parentId, (r) => ({
+      await this.host.update(parentId, (r) => settleContinuedOutcomes({
         ...r,
         completions: [...r.completions, completion],
         deliveries: [
           ...r.deliveries,
           {
             completionId: id,
+            targetId:
+              (
+                r.operations[`moa:agent:${workerId}`] as unknown as
+                  | AgentDescriptor
+                  | undefined
+              )?.reportTo ?? parentId,
             message,
             state:
               (this.host.worker(r, workerId).lifecycle === "deleting" ||
@@ -111,16 +122,20 @@ export class CompletionOutbox {
     }
     await this.deliver(parentId);
   }
-  async consume(parentId: SessionId, messageId: string) {
-    const r = this.host.record(parentId);
+  async consume(targetId: SessionId, messageId: string) {
+    const r = this.host.record(targetId) ?? this.host.owner(targetId);
+    const parentId = r ? SessionId(r.project.coordinatorSessionId) : targetId;
     if (
       !r ||
       !r.deliveries.some(
-        (d) => d.message.id === messageId && d.state !== "consumed",
+        (d) =>
+          d.message.id === messageId &&
+          (d.targetId ?? parentId) === targetId &&
+          d.state !== "consumed",
       )
     )
       return;
-    const agent = this.host.ctx.agents.get(parentId);
+    const agent = this.host.ctx.agents.get(targetId);
     // Captured by the native projection at the exact user/message receipt;
     // asynchronous persistence must not borrow a later human input's anchor.
     let anchor = agent
@@ -128,7 +143,7 @@ export class CompletionOutbox {
       : undefined;
     if (!anchor) {
       using observed =
-        await this.host.ctx.sessionQuery.observeSession(parentId);
+        await this.host.ctx.sessionQuery.observeSession(targetId);
       anchor = observed.events.reduce(
         projection.apply,
         projection.init(observed.header, observed.inheritedEventCount),
@@ -144,7 +159,7 @@ export class CompletionOutbox {
           completion = r.completions.find(
             (c) => c.id === delivery?.completionId,
           );
-        return anchor && completion
+        return targetId === parentId && anchor && completion
           ? participatingMemberships(
               r,
               completion.workerId,
@@ -169,28 +184,59 @@ export class CompletionOutbox {
     return work;
   }
   private async admitDeliveries(parentId: SessionId) {
-    if (this.normalizing.has(parentId)) return;
-    if (
-      !this.host
-        .record(parentId)!
-        .deliveries.some(
-          (delivery) =>
-            delivery.state !== "consumed" && delivery.state !== "suppressed",
-        )
-    )
+    const record = this.host.record(parentId);
+    if (!record) return;
+    const targets = new Set(
+      record.deliveries
+        .filter((d) => d.state !== "consumed" && d.state !== "suppressed")
+        .map((d) => SessionId(d.targetId ?? parentId)),
+    );
+    for (const targetId of targets) await this.admitTarget(parentId, targetId);
+  }
+  private async admitTarget(
+    parentId: SessionId,
+    targetId: SessionId,
+    resident?: Agent,
+  ): Promise<void> {
+    const target =
+      targetId === parentId
+        ? undefined
+        : this.host.record(parentId)?.workers.find((w) => w.id === targetId);
+    if (target?.lifecycle === "deleted") {
+      await this.host.update(parentId, (r) => ({
+        ...r,
+        deliveries: r.deliveries.map((d) =>
+          d.targetId === targetId && d.state !== "consumed"
+            ? { ...d, state: "suppressed" }
+            : d,
+        ),
+      }));
+      return;
+    }
+    if (target?.lifecycle === "deleting" || this.normalizing.has(targetId))
       return;
     // A legacy/native parent delivery may have been consumed while this plugin
     // was absent. Reconcile BEFORE resolving/waking the cold coordinator.
-    let agent = this.host.ctx.agents.get(parentId);
+    let agent = resident ?? this.host.ctx.agents.get(targetId);
     const events = agent
       ? agent.session.snapshotEvents()
       : await (async () => {
           using observed =
-            await this.host.ctx.sessionQuery.observeSession(parentId);
+            await this.host.ctx.sessionQuery.observeSession(targetId);
           return observed.events;
         })();
     const receipts = consumedNativeReceipts(
-      this.host.record(parentId)!.completions,
+      this.host
+        .record(parentId)!
+        .completions.filter((c) =>
+          this.host
+            .record(parentId)!
+            .deliveries.some(
+              (d) =>
+                d.completionId === c.id &&
+                (d.targetId ?? parentId) === targetId,
+            ),
+        ),
       events,
     );
     const adopted = this.host
@@ -200,7 +246,8 @@ export class CompletionOutbox {
           d.state !== "consumed" &&
           d.state !== "suppressed" &&
           receipts.has(d.completionId) &&
-          !this.claimed.get(parentId)?.has(d.message.id),
+          (d.targetId ?? parentId) === targetId &&
+          !this.claimed.get(targetId)?.has(d.message.id),
       );
     if (adopted.length) {
       await this.host.update(parentId, (r) => ({
@@ -222,22 +269,32 @@ export class CompletionOutbox {
       !this.host
         .record(parentId)!
         .deliveries.some(
-          (d) => d.state !== "consumed" && d.state !== "suppressed",
+          (d) =>
+            (d.targetId ?? parentId) === targetId &&
+            d.state !== "consumed" &&
+            d.state !== "suppressed",
         )
     )
       return;
-    if (!agent) agent = await resolveOrdinaryAgent(this.host.ctx, parentId);
-    if (!agent) return;
+    if (!resident)
+      return withManagedAgent(
+        this.host,
+        targetId,
+        this.host.closing.signal,
+        async (resolved) => this.admitTarget(parentId, targetId, resolved),
+      );
+    agent = resident;
     for (const d of this.host.record(parentId)!.deliveries) {
-      if (this.normalizing.has(parentId)) return;
+      if (this.normalizing.has(targetId)) return;
+      if ((d.targetId ?? parentId) !== targetId) continue;
       if (d.state === "consumed" || d.state === "suppressed") continue;
       if (
         projected(this.host.ctx, agent.session).consumed.includes(d.message.id)
       ) {
-        await this.consume(parentId, d.message.id);
+        await this.consume(targetId, d.message.id);
         continue;
       }
-      if (this.claimed.get(parentId)?.has(d.message.id)) continue;
+      if (this.claimed.get(targetId)?.has(d.message.id)) continue;
       if (
         [...agent.inbox.nextStep, ...agent.inbox.nextTurn].some(
           (m) => m.id === d.message.id,
@@ -281,7 +338,7 @@ export class CompletionOutbox {
             setTimeout(
               () => {
                 this.retries.delete(parentId);
-                this.host.enqueue(() => this.deliver(parentId));
+                this.host.enqueue(parentId, () => this.deliver(parentId));
               },
               Math.min(
                 this.host.config.retryMaxDelayMs,
