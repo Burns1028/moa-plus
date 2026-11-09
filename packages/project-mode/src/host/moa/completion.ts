@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import type { HostAccess } from "../host-access.ts";
 import { waitForTurn } from "../native.ts";
+import { outcomeVerifierPrompt, rubricBuilderPrompt } from "../prompts/completion.ts";
 import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./worker-memory-policy.ts";
 
 declare module "@deepseek-ai/dsh-llm" {
@@ -179,11 +180,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     try {
       verifier = await make("verifier");
       verifierMemoryPolicy = bindWorkerMemoryPolicy(host.ctx, verifier.agent, record.project.paths);
-      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: `Independently derive task-deliverable acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Read the requirements in chronological order: later clarifications supersede conflicting earlier instructions. sourceVersions records each explicit human source reference with its 1-based requirements position; a null position denotes a legacy snapshot captured before version tracking. sources contains the latest captured content for each path. Apply a revised source from its associated requirement while preserving unaffected earlier requirements. An instruction governing subsequent actions applies from its arrival unless the user explicitly makes it retroactive; do not turn it into a restriction on earlier actions. Preserve all other explicit deliverable, artifact, build and test requirements. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation.
-
-You are part of a pre-end completion gate. The parent turn is still open while the Builder and Verifier run; a passing review allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Do not require this review's own completed record or the subsequent parent turn/end as already-existing task deliverables.
-
-Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${JSON.stringify({ ...input, attachments: undefined })}` }, ...input.attachments] }));
+      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: rubricBuilderPrompt(JSON.stringify({ ...input, attachments: undefined })) }, ...input.attachments] }));
       const build = builder.agent.whenIdle().then(async () => {
         if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
         rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
@@ -292,11 +289,7 @@ Submit the completed Markdown rubric by calling submit_rubric. Set tests_require
         if (call) successfulBash.add(call.seq);
       });
       clearCandidate = pair.freezeCandidate(answer, control);
-      pair.verifier.agent.followup(msg(`Independently verify actual deliverables against this rubric. Interpret the anchored requirements chronologically: later clarifications supersede conflicting earlier instructions, and instructions about subsequent actions apply from their arrival unless explicitly retroactive.
-
-This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
-
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require Bash merely to inspect it. Inspect file artifacts with available native tools and personally run relevant Bash/build/tests where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Rubric file: ${pair.rubricPath}`));
+      pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       await pair.read(control);
       const events = pair.verifier.agent.session.snapshotEvents().slice(offset);

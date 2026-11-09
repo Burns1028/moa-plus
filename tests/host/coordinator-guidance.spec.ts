@@ -4,7 +4,7 @@ import { createUserMessage, type GenerateOptions } from "@deepseek-ai/dsh-llm";
 import Loader from "@deepseek-ai/cordis-plugin-loader";
 import Presets from "@deepseek-ai/dsh-agent-preset-registry";
 import { fixture, response } from "./fixture.ts";
-import { coordinatorPrompt } from "../../packages/project-mode/src/host/coordinator-prompt.ts";
+import { coordinatorPrompt } from "../../packages/project-mode/src/host/prompts/coordinator.ts";
 
 function systemText(request: GenerateOptions) {
   return request.messages

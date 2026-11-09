@@ -68,11 +68,11 @@ it("forks a selected session through native activation with a fresh identity", a
     });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     (f.ctx.projectMode as any).moa.dispose();
-    const seeds = new Map();
-    const unregister = f.ctx.subagents.registerProvider(
-      createForkProvider(seeds),
-    );
     const child = SessionId("fork-child");
+    let seed: ReturnType<typeof prepareForkSeed> | undefined;
+    const unregister = f.ctx.subagents.registerProvider(
+      createForkProvider((id) => id === child ? seed : undefined),
+    );
     const { agent: source } = await f.ctx.agents.create({
       sessionId: SessionId("selected-source"),
       meta: { cwd: f.root },
@@ -86,7 +86,7 @@ it("forks a selected session through native activation with a fresh identity", a
     );
     await source.whenIdle();
     const events = source.session.snapshotEvents();
-    seeds.set(child, prepareForkSeed(events, events.at(-1)!.seq));
+    seed = prepareForkSeed(events, events.at(-1)!.seq);
     const received = Promise.withResolvers<void>();
     f.adapter.handler = (options) => {
       if (options.sessionId === child) received.resolve();
@@ -114,7 +114,6 @@ it("forks a selected session through native activation with a fresh identity", a
     expect(messages.indexOf("inherited source fact")).toBeLessThan(
       messages.indexOf("Agent ID: fork-child"),
     );
-    expect(seeds.has(child)).toBe(false);
     unregister();
   } finally {
     await f.dispose();

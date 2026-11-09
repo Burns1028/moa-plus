@@ -30,7 +30,8 @@ Patterns are decisions made through these tools and role prompts: create a clean
 | File | Responsibility and main entry points |
 | --- | --- |
 | [host/index.ts](../packages/project-mode/src/host/index.ts) | `ProjectMode[Service.init]`, `prepareAgent`, `attach`, `recover`, and authorized Remote methods compose the plugin. |
-| [host/moa/tools.ts](../packages/project-mode/src/host/moa/tools.ts) | Native model definitions and validation for Task, Fork, QueryAgent, KillAgent, and ProjectContext. |
+| [host/prompts/](../packages/project-mode/src/host/prompts/) | Coordinator/Worker policies, Builder/Verifier instructions, identity/reporting text, and interrupt-judge instructions. Constants and pure text constructors live here; native message admission, source serialization, attachments and runtime state stay with their services. |
+| [host/moa/tools.ts](../packages/project-mode/src/host/moa/tools.ts) | Model-facing definitions for Task, Fork, SendMessage, QueryAgent, KillAgent, and ProjectContext; validate arguments and call the responsible service. |
 | [host/moa/agents.ts](../packages/project-mode/src/host/moa/agents.ts) | `MoAAgents.task`, `fork`, `query`, `kill`, `context`, `recover`, and `lifecycle` implement controls through existing native capabilities. |
 | [host/moa/roles.ts](../packages/project-mode/src/host/moa/roles.ts) | `applyRoleRestrictions` mounts each specialist's execution-tool boundary. |
 | [host/moa/workspaces.ts](../packages/project-mode/src/host/moa/workspaces.ts) | `MoAWorkspaceManager.prepare`, `discoverOwned`, and `destroy` own dirty-state snapshots and cleanup of owned worktrees. |
@@ -39,7 +40,7 @@ Patterns are decisions made through these tools and role prompts: create a clean
 | [host/moa/judge.ts](../packages/project-mode/src/host/moa/judge.ts) | `judgeInterrupt` makes a short native no-thinking decision about pending input without consuming it or creating an Agent. |
 | [host/moa/background.ts](../packages/project-mode/src/host/moa/background.ts) | `bindBackground` binds policy, job queries/cancellation, canonical result receipts, recovery, and teardown to one native Agent. |
 | [host/moa/completion.ts](../packages/project-mode/src/host/moa/completion.ts) | `bindCompletion` installs Ralph and the Coordinator's owned independent Builder/Verifier helpers. |
-| [host/project-memory.ts](../packages/project-mode/src/host/project-memory.ts) | `memoryPaths`, `identityMessage`, `ensureContextIndex`, and `bindProjectMemory` own paths, identity text, progressive index creation, and full notes admission. |
+| [host/project-memory.ts](../packages/project-mode/src/host/project-memory.ts) | `memoryPaths`, `accessProjectContext`, `ensureContextIndex`, and `bindProjectMemory` own paths, shared Context I/O, progressive index creation, and full notes admission. Shared writes retain membership, native policy, path containment and conditional-version checks. |
 | [host/moa/worker-memory-policy.ts](../packages/project-mode/src/host/moa/worker-memory-policy.ts) | `bindWorkerMemoryPolicy` attaches the project's actual notes/archive paths to the Worker's native session policy and retains protection through joined teardown. |
 | [host/worker-operations.ts](../packages/project-mode/src/host/worker-operations.ts) | `spawnMoA` and the existing prepare/admit/accept/reconcile path persist input acceptance and capsule provenance. Legacy backend controls use the same path. |
 | [host/completion-outbox.ts](../packages/project-mode/src/host/completion-outbox.ts) | `ingest`, `deliver`, and `consume` persist full ended-turn results and route them once to the designated recipient. |

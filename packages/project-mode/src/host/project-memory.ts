@@ -2,7 +2,8 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ProjectPaths } from "../shared/index.ts";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
-import { isAbsolute, resolve, basename } from "node:path";
+import { FsVersion } from "@deepseek-ai/dsh-fs";
+import { resolve, basename } from "node:path";
 import type { HostAccess } from "./host-access.ts";
 
 declare module "@deepseek-ai/dsh-llm" {
@@ -28,20 +29,6 @@ export function notesInjection(text: string): string {
     : text;
 }
 
-export interface MoAIdentity {
-  id: string;
-  workdir: string;
-  isolated: boolean;
-  reportTo: string;
-  reportingInstructions: string;
-}
-/** Identity is dialogue content; it never personalizes the system prompt. */
-export function identityMessage(identity: MoAIdentity): string {
-  if (!isAbsolute(identity.workdir))
-    throw new Error("project-mode/workdir-not-absolute");
-  return `Agent ID: ${identity.id}\nWorkdir: ${identity.workdir} (${identity.isolated ? "Isolated" : "Shared"})\nReport to: ${identity.reportTo}\nReporting instructions: ${identity.reportingInstructions}`;
-}
-
 function filesystem(ctx: Context, agent: Agent) {
   const presets = ctx.get("agentPresets");
   const fs = presets?.serviceFor(agent, "fs") ?? agent.ctx.get("fs");
@@ -59,6 +46,73 @@ export const contextIndexTemplate =
   "# Project context\n\nRead this shared index first, then open only the context files needed for the task. Coordinator and Workers maintain reusable project knowledge here. Workers contribute valuable reusable findings; the Coordinator primarily organizes, consolidates and prunes context. Keep each entry's path and short description current.\n\n## Context files\n";
 export const contextIndexPath = (paths: ProjectPaths) =>
   paths.index ?? resolve(paths.context, "index.md");
+
+export interface ProjectContextInput {
+  action: "read" | "write";
+  path: string;
+  content?: string;
+  version?: string;
+}
+
+/** Access the shared knowledge directory through the acting Agent's native policy. */
+export async function accessProjectContext(
+  host: HostAccess,
+  agent: Agent,
+  input: ProjectContextInput,
+  signal: AbortSignal,
+) {
+  const record = host.record(agent.id) ?? host.owner(agent.id);
+  if (
+    !record ||
+    record.project.mode !== "enabled" ||
+    host.ctx.agents.get(agent.id) !== agent ||
+    (agent.id !== record.project.coordinatorSessionId &&
+      !record.workers.some(
+        (w) => w.id === agent.id && w.lifecycle === "active",
+      ))
+  )
+    throw new Error("moa/not-member");
+  const presets = host.ctx.get("agentPresets");
+  const fs = presets?.serviceFor(agent, "fs") ?? agent.ctx.get("fs");
+  const policies =
+    presets?.serviceFor(agent, "sandboxPolicy") ??
+    agent.ctx.get("sandboxPolicy");
+  if (!fs || (fs.sandboxMode && !policies))
+    throw new Error("moa/context-capability-unavailable");
+  const root = await fs.resolve(record.project.paths.context, { signal });
+  const target = await fs.resolve(input.path, {
+    cwd: fs.processPath(root),
+    signal,
+  });
+  if (!fs.contains(root, target) || target.targetKey === root.targetKey)
+    throw new Error("moa/context-path-escape");
+  if (input.action === "read") {
+    const stat = await fs.stat(target, signal);
+    if (!stat || stat.type !== "file")
+      throw new Error("moa/context-file-not-found");
+    return {
+      content: await fs.readText(target, signal),
+      version: stat.version,
+    };
+  }
+  if (input.content === undefined)
+    throw new Error("moa/context-content-required");
+  const policy = policies?.resolve({ session: agent.session });
+  if (policy?.mode === "read-only") throw new Error("moa/context-read-only");
+  const scoped = policy
+    ? { ...policy, workspaceRoot: fs.processPath(root) }
+    : undefined;
+  const result = await fs.writeText(
+    target,
+    input.content,
+    input.version
+      ? { kind: "replaceIfVersion", version: FsVersion(input.version) }
+      : { kind: "createIfAbsent" },
+    signal,
+    scoped,
+  );
+  return { version: result.version, operation: result.operation };
+}
 
 export async function readNotes(
   ctx: Context,

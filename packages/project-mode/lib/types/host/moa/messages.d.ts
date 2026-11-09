@@ -1,3 +1,4 @@
+import type { HostAccess } from "../host-access.ts";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
 import { z } from "zod";
@@ -76,8 +77,6 @@ export declare class MoAMessageBroker {
     private run;
     private awaitAnswer;
 }
-export declare function createSendMessageTool(broker: MoAMessageBroker): import("@deepseek-ai/dsh-tools").ToolDefinition;
-import type { HostAccess } from "../host-access.ts";
 declare module "@deepseek-ai/dsh-llm" {
     interface MessageSourceMap {
         "moa-message": {

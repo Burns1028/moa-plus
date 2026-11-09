@@ -4,6 +4,16 @@
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
+### Structure and tool cleanup: 2026-11-10
+
+Role, completion, identity and interrupt-judge instructions now live in `host/prompts/` as ordinary constants or text constructors. Eight representative pre/post outputs are byte-identical. Serialization, attachments, native admission and gate state remain with their original services. The Client bundle is byte-identical too, so the earlier browser evidence retains its UI scope.
+
+Public collaboration tool definitions are together in `host/moa/tools.ts`; routing/recovery remains in `messages.ts`, and shared Context I/O belongs to `project-memory.ts`. Context membership, selected-preset policy, path containment and conditional-version writes are preserved. Fork uses its durable seed loader directly and still clears the saved seed only after confirmed native admission. Interrupt/delete no longer compute unrelated assignment placement.
+
+A native recovery regression first reproduced duplicate insertion when a later unrelated input's text equaled the operation ID and the broker receipt was missing. Recovery now matches inserted messages by their native source/root/operation fields instead of searching serialized JSON. The fixed test verifies one actual native admission, not only a stable returned ID.
+
+The complete run passed **340 tests across 59 files**, both typechecks, the production build and all **19 launcher checks**. An independent read-only review found no actionable issues. This cleanup adds no orchestration strategy or execution framework.
+
 ### Rubric configuration and collaboration contracts: 2026-11-10
 
 At `424dc09`, only the Builder selects the model's lowest supported reasoning effort after native model selection. The Coordinator and Verifier retain their selected effort. Work ownership, specialist execution tools, selective Context contributions and explicit Notify replies are described in the actual native model inputs and schemas; execution permissions and lifecycle controls are unchanged.

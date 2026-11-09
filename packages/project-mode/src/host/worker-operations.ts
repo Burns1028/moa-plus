@@ -192,6 +192,10 @@ export class WorkerOperations {
     let r = options
       ? this.host.record(rootId)!
       : this.host.requireCoordinator(agent);
+    if (req.action === "interrupt" || req.action === "delete")
+      return req.action === "delete" && r.operations[`moa:agent:${req.worker_id}`]
+        ? this.host.stopManagedWorker(agent, req, operationId, signal)
+        : this.interruptOrDelete(agent, req, operationId);
     const rootAgent =
       rootId === agent.id ? agent : this.host.ctx.agents.get(rootId);
     const placement = rootAgent
@@ -212,10 +216,6 @@ export class WorkerOperations {
           "turnBoundary",
         )!.lastTurn
       : placement.turn;
-    if (req.action === "interrupt" || req.action === "delete")
-      return req.action === "delete" && r.operations[`moa:agent:${req.worker_id}`]
-        ? this.host.stopManagedWorker(agent, req, operationId, signal)
-        : this.interruptOrDelete(agent, req, operationId);
     let assignment = r.assignments.find((a) => a.operationId === operationId);
     const workerId =
       req.action === "spawn"

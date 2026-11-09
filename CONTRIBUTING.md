@@ -20,6 +20,8 @@ Submit changes from a branch through a pull request. `main` requires the GitHub 
 
 Edit `packages/project-mode/src`; generated `lib` artifacts are committed for Git installation. Build to regenerate them. Keep plugin state schemas separate from public view types, and keep execution state owned by DSH.
 
+Role and review instructions live in `host/prompts/` as ordinary constants or pure text constructors. Keep message admission, source serialization, attachments and execution state with their owning services. Public collaboration tool definitions live in `host/moa/tools.ts`; message routing/recovery stays in `messages.ts`, Agent controls in `agents.ts`, and shared Context I/O in `project-memory.ts`.
+
 For behavior changes, add a regression covering a meaningful native or UI boundary, and run the relevant checks. Start with a focused test; before releasing, run the full integration and package checks:
 
 ```sh

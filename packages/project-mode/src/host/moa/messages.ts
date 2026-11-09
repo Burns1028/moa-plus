@@ -1,8 +1,16 @@
-import { defineTool } from "@deepseek-ai/dsh-tools";
+import { createHash } from "node:crypto";
+import { freezeMessage, MessageId } from "@deepseek-ai/dsh-llm";
+import { SessionId, type SessionEvent } from "@deepseek-ai/dsh-session";
+import {
+  observeForTurn,
+} from "../native.ts";
+import type { HostAccess } from "../host-access.ts";
+import { withManagedAgent } from "./residency.ts";
+import { nativeOperationSeq } from "../capsule-participation.ts";
+import { messageSchema } from "../state.ts";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
 import { z } from "zod";
-import { toolOperationId } from "../native.ts";
 
 export const sendMessageSchema = z
   .object({
@@ -369,68 +377,6 @@ export class MoAMessageBroker {
   }
 }
 
-export function createSendMessageTool(broker: MoAMessageBroker) {
-  return defineTool({
-    name: "SendMessage",
-    nativeOnly: true,
-    description:
-      "Send a notification or ask another MoA agent a question. Answer an existing request with mode=notify and reply_to, not a new request. Requests wait for an explicit answer, timeout, or priority input.",
-    parameters: {
-      target: {
-        type: "string",
-        required: true,
-        description: "Target agent session ID",
-      },
-      message: {
-        type: "string",
-        required: true,
-        description: "Message content",
-      },
-      mode: {
-        type: "string",
-        enum: ["notify", "request"],
-        description: "notify (default) sends information or a reply; request asks a new question and waits",
-      },
-      delivery: {
-        type: "string",
-        enum: ["steer", "queue"],
-        description: "Next step (default) or next turn",
-      },
-      timeout_ms: {
-        type: "integer",
-        description: "Required request timeout in milliseconds",
-      },
-      reply_to: { type: "string", description: "Request ID being answered; use mode=notify" },
-    },
-    output: {
-      schema: { type: "string" },
-      render: (_a, value) => [{ type: "text", text: value }],
-    },
-    execute: async (args, exec) => {
-      if (!exec.agent) throw new Error("moa/agent-required");
-      return JSON.stringify(
-        await broker.send(
-          exec.agent,
-          sendMessageSchema.parse(args),
-          toolOperationId(exec),
-          exec.signal,
-        ),
-      );
-    },
-  });
-}
-
-import { createHash } from "node:crypto";
-import { freezeMessage, MessageId } from "@deepseek-ai/dsh-llm";
-import { SessionId, type SessionEvent } from "@deepseek-ai/dsh-session";
-import {
-  observeForTurn,
-} from "../native.ts";
-import type { HostAccess } from "../host-access.ts";
-import { withManagedAgent } from "./residency.ts";
-import { nativeOperationSeq } from "../capsule-participation.ts";
-import { messageSchema } from "../state.ts";
-
 declare module "@deepseek-ai/dsh-llm" {
   interface MessageSourceMap {
     "moa-message": {
@@ -593,23 +539,11 @@ export function createNativeMessageBroker(
       const message = nativeMessage(envelope, senderName(envelope.rootId, envelope.senderId));
       // A retry after admission but before its receipt must not enqueue twice.
       using observed = await observeForTurn(host.ctx, targetId, signal);
-      const prior = observed.events.findLast(
-        (event) =>
-          event.type === "agent/inbox/spliced" &&
-          JSON.stringify(event.data).includes(
-            JSON.stringify(envelope.operationId),
-          ),
-      );
-      let priorId: MessageId | undefined;
-      if (prior && prior.type === "agent/inbox/spliced") {
-        const inserted = prior.data.inserted.find(
-          (m) =>
-            m.source.kind === "moa-message" &&
-            m.source.operationId === envelope.operationId &&
-            m.source.rootId === envelope.rootId,
-        );
-        if (inserted) priorId = inserted.id;
-      }
+      const priorId = observed.events.flatMap(event =>
+        event.type === "agent/inbox/spliced" ? event.data.inserted : [],
+      ).findLast(message => message.source.kind === "moa-message" &&
+        message.source.rootId === envelope.rootId &&
+        message.source.operationId === envelope.operationId)?.id;
       const admit = (signal: AbortSignal) => priorId
         ? Promise.resolve(priorId)
         : withManagedAgent(host, targetId, signal, async (target) => {

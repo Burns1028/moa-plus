@@ -1,9 +1,9 @@
 import type {} from "@deepseek-ai/dsh-user-approval";
 import { withManagedAgent } from "./residency.ts";
-import { FsVersion } from "@deepseek-ai/dsh-fs";
 import { randomUUID } from "node:crypto";
 import { observeForTurn } from "../native.ts";
-import { contextIndexPath, identityMessage } from "../project-memory.ts";
+import { accessProjectContext, contextIndexPath, type ProjectContextInput } from "../project-memory.ts";
+import { identityMessage, workerReportingInstructions } from "../prompts/identity.ts";
 import {
   MoAWorkspaceManager,
   MoAWorkspacePrepareError,
@@ -19,8 +19,7 @@ import type { SubagentProvider } from "@deepseek-ai/dsh-subagent";
 
 /** Native continuation manager reserves the child and owns activation. */
 export function createForkProvider(
-  seeds: Map<SessionId, readonly SessionEvent[]>,
-  persisted?: (id: SessionId) => readonly SessionEvent[] | undefined,
+  loadSeed: (id: SessionId) => readonly SessionEvent[] | undefined,
 ): SubagentProvider {
   return {
     name: "moa-fork",
@@ -33,9 +32,8 @@ export function createForkProvider(
     inheritsParentContext: true,
     async prepareContinuable({ sessionId, signal }) {
       signal.throwIfAborted();
-      const seed = seeds.get(sessionId) ?? persisted?.(sessionId);
+      const seed = loadSeed(sessionId);
       if (!seed) throw new Error("moa/fork-seed-unavailable");
-      seeds.delete(sessionId);
       return seed.length ? { seed } : {};
     },
   };
@@ -100,7 +98,7 @@ export class MoAAgents {
   ) {
     if (!host.ctx.subagents.getProvider("moa-fork"))
       this.unregisterFork = host.ctx.subagents.registerProvider(
-        createForkProvider(new Map(), (id) => {
+        createForkProvider((id) => {
           const descriptor = this.descriptor(id);
           const fork = descriptor?.forkOperation
             ? (host.owner(id)?.operations[
@@ -337,7 +335,7 @@ export class MoAAgents {
         workdir: descriptor.workspace!.directory,
         isolated: descriptor.workspace!.mode === "isolated",
         reportTo: descriptor.reportTo,
-        reportingInstructions: `Use SendMessage to report results and request help when blocked. Shared context index: ${contextIndexPath(record.project.paths)}. Read that index before loading relevant context files. Maintain valuable reusable knowledge through ProjectContext. Notes ${record.project.paths.notes} and archive ${record.project.paths.archived} are Coordinator-owned and read-only for you.`,
+        reportingInstructions: workerReportingInstructions(contextIndexPath(record.project.paths), record.project.paths.notes, record.project.paths.archived),
       });
       try {
         const result = await this.workers.spawnMoA(
@@ -565,65 +563,10 @@ export class MoAAgents {
   }
   async context(
     agent: Agent,
-    input: {
-      action: "read" | "write";
-      path: string;
-      content?: string;
-      version?: string;
-    },
+    input: ProjectContextInput,
     signal: AbortSignal,
   ) {
-    const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
-    if (
-      !record ||
-      record.project.mode !== "enabled" ||
-      this.host.ctx.agents.get(agent.id) !== agent ||
-      (agent.id !== record.project.coordinatorSessionId &&
-        !record.workers.some(
-          (w) => w.id === agent.id && w.lifecycle === "active",
-        ))
-    )
-      throw new Error("moa/not-member");
-    const presets = this.host.ctx.get("agentPresets");
-    const fs = presets?.serviceFor(agent, "fs") ?? agent.ctx.get("fs");
-    const policies =
-      presets?.serviceFor(agent, "sandboxPolicy") ??
-      agent.ctx.get("sandboxPolicy");
-    if (!fs || (fs.sandboxMode && !policies))
-      throw new Error("moa/context-capability-unavailable");
-    const root = await fs.resolve(record.project.paths.context, { signal });
-    const target = await fs.resolve(input.path, {
-      cwd: fs.processPath(root),
-      signal,
-    });
-    if (!fs.contains(root, target) || target.targetKey === root.targetKey)
-      throw new Error("moa/context-path-escape");
-    if (input.action === "read") {
-      const stat = await fs.stat(target, signal);
-      if (!stat || stat.type !== "file")
-        throw new Error("moa/context-file-not-found");
-      return {
-        content: await fs.readText(target, signal),
-        version: stat.version,
-      };
-    }
-    if (input.content === undefined)
-      throw new Error("moa/context-content-required");
-    const policy = policies?.resolve({ session: agent.session });
-    if (policy?.mode === "read-only") throw new Error("moa/context-read-only");
-    const scoped = policy
-      ? { ...policy, workspaceRoot: fs.processPath(root) }
-      : undefined;
-    const result = await fs.writeText(
-      target,
-      input.content,
-      input.version
-        ? { kind: "replaceIfVersion", version: FsVersion(input.version) }
-        : { kind: "createIfAbsent" },
-      signal,
-      scoped,
-    );
-    return { version: result.version, operation: result.operation };
+    return accessProjectContext(this.host, agent, input, signal);
   }
   async kill(
     agent: Agent,

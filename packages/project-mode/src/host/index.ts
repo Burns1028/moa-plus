@@ -9,6 +9,7 @@ import {
   createQueryAgentTool,
   createKillAgentTool,
   createProjectContextTool,
+  createSendMessageTool,
 } from "./moa/tools.ts";
 import { applyRoleRestrictions } from "./moa/roles.ts";
 import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./moa/worker-memory-policy.ts";
@@ -16,7 +17,6 @@ import { withManagedAgent } from "./moa/residency.ts";
 import { followWorkerParent } from "./worker-parent-retention.ts";
 import {
   createNativeMessageBroker,
-  createSendMessageTool,
   type MoAMessageBroker,
 } from "./moa/messages.ts";
 import { buildProjectSnapshot } from "./project-views.ts";
@@ -51,8 +51,8 @@ import type {} from "@deepseek-ai/dsh-sandbox-policy";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { randomUUID } from "node:crypto";
 import { Config } from "./config.ts";
-import { coordinatorPrompt } from "./coordinator-prompt.ts";
-import { workerPrompt } from "./worker-prompt.ts";
+import { coordinatorPrompt } from "./prompts/coordinator.ts";
+import { workerPrompt } from "./prompts/worker.ts";
 import { contextIndexPath } from "./project-memory.ts";
 import { readWorkerActivity } from "./worker-activity.ts";
 import {
