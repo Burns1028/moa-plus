@@ -136,6 +136,15 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         // Helpers use direct tool calls, including when the parent uses PTC.
         ctx.tools.presentAs("native");
         if (role === "builder") {
+          // Rubric extraction has no execution or research to perform. Select
+          // the model's least reasoning effort after native model selection;
+          // the parent and evidence-gathering Verifier keep their own effort.
+          ctx.on("agent/request", async ({ signal }, next) => {
+            const config = await next();
+            const model = await ctx.llm.resolveModelInfo(config.provider, config.model, signal);
+            const effort = model.reasoning?.efforts[0]?.id;
+            return effort === undefined ? config : { ...config, reasoningEffort: effort };
+          }, { prepend: true });
           ctx.tools.restrict({ allow: [] });
           ctx.tools.register(defineTool({
             name: "submit_rubric",

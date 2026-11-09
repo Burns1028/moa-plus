@@ -374,7 +374,7 @@ export function createSendMessageTool(broker: MoAMessageBroker) {
     name: "SendMessage",
     nativeOnly: true,
     description:
-      "Send a notification or ask another MoA agent a question. Reply to a request using reply_to. Requests wait for an explicit answer, timeout, or priority input.",
+      "Send a notification or ask another MoA agent a question. Answer an existing request with mode=notify and reply_to, not a new request. Requests wait for an explicit answer, timeout, or priority input.",
     parameters: {
       target: {
         type: "string",
@@ -389,7 +389,7 @@ export function createSendMessageTool(broker: MoAMessageBroker) {
       mode: {
         type: "string",
         enum: ["notify", "request"],
-        description: "notify (default) or request",
+        description: "notify (default) sends information or a reply; request asks a new question and waits",
       },
       delivery: {
         type: "string",
@@ -400,7 +400,7 @@ export function createSendMessageTool(broker: MoAMessageBroker) {
         type: "integer",
         description: "Required request timeout in milliseconds",
       },
-      reply_to: { type: "string", description: "Request ID being answered" },
+      reply_to: { type: "string", description: "Request ID being answered; use mode=notify" },
     },
     output: {
       schema: { type: "string" },

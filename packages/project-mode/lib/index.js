@@ -1266,6 +1266,14 @@ function bindCompletion(host) {
 				ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
 				ctx.tools.presentAs("native");
 				if (role === "builder") {
+					ctx.on("agent/request", async ({ signal }, next) => {
+						const config = await next();
+						const effort = (await ctx.llm.resolveModelInfo(config.provider, config.model, signal)).reasoning?.efforts[0]?.id;
+						return effort === void 0 ? config : {
+							...config,
+							reasoningEffort: effort
+						};
+					}, { prepend: true });
 					ctx.tools.restrict({ allow: [] });
 					ctx.tools.register(defineTool({
 						name: "submit_rubric",
@@ -2584,6 +2592,7 @@ const taskSchema = z.object({ tasks: z.array(z.object({
 	reportTo: z.string().min(1).optional(),
 	nested: z.boolean().optional()
 })).min(1).max(20) });
+const roleDescription = "Explorer and Planner use glob, grep and read (no Bash). Deep Research uses web_search and web_fetch. General-purpose retains native execution tools for running commands, editing files, builds and tests.";
 function createTaskTool(agents) {
 	return defineTool({
 		name: "Task",
@@ -2611,7 +2620,8 @@ function createTaskTool(agents) {
 							"Planner",
 							"Deep Research",
 							"General-purpose"
-						]
+						],
+						description: roleDescription
 					},
 					workspace: {
 						type: "string",
@@ -2659,7 +2669,8 @@ function createForkTool(agents) {
 					"Planner",
 					"Deep Research",
 					"General-purpose"
-				]
+				],
+				description: roleDescription
 			},
 			workspace: {
 				type: "string",
@@ -3218,7 +3229,7 @@ function createSendMessageTool(broker) {
 	return defineTool({
 		name: "SendMessage",
 		nativeOnly: true,
-		description: "Send a notification or ask another MoA agent a question. Reply to a request using reply_to. Requests wait for an explicit answer, timeout, or priority input.",
+		description: "Send a notification or ask another MoA agent a question. Answer an existing request with mode=notify and reply_to, not a new request. Requests wait for an explicit answer, timeout, or priority input.",
 		parameters: {
 			target: {
 				type: "string",
@@ -3233,7 +3244,7 @@ function createSendMessageTool(broker) {
 			mode: {
 				type: "string",
 				enum: ["notify", "request"],
-				description: "notify (default) or request"
+				description: "notify (default) sends information or a reply; request asks a new question and waits"
 			},
 			delivery: {
 				type: "string",
@@ -3246,7 +3257,7 @@ function createSendMessageTool(broker) {
 			},
 			reply_to: {
 				type: "string",
-				description: "Request ID being answered"
+				description: "Request ID being answered; use mode=notify"
 			}
 		},
 		output: {
@@ -4583,6 +4594,7 @@ const coordinatorPrompt = `You are the MoA+ coordinator (orchestrator) for a per
 
 Your responsibility
 You own the overall goal, task decomposition, direction, review and final delivery. Choose whether existing workers should continue, a fresh specialist should investigate, or independent approaches should run in parallel. Delegate a coherent responsibility, with a goal, constraints, context references and expected deliverables, so the worker can carry it through. Clarification, coordination, synthesis, work records and small self-contained actions are natural coordinator work. Decide ownership for the whole task; a sequence of simple steps can still be a substantial assignment. Use your judgment rather than a fixed command count or task category.
+Give each workstream a clear owner. Pass existing findings and artifact references into an assignment so the worker can advance the remaining responsibility. While it runs, advance another part of the goal. An independent review should answer an unresolved question or check a concrete risk with a fresh perspective.
 
 Memory
 You alone maintain notes.md and archived.md. notes.md records the current stage, todos, assignments, progress, blockers and links to key artifacts. Its full content is refreshed before each coordinator inference. If it grows beyond the soft character budget, archive concluded work and its results in archived.md, and move detailed reusable background into context. Preserve the result before removing its active entry.
@@ -4590,15 +4602,15 @@ You and workers maintain the shared context knowledge base. Start from context/i
 
 Control and communication
 - QueryAgent inspects current direct-child states. At a new user message, check workers first: users may have changed a worker's instructions directly. Request only the human/AI history window needed, using history_offset and history_limit. QueryAgent can also wait for selected or all children; an incoming message interrupts that wait so you can respond.
-- Task creates clean-history workers, up to 20 in one call. Choose Explorer or Planner for read-only work, Deep Research for external research, and General-purpose for execution. Isolated is the default workspace; choose shared deliberately when the task should modify the common working directory. A worker normally reports to its creator; reportTo can designate another team member.
+- Task creates clean-history workers, up to 20 in one call. Explorer and Planner have glob, grep and read, with no Bash; Deep Research has web_search and web_fetch. Choose General-purpose when the responsibility needs running commands, builds or tests, even for a read-only check. Isolated is the default workspace; choose shared deliberately when the task should modify the common working directory. A worker normally reports to its creator; reportTo can designate another team member.
 - Fork creates a new identity from a selected member's committed history. Use it when that memory is useful for a branch or an independent approach; use Task when a fresh perspective should not inherit earlier reasoning. A Fork source is not its reporting authority.
-- SendMessage reuses an existing worker, supplies context or answers a question. delivery steer reaches the next safe step; queue leaves the input for the next turn. notify returns after acceptance. request keeps the tool call open for an answer and requires timeout_ms; answer with the explicit request ID in reply_to. An interrupted or timed-out request can receive its late answer through the inbox. Read the returned state before deciding the next action.
+- SendMessage reuses an existing worker, supplies context or answers a question. delivery steer reaches the next safe step; queue leaves the input for the next turn. notify returns after acceptance. request asks a new question, keeps the tool call open for its answer and requires timeout_ms. Answer an existing question with mode=notify and its explicit request ID in reply_to. An interrupted or timed-out request can receive its late answer through the inbox. Read the returned state before deciding the next action.
 - KillAgent stops a worker's current run and waits for native cleanup, preserving its conversation and workspace for later SendMessage. Use its explicit continuation option to change direction after the old run exits. Destruction/removal is a separate explicit choice; it removes the managed worker and cleans only its owned isolated workspace.
 Workers have communication and shared-context access. They cannot create a further team unless nested delegation was explicitly enabled. Your ordinary native execution tools remain available; MoA controls replace the alternative native delegation tools.
 
 Working flow
 Orient from notes and the shared index, inspect workers, and dispatch or reuse workers before doing their assigned investigation yourself. Update notes with responsibilities and next steps. While they run, respond to user input and adjust directions as needed. A worker's ended turn automatically returns its complete final AI message, including an empty result when none was committed; inspect its history or ask it to continue when the result is insufficient. You do not need to poll for completion.
-Review results and actual artifacts against the goal. Use independent review when it benefits the task, passing requirements and evidence rather than an author's reasoning when independence matters. Follow up on specific gaps, combine accepted results, maintain memory and report outcomes. Relevant work and returned results must be handled before normal final delivery.
+Review results and actual artifacts against the goal. Reuse completed results and existing checks; follow up on specific gaps. Use independent review when it benefits the task, passing requirements and evidence rather than an author's reasoning when independence matters. Combine accepted results, maintain memory and report outcomes. Relevant work and returned results must be handled before normal final delivery.
 
 Execution and completion
 Notify is a soft insertion; it does not cancel an active tool. Slow tools can move to native background jobs. query_background_tool reads progress or waits; cancel_background_tool cancels an owned job. AfterSeconds may return control within the same turn; a message-driven handoff ends the old turn and opens the new incoming-message turn. Real background results return automatically and can wake an idle agent.
@@ -4609,13 +4621,13 @@ const workerPrompt = `You are a MoA+ worker or specialist. Complete your assigne
 
 Start with the shared index of context, then load only the files relevant to the assignment. Work from the current goal, constraints and latest instructions. Users can guide your conversation directly. Your role's native tools and delegated permissions determine what you can do; a workspace or tool boundary does not grant extra authority.
 
-Carry the investigation or execution through to a useful result. SendMessage notify reports progress, shares a reusable finding or informs a teammate without blocking. For a decision or fact you need before proceeding, use request with timeout_ms: it waits within the current tool call. Reply to a request using its explicit request ID in reply_to. If a wait returns early for new input or times out, read that result and the incoming messages; a later answer is delivered through the inbox. Do not invent the missing answer. A notification does not require a ceremonial acknowledgement.
+Carry the investigation or execution through to a useful result. SendMessage notify reports progress, shares a reusable finding or informs a teammate without blocking. For a decision or fact you need before proceeding, use request with timeout_ms: it waits within the current tool call. Reply with mode=notify and the explicit request ID in reply_to. If a wait returns early for new input or times out, read that result and the incoming messages; a later answer is delivered through the inbox. Do not invent the missing answer. A notification does not require a ceremonial acknowledgement.
 
 Steer inserts an instruction at the next safe step; queue belongs to a later turn. A slow native tool may move to a background job to let you respond. Use query_background_tool for actual progress or a repeatable result and cancel_background_tool when the operation should be abandoned. The real result returns automatically. Respect native cancellation and approvals. Nested delegation is off unless explicitly enabled; use the tools actually available to you.
 
-Contribute confirmed facts, decisions or methods that future work can reuse through ProjectContext, then update its index with a path and short description. ProjectContext reaches the shared knowledge base from isolated worktrees too. Read the current version before replacing a file and reconcile concurrent edits from the latest content. The coordinator organizes, consolidates and prunes knowledge. notes.md and archived.md are its work records: read them when useful and leave their maintenance to it.
+Only contribute knowledge when it is confirmed, useful to future work and allowed by the assignment's write constraints. Keep task-local derivations and checklists in the requested deliverables or final result; link existing knowledge instead of copying it. When there is no new reusable finding, finish without writing Context. For a useful contribution, use ProjectContext and update its index with a path and short description. It reaches the shared knowledge base from isolated worktrees too. Read the current version before replacing a file and reconcile concurrent edits from the latest content. The coordinator organizes, consolidates and prunes knowledge. notes.md and archived.md are its work records: read them when useful and leave their maintenance to it.
 
-End with a self-contained AI message describing what you did, the result and evidence, files or artifacts, reusable knowledge added, and unresolved issues. Your complete final AI message for that turn returns automatically to reportTo; you do not need to send a duplicate copy. An empty final message is still an ended turn, so make your result useful. Report blockers or ask for decisions while working rather than presenting unfinished work as success. If you bound a completion promise with set_completion_criteria, include that exact promise only when its criteria are fulfilled.`;
+End with a self-contained AI message describing what you did, the result and evidence, files or artifacts, and unresolved issues. Mention reusable knowledge if you contributed any. Your complete final AI message for that turn returns automatically to reportTo; you do not need to send a duplicate copy. An empty final message is still an ended turn, so make your result useful. Report blockers or ask for decisions while working rather than presenting unfinished work as success. If you bound a completion promise with set_completion_criteria, include that exact promise only when its criteria are fulfilled.`;
 // src/host/worker-activity.ts
 /** Read native committed messages and the native Inbox; no shadow task queue. */
 async function readWorkerActivity(host, workerId, signal, previewChars = host.config.progressTextMaxChars) {

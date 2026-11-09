@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { createUserMessage, type StreamChunk } from "@deepseek-ai/dsh-llm";
+import { createUserMessage, ReasoningEffortId, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import { installModelSelection } from "@deepseek-ai/dsh-agent";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fixture, response } from "./fixture.ts";
@@ -15,6 +16,57 @@ function call(name: string, args: object): StreamChunk[] {
     { type: "finish", reason: { kind: "tool-calls" } },
   ];
 }
+
+it.each([
+  { efforts: ["off", "low", "high"], expected: "off" },
+  { efforts: ["low", "high"], expected: "low" },
+  { efforts: ["high"], expected: "high" },
+  { efforts: undefined, expected: undefined },
+])("uses the model's supported lightweight Builder effort without changing execution or verification ($expected)", async ({ efforts, expected }) => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    f.adapter.resolveModel = async (provider, model) => ({
+      provider, id: model, name: model,
+      ...(efforts ? { reasoning: { efforts: efforts.map(id => ({ id: ReasoningEffortId(id), name: id })), defaultEffort: ReasoningEffortId("high") } } : {}),
+    });
+    // The real Session Controller installs selection after setup. Exercise that
+    // native request override, rather than only checking Agent creation options.
+    f.ctx.on("agent/created", ({ agent }) => {
+      installModelSelection(agent.ctx, {
+        current: { provider: "test", model: "selected", ...(efforts ? { reasoningEffort: ReasoningEffortId("high") } : {}) },
+        assembled: undefined,
+      });
+    });
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-builder-effort"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "initial" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the report [human requirement]", tests_required: false });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("read_candidate", {});
+        return response('{"status":"Pass","issues":[]}');
+      }
+      return response("The completed report");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver the report" }] }));
+    await agent.whenIdle();
+    const builder = f.adapter.requests.filter(options => String(options.sessionId).startsWith("moa-builder-"));
+    const execution = f.adapter.requests.filter(options => !String(options.sessionId).startsWith("moa-builder-"));
+    expect(builder).toHaveLength(1);
+    expect(builder[0]).toMatchObject({ provider: "test", model: "selected" });
+    expect(builder[0].reasoningEffort).toBe(expected);
+    expect(builder[0].maxTokens).toBeUndefined();
+    expect(builder[0].tools?.map(tool => tool.name)).toEqual(["submit_rubric"]);
+    expect(execution).toHaveLength(4);
+    for (const request of execution) {
+      expect(request).toMatchObject({ provider: "test", model: "selected" });
+      expect(request.reasoningEffort).toBe(efforts ? "high" : undefined);
+    }
+    expect(agent.session.snapshotEvents().filter(event => event.type === "turn/end")).toMatchObject([{ data: { reason: { kind: "completed" } } }]);
+  } finally { await f.dispose(); }
+});
 
 it.each(["native", "ptc"])("inherits preset execution tools for the Verifier while limiting the Builder to rubric submission (parent=%s)", async (mode) => {
   const f = await fixture(undefined, { completionVerification: true });

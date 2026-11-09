@@ -137,6 +137,8 @@ const taskSchema = z.object({
     .min(1)
     .max(20),
 });
+const roleDescription =
+  "Explorer and Planner use glob, grep and read (no Bash). Deep Research uses web_search and web_fetch. General-purpose retains native execution tools for running commands, editing files, builds and tests.";
 export function createTaskTool(agents: MoAAgents) {
   return defineTool({
     name: "Task",
@@ -156,6 +158,7 @@ export function createTaskTool(agents: MoAAgents) {
               type: "string",
               required: true,
               enum: ["Explorer", "Planner", "Deep Research", "General-purpose"],
+              description: roleDescription,
             },
             workspace: { type: "string", enum: ["shared", "isolated"] },
             reportTo: {
@@ -200,6 +203,7 @@ export function createForkTool(agents: MoAAgents) {
         type: "string",
         required: true,
         enum: ["Explorer", "Planner", "Deep Research", "General-purpose"],
+        description: roleDescription,
       },
       workspace: { type: "string", enum: ["shared", "isolated"] },
       reportTo: {
