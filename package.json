@@ -126,7 +126,7 @@
     "node": ">=24.9.0"
   },
   "version": "0.1.23",
-  "description": "MoA+ for DeepSeek Harness: advancing intelligence through native multi-agent collaboration. Developer preview; requires the reviewed rc.3 compatibility runtime.",
+  "description": "Multi-agent collaboration for DeepSeek Harness: persistent agents, shared knowledge, direct communication, and independent review. Requires the matching DSH 0.2.1-rc.3 runtime.",
   "keywords": [
     "deepseek",
     "deepseek-harness",
