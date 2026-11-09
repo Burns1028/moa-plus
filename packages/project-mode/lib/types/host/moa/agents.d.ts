@@ -1,9 +1,9 @@
-import { FsVersion } from "@deepseek-ai/dsh-fs";
+import { type ProjectContextInput } from "../project-memory.ts";
 import { type MoAWorkspaceRecord } from "./workspaces.ts";
 import { SessionId, type SessionEvent, type SessionSeq } from "@deepseek-ai/dsh-session";
 import type { SubagentProvider } from "@deepseek-ai/dsh-subagent";
 /** Native continuation manager reserves the child and owns activation. */
-export declare function createForkProvider(seeds: Map<SessionId, readonly SessionEvent[]>, persisted?: (id: SessionId) => readonly SessionEvent[] | undefined): SubagentProvider;
+export declare function createForkProvider(loadSeed: (id: SessionId) => readonly SessionEvent[] | undefined): SubagentProvider;
 /** The inclusive committed watermark is selected by the caller observing the source. */
 export declare function prepareForkSeed(events: readonly SessionEvent[], watermark: SessionSeq): SessionEvent[];
 import type { Agent } from "@deepseek-ai/dsh-agent";
@@ -60,17 +60,12 @@ export declare class MoAAgents {
     private clearWorkspace;
     /** Startup reconciliation cleans abandoned preparations and removed native families. */
     recover(agent: Agent, signal: AbortSignal): Promise<void>;
-    context(agent: Agent, input: {
-        action: "read" | "write";
-        path: string;
-        content?: string;
-        version?: string;
-    }, signal: AbortSignal): Promise<{
+    context(agent: Agent, input: ProjectContextInput, signal: AbortSignal): Promise<{
         content: string;
-        version: FsVersion;
+        version: import("@deepseek-ai/dsh-fs").FsVersion;
         operation?: undefined;
     } | {
-        version: FsVersion;
+        version: import("@deepseek-ai/dsh-fs").FsVersion;
         operation: "create" | "update";
         content?: undefined;
     }>;

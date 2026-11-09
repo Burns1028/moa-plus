@@ -676,6 +676,61 @@ it("reconciles a native inbox admission after a missing operation receipt", asyn
 import { createNativeMessageBroker } from "../../packages/project-mode/src/host/moa/messages.ts";
 import type { HostAccess } from "../../packages/project-mode/src/host/host-access.ts";
 
+it("reuses an admitted peer message when a later unrelated input equals its operation ID", async () => {
+  const f = await fixture();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { agent: root } = await f.ctx.agents.create({
+      sessionId: SessionId("peer-admission-root"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
+    f.adapter.handler = async () => {
+      await release.promise;
+      return response("done");
+    };
+    const created = await f.ctx.projectMode.controlForAgent(
+      root,
+      { action: "spawn", name: "sender", task: "hold" },
+      "spawn-peer-sender",
+      new AbortController().signal,
+    ) as { workerId: SessionId };
+    const sender = f.ctx.agents.get(created.workerId)!;
+    const host = (f.ctx.projectMode as unknown as { access: HostAccess }).access;
+    const input = sendMessageSchema.parse({ target: root.id, message: "deliver once" });
+    const operationId = "stable-peer-operation";
+    const signal = new AbortController().signal;
+    const first = createNativeMessageBroker(host, async () => false);
+    const recovered = createNativeMessageBroker(host, async () => false);
+    try {
+      const receipt = await first.send(sender, input, operationId, signal);
+      await host.update(root.id, (record) => {
+        const operations = { ...record.operations };
+        delete operations[`moa:receipt:${operationId}`];
+        return { ...record, operations };
+      });
+      root.send(createUserMessage({
+        source: { kind: "user" },
+        content: [{ type: "text", text: operationId }],
+      }), "next-step", false);
+
+      expect(await recovered.send(sender, input, operationId, signal)).toEqual(receipt);
+      const admitted = root.session.snapshotEvents().flatMap(event =>
+        event.type === "agent/inbox/spliced" ? event.data.inserted : [],
+      ).filter(message => message.source.kind === "moa-message" &&
+        message.source.rootId === root.id && message.source.operationId === operationId);
+      expect(admitted).toHaveLength(1);
+    } finally {
+      first.dispose();
+      recovered.dispose();
+    }
+  } finally {
+    release.resolve();
+    await f.dispose();
+  }
+});
+
 it("preserves late reply routing after cancellation and broker restart", async () => {
   const f = brokerFixture();
   const a = f.agent("a"),

@@ -20,7 +20,7 @@ Coordinator 与 Worker 使用同一套原生 Agent Loop。区别在于身份、�
 
 Coordinator 直接面对用户，负责目标、任务拆解、方向判断、结果综合和最终交付。它保留普通执行工具，也可以做澄清、协调、综合和简单完整的操作；分工按整个责任判断，不靠任务关键词或命令次数硬性规定。
 
-Worker 对一个明确的执行或调查责任持续工作，可以是只读 Explorer、Planner、联网 Deep Research 或通用执行者。默认不开放下级派生；需要多层团队时明确启用 `nested`。创建者、Fork 的历史来源和最终汇报对象是三个不同的事实。
+Worker 对一个明确的执行或调查责任持续工作，可以是只读 Explorer、Planner、联网 Deep Research 或通用执行者。Explorer 和 Planner 只有文件探查工具，没有 Bash；需要运行命令、构建或测试的责任应选择 General-purpose，即使只是只读验收。Coordinator 明确各条工作线的责任人，传递已有结论与产物，复用已完成的检查，独立审阅则聚焦尚未解决的问题或风险。默认不开放下级派生；需要多层团队时明确启用 `nested`。创建者、Fork 的历史来源和最终汇报对象是三个不同的事实。
 
 ## Coordinator 的操作流
 
@@ -68,7 +68,7 @@ workspace/
 
 `notes.md` 由 Coordinator 维护，Host 在它每次推理前完整注入。超过 8,000 字符只追加整理提醒，不截断；Coordinator 把已完成条目及结果移入 `archived.md`，把有复用价值的详细背景移入 Context。
 
-Coordinator 与 Workers 共同维护 Context。Agent 先读索引，再按需读正文；派活传文件引用，不反复复制大段背景。Worker 贡献确认过、可复用的发现，Coordinator 更多负责合并、整理和删除过时内容。`ProjectContext` 从隔离 worktree 访问真正的共享库，按版本替换避免覆盖别人刚写的内容。进度留在工作记录，知识留在 Context。
+Coordinator 与 Workers 共同维护 Context。Agent 先读索引，再按需读正文；派活传文件引用，不反复复制大段背景。Worker 在符合当前任务写入要求时贡献确认过、可复用的新发现；任务内推导和例行检查清单留在指定产物或最终结果，没有新知识时无需更新 Context。Coordinator 更多负责合并、整理和删除过时内容。`ProjectContext` 从隔离 worktree 访问真正的共享库，按版本替换避免覆盖别人刚写的内容。进度留在工作记录，知识留在 Context。
 
 已有保存路径继续保留，旧 `context/context.md` 文件也不会被覆盖。相同 cwd 的会话共享这些工作区文件；独立项目宜使用独立工作区。
 
@@ -76,6 +76,6 @@ Coordinator 与 Workers 共同维护 Context。Agent 先读索引，再按需读
 
 慢工具超过阈值后，可按 AfterSeconds、NewMessage 或轻量 LLM Judge 策略转后台。没有新消息的 AfterSeconds 在当前 turn 内继续思考；消息驱动的转后台写入 Tool Message 占位、结束原 turn，再由新消息开启下一轮。真实结果随后回流，Agent 可以查询、取消，并在空闲时被唤醒。
 
-`set_completion_criteria` 可以绑定任务完成标准和完整承诺原文，Ralph 在结束出口检查。Coordinator 还有独立出卷和判卷：Builder 只看原始人类需求与规格快照，Verifier 读 `rubrics.md` 并通过原生工具检查产物。未通过、缺证据或不完整的承诺会触发继续工作。内部催办消息不变成新的原始需求，避免验收标准被实现过程污染。
+`set_completion_criteria` 可以绑定任务完成标准和完整承诺原文，Ralph 在结束出口检查。Coordinator 还有独立出卷和判卷：Builder 只看原始人类需求与规格快照，使用模型支持的最低推理档位提取标准；Verifier 读 `rubrics.md` 并通过原生工具检查产物，保留用户选择的推理设置。未通过、缺证据或不完整的承诺会触发继续工作。内部催办消息不变成新的原始需求，避免验收标准被实现过程污染。
 
 原生循环仍负责并行工具的前台屏障、取消后结果配对和结束前收件箱检查。详细的结构体、函数及原生边界见[代码架构](architecture.md)与[工具 API](tool-api.md)。

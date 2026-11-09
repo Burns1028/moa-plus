@@ -2,6 +2,10 @@
 
 ## Unreleased review corrections
 
+- Organize role, review, identity and interrupt-judge prompts under `host/prompts/`, centralize collaboration tool definitions, and move shared Context I/O to the memory module without changing prompt output or native execution contracts.
+- Match accepted messages by their native source identity during recovery; unrelated message text can no longer hide a prior admission and cause duplicate insertion.
+- Use the model's lowest supported reasoning effort for rubric extraction, without changing the Coordinator or evidence-gathering Verifier's selected effort.
+- Clarify workstream ownership, reuse of completed checks, specialist execution capabilities, explicit Notify replies, and selective shared-knowledge contributions.
 - Let independent verification inspect the complete final chat answer through an attempt-scoped candidate tool, while retaining real artifact and required test evidence.
 - Capture chronological specification versions when a human explicitly refers to an updated source, retaining earlier snapshots for ongoing tasks.
 - Keep explicit QueryAgent waits under their own completion, input, cancellation and timeout rules instead of transferring them through the generic slow-tool policy.

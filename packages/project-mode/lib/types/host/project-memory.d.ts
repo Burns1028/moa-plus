@@ -1,6 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ProjectPaths } from "../shared/index.ts";
+import { FsVersion } from "@deepseek-ai/dsh-fs";
 import type { HostAccess } from "./host-access.ts";
 declare module "@deepseek-ai/dsh-llm" {
     interface MessageSourceMap {
@@ -14,17 +15,24 @@ export declare function memoryPaths(root: string): ProjectPaths & {
     index: string;
 };
 export declare function notesInjection(text: string): string;
-export interface MoAIdentity {
-    id: string;
-    workdir: string;
-    isolated: boolean;
-    reportTo: string;
-    reportingInstructions: string;
-}
-/** Identity is dialogue content; it never personalizes the system prompt. */
-export declare function identityMessage(identity: MoAIdentity): string;
 export declare const contextIndexTemplate = "# Project context\n\nRead this shared index first, then open only the context files needed for the task. Coordinator and Workers maintain reusable project knowledge here. Workers contribute valuable reusable findings; the Coordinator primarily organizes, consolidates and prunes context. Keep each entry's path and short description current.\n\n## Context files\n";
 export declare const contextIndexPath: (paths: ProjectPaths) => string;
+export interface ProjectContextInput {
+    action: "read" | "write";
+    path: string;
+    content?: string;
+    version?: string;
+}
+/** Access the shared knowledge directory through the acting Agent's native policy. */
+export declare function accessProjectContext(host: HostAccess, agent: Agent, input: ProjectContextInput, signal: AbortSignal): Promise<{
+    content: string;
+    version: FsVersion;
+    operation?: undefined;
+} | {
+    version: FsVersion;
+    operation: "create" | "update";
+    content?: undefined;
+}>;
 export declare function readNotes(ctx: Context, agent: Agent, project: {
     workspacePath: string;
     paths: ProjectPaths;

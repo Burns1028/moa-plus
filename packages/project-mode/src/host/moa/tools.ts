@@ -3,6 +3,7 @@ import { SessionId } from "@deepseek-ai/dsh-session";
 import { z } from "zod";
 import type { MoAAgents } from "./agents.ts";
 import { toolOperationId } from "../native.ts";
+import { sendMessageSchema, type MoAMessageBroker } from "./messages.ts";
 
 const output = {
   schema: { type: "string" as const },
@@ -137,6 +138,8 @@ const taskSchema = z.object({
     .min(1)
     .max(20),
 });
+const roleDescription =
+  "Explorer and Planner use glob, grep and read (no Bash). Deep Research uses web_search and web_fetch. General-purpose retains native execution tools for running commands, editing files, builds and tests.";
 export function createTaskTool(agents: MoAAgents) {
   return defineTool({
     name: "Task",
@@ -156,6 +159,7 @@ export function createTaskTool(agents: MoAAgents) {
               type: "string",
               required: true,
               enum: ["Explorer", "Planner", "Deep Research", "General-purpose"],
+              description: roleDescription,
             },
             workspace: { type: "string", enum: ["shared", "isolated"] },
             reportTo: {
@@ -200,6 +204,7 @@ export function createForkTool(agents: MoAAgents) {
         type: "string",
         required: true,
         enum: ["Explorer", "Planner", "Deep Research", "General-purpose"],
+        description: roleDescription,
       },
       workspace: { type: "string", enum: ["shared", "isolated"] },
       reportTo: {
@@ -264,6 +269,54 @@ export function createProjectContextTool(agents: MoAAgents) {
         .parse(args);
       return JSON.stringify(
         await agents.context(exec.agent, input, exec.signal),
+      );
+    },
+  });
+}
+
+export function createSendMessageTool(broker: MoAMessageBroker) {
+  return defineTool({
+    name: "SendMessage",
+    nativeOnly: true,
+    description:
+      "Send a notification or ask another MoA agent a question. Answer an existing request with mode=notify and reply_to, not a new request. Requests wait for an explicit answer, timeout, or priority input.",
+    parameters: {
+      target: {
+        type: "string",
+        required: true,
+        description: "Target agent session ID",
+      },
+      message: {
+        type: "string",
+        required: true,
+        description: "Message content",
+      },
+      mode: {
+        type: "string",
+        enum: ["notify", "request"],
+        description: "notify (default) sends information or a reply; request asks a new question and waits",
+      },
+      delivery: {
+        type: "string",
+        enum: ["steer", "queue"],
+        description: "Next step (default) or next turn",
+      },
+      timeout_ms: {
+        type: "integer",
+        description: "Required request timeout in milliseconds",
+      },
+      reply_to: { type: "string", description: "Request ID being answered; use mode=notify" },
+    },
+    output,
+    execute: async (args, exec) => {
+      if (!exec.agent) throw new Error("moa/agent-required");
+      return JSON.stringify(
+        await broker.send(
+          exec.agent,
+          sendMessageSchema.parse(args),
+          toolOperationId(exec),
+          exec.signal,
+        ),
       );
     },
   });

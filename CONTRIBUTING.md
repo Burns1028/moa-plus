@@ -4,7 +4,7 @@ Start with [MOA responsibilities](docs/moa-architecture.md), the [code architect
 
 ## Local setup
 
-Use Node 24.9+, npm and Git. This plugin targets DSH 0.2.1-rc.3 with the explicit native compatibility manifest in this checkout. The current unreleased runtime extends 13 native packages; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
+Use Node 24.9+, npm and Git. This plugin targets DSH 0.2.1-rc.3 with the explicit native compatibility manifest in this checkout. The current unreleased runtime extends 19 native packages across 43 file paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
 
 ```sh
 npm ci
@@ -19,6 +19,8 @@ These commands modify only this checkout's native dependencies. They do not modi
 Submit changes from a branch through a pull request. `main` requires the GitHub Actions launcher checks on macOS and Linux, an up-to-date branch, and resolved review conversations. These rules also apply to administrators; force pushes and branch deletion are disabled. A separate approving reviewer is not required.
 
 Edit `packages/project-mode/src`; generated `lib` artifacts are committed for Git installation. Build to regenerate them. Keep plugin state schemas separate from public view types, and keep execution state owned by DSH.
+
+Role and review instructions live in `host/prompts/` as ordinary constants or pure text constructors. Keep message admission, source serialization, attachments and execution state with their owning services. Public collaboration tool definitions live in `host/moa/tools.ts`; message routing/recovery stays in `messages.ts`, Agent controls in `agents.ts`, and shared Context I/O in `project-memory.ts`.
 
 For behavior changes, add a regression covering a meaningful native or UI boundary, and run the relevant checks. Start with a focused test; before releasing, run the full integration and package checks:
 

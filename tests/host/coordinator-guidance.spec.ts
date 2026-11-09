@@ -4,7 +4,7 @@ import { createUserMessage, type GenerateOptions } from "@deepseek-ai/dsh-llm";
 import Loader from "@deepseek-ai/cordis-plugin-loader";
 import Presets from "@deepseek-ai/dsh-agent-preset-registry";
 import { fixture, response } from "./fixture.ts";
-import { coordinatorPrompt } from "../../packages/project-mode/src/host/coordinator-prompt.ts";
+import { coordinatorPrompt } from "../../packages/project-mode/src/host/prompts/coordinator.ts";
 
 function systemText(request: GenerateOptions) {
   return request.messages
@@ -42,6 +42,76 @@ function policyCopies(request: GenerateOptions) {
       .split(coordinatorPrompt).length - 1
   );
 }
+
+it("describes distinct work ownership and selective knowledge contributions in actual model inputs", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("guidance-work-ownership"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(prompt("Continue from the existing evidence and assign the remaining work."));
+    await agent.whenIdle();
+    const coordinator = f.adapter.requests.find((request) => request.sessionId === agent.id)!;
+    const policy = `${systemText(coordinator)}\n${runtimeText(coordinator)}`;
+    expect(policy).toContain("Give each workstream a clear owner");
+    expect(policy).toContain("Reuse completed results and existing checks");
+    expect(policy).toContain("unresolved question");
+
+    const seen = Promise.withResolvers<GenerateOptions>();
+    f.adapter.handler = (request) => {
+      if (request.sessionId !== agent.id) seen.resolve(request);
+      return response("done");
+    };
+    const receipt = await f.ctx.projectMode.controlForAgent(
+      agent,
+      { action: "spawn", name: "reviewer", task: "Review the existing evidence without modifying any file." },
+      "selective-memory",
+      new AbortController().signal,
+    ) as { workerId: SessionId };
+    // Native ownership may release a completed Worker before admission returns.
+    // The captured model request is the contract under test, not residency.
+    const worker = await seen.promise;
+    expect(worker.sessionId).toBe(receipt.workerId);
+    const instructions = JSON.stringify(worker.messages);
+    expect(instructions).toContain("without modifying any file");
+    expect(instructions).toContain("Only contribute knowledge when");
+    expect(instructions).toContain("no new reusable finding");
+    expect(instructions).toContain("assignment's write constraints");
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("explains role execution capabilities and explicit reply syntax in native tool schemas", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("guidance-role-tools"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(prompt("Assign an independent check that can run the required commands."));
+    await agent.whenIdle();
+    const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
+    for (const name of ["Task", "Fork"]) {
+      const schema = JSON.stringify(request.tools!.find((tool) => tool.name === name));
+      expect(schema).toContain("glob, grep and read");
+      expect(schema).toContain("no Bash");
+      expect(schema).toContain("General-purpose");
+      expect(schema).toContain("running commands");
+    }
+    const send = JSON.stringify(request.tools!.find((tool) => tool.name === "SendMessage"));
+    expect(send).toContain("mode=notify");
+    expect(send).toContain("reply_to");
+    expect(send).toContain("not a new request");
+  } finally {
+    await f.dispose();
+  }
+});
 
 it("puts coordinator policy in the actual system message and removes it on plugin disposal", async () => {
   const f = await fixture();

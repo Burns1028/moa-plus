@@ -3,12 +3,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { fixture } from "./fixture.ts";
+import { identityMessage } from "../../packages/project-mode/src/host/prompts/identity.ts";
 import {
   ensureContextIndex,
   readNotes,
   memoryPaths,
   notesInjection,
-  identityMessage,
   contextIndexTemplate,
 } from "../../packages/project-mode/src/host/project-memory.ts";
 
