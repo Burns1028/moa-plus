@@ -2,7 +2,7 @@
 
 **通过多智能体协作，让智能更进一步。**
 
-MoA+ 在 DeepSeek Harness 中组织一支持续工作的 Agent 团队。Coordinator 统筹方向，专长不同的 Workers 探索、执行、提问和审阅。它们保有各自的会话，可以直接交换消息，并把有价值的发现沉淀为下一次任务能复用的知识。
+MoA+ 以 DeepSeek Harness 插件的形式构建多智能体系统（Mixture of Agents）。常驻的 Coordinator 统筹方向，专长不同的 Workers 探索、执行、提问和审阅。它们保有各自的会话，可以直接交换消息，并把有价值的发现沉淀为下一次任务能复用的知识。
 
 [English](README.md) | 简体中文
 

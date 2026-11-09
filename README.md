@@ -2,7 +2,7 @@
 
 **Advancing intelligence through multi-agent collaboration.**
 
-MoA+ brings a persistent team of Agents to DeepSeek Harness. A Coordinator directs the work; specialists explore, implement, question, and review. They keep their own conversations, exchange messages directly, and build shared knowledge that the next task can reuse.
+MoA+ builds a Mixture of Agents system as a DeepSeek Harness plugin. A persistent Coordinator directs the work; specialists explore, implement, question, and review. They keep their own conversations, exchange messages directly, and build shared knowledge that the next task can reuse.
 
 English | [简体中文](README.zh.md)
 
