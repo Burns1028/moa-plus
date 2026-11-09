@@ -8,7 +8,7 @@ MoA+ 以 DeepSeek Harness 插件的形式构建多智能体系统（Mixture of A
 
 [架构与角色][roles] · [试用新运行时](#试用新运行时) · [观看真实协作](docs/media/project-workflow.mp4) · [验证记录][verification]
 
-**开发预览：**新 MoA 运行时位于 `feat/moa-whitepaper` 分支，正在 [PR #3](https://github.com/Burns1028/moa-plus/pull/3) 中接受审阅，需要配套的 DSH **0.2.1-rc.3 兼容运行时**。最新已发布 tag **v0.1.23** 是此前的 Project Mode 预览版。详见[版本与兼容说明][compatibility]。
+**开发预览**：新 MoA 运行时位于 `feat/moa-whitepaper` 分支，正在 [PR #3](https://github.com/Burns1028/moa-plus/pull/3) 中接受审阅，需要配套的 DSH **0.2.1-rc.3 兼容运行时**。最新已发布 tag **v0.1.23** 是此前的 Project Mode 预览版。详见[版本与兼容说明][compatibility]。
 
 ## 为什么要组织一支团队？
 

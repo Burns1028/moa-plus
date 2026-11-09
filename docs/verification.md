@@ -4,24 +4,24 @@
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **13 native packages / 31 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
-This is an unreleased branch; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`, with its separate evidence below.
+This is an unreleased branch; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
 
 ### Current automated evidence
 
 | Check | Verified revision and result |
 | --- | --- |
-| Combined Host, Client, integration, and native-contract regression | Source `8546b3a` / bundle `ada2e01`: **55 files / 300 tests passed**. This total already includes native-contract tests. The previous completion-role run at source `e617f0f` / bundle `e982a59` passed 54 files / 296 tests. |
-| Production build and generated artifacts | Build passed for the message-display follow-up; matching bundle committed as `ada2e01`. The prior completion-role bundle is `e982a59`. |
-| Host and Client typechecks | Both passed for the message-display follow-up, retaining the Coordinator closure, background-query, detached PTC logging, and completion-role fixes. |
+| Combined Host, Client, integration, and native-contract regression | Runtime code in `9036551`: **55 files / 302 tests passed**, including the new readiness recovery and persistent-error regressions. This total includes native-contract tests. Earlier message-display and completion-role totals remain associated with their revisions below. |
+| Production build and generated artifacts | Production build passed; the reviewed Host cleanup and Client readiness correction are committed in bundle `9036551`. Later package metadata and static README media do not alter execution code. |
+| Host and Client typechecks | Both passed for the latest runtime code. Host also passes no-unused-locals/parameters checking after removing stale wiring. |
 | Isolated runtime launcher | **19 passed, zero skipped**, including unsupported-byte refusal, setup recovery, and child signal forwarding. |
 | Exact native compatibility | Fresh npm, published legacy-tool-isolation, and runtime-only variants passed application, target-hash, idempotence, unknown-byte refusal, and backup rollback probes for the current manifest. |
-| Fresh package consumers | At `231663c`, npm, forwarding-package, and committed-Git consumers passed stock-runtime refusal, explicit compatibility installation, declarations, Host/browser loading, nine native Loader endpoints, Client Gateway roundtrip, and disposal. Git clean-checkout `npm ci` also passed. Completed disposable consumer fixtures are released between stages; check assertions are unchanged. |
+| Fresh package consumers | At `1d24865`, npm, forwarding-package, and committed-Git consumers passed stock-runtime refusal, explicit compatibility installation, declarations, Host/browser loading, nine native Loader endpoints, Client Gateway roundtrip, and disposal. Git clean-checkout `npm ci` also passed. Completed disposable consumer fixtures are released between stages; check assertions are unchanged. |
 
 The closure regression holds a real final Worker ingestion while the guard awaits Worker state. It proves the Coordinator stays in the original turn until that canonical result is admitted and consumed. Background-query coverage checks current native job status instead of repeating a historical running/stopping snapshot. The [detached PTC log correction](native-moa-detached-ptc-log-contract.md) preserves late subcall lineage and canonical payloads through native ignorable records; regressions cover cold persistence and transfer during asynchronous log shaping while keeping ordinary foreground events unchanged. These are scripted native regressions, distinct from the observed real-model tasks below.
 
 ### Requirement → code, tests and evidence
 
-Plugin source paths below are relative to `packages/project-mode/src/`; test paths are relative to the repository root. These are the delivered module boundaries, including the consolidation recorded in the [implementation plan](superpowers/plans/2026-11-08-moa-whitepaper.md). Automated coverage is included in the 300-test total above; observed real-model evidence is summarized below. Design goals are not a claim of measured intelligence or guaranteed delegation quality.
+Plugin source paths below are relative to `packages/project-mode/src/`; test paths are relative to the repository root. These are the delivered module boundaries, including the consolidation recorded in the [implementation plan](superpowers/plans/2026-11-08-moa-whitepaper.md). Automated coverage is included in the 302-test total above; observed real-model evidence is summarized below. Design goals are not a claim of measured intelligence or guaranteed delegation quality.
 
 | Whitepaper chapter and requirement | Actual code | Tests and evidence |
 | --- | --- | --- |
@@ -72,6 +72,23 @@ Real UI inspection opened the Coordinator and both Worker conversations. The Coo
 
 Use [manual verification](manual-verification.md) to repeat the scenarios on a new runtime. Credentials, profiles, private conversations, raw trajectories, and screenshots stay outside Git. Historical preview evidence below remains associated with its tagged version.
 
+### Fresh browser-driven product acceptance: 2026-11-09
+
+A new empty runtime was prepared through the documented launcher, using a fresh Git copy of the public Note Bundle starter and the real DeepSeek-V4.1-Flash 1017 High route. Independent completion verification stayed enabled. The first task used the message-display build; after its successful closure, the runtime loaded the final reviewed execution/UI bundle `9036551`, passed doctor, and restarted before the follow-up task.
+
+- The Coordinator created Exporter and Docs in shared execution. The baseline was three passing tests and one intentional missing-feature failure. A human changed title order directly in the busy Exporter conversation, then used Enter in the waiting Coordinator. The input was admitted promptly; the Coordinator inspected real Worker state and human/AI history and steered both existing Workers.
+- Docs asked Exporter directly for the contract. Incoming clarification interrupted the first Request. A revised Request received an explicit ReplyTo on its original Tool Result; the older reply arrived later through the inbox. Model mistakes in reportTo, history-window arguments and message mode/delivery were rejected and corrected during the actual run, not removed from its evidence.
+- Both Workers returned complete final AI content once. The independent Verifier ran tools, returned Pass, and only then did the Coordinator commit its normal completed end. Earlier message-driven handoff ends were retained as handoffs, not counted as final delivery.
+- Restart did not reopen a model turn, repeat either accepted result or duplicate a background notice. The next browser-submitted task reused Exporter and saved knowledge. It generated `Pears`, `Cherries`, `Bananas`, `apples` without creating another Worker. Independent checks ran eight tests successfully and confirmed the generated file exactly matched the CLI output.
+- The second Verifier first returned Partial: the generated output contained four notes, but the guide still described three. The Coordinator kept the same turn open, sent the correction to the original Docs Worker, and obtained a fresh tool-backed Pass before normal completion. No operator changed the deliverables, rubric or verdict to make it pass.
+- All four legitimate Worker turns across both tasks had one consumed final-result delivery, one attempt and exact full-AI content equality. Both accepted project tasks ended normally after their independent Pass.
+
+Ego browser inspection opened the Coordinator and both native Worker chats, saw named incoming peer/Coordinator messages, expanded original Markdown, and used Back with inherited permissions. The final build showed newest-first work-axis inputs, outputs and artifacts; default previews were two lines (approximately 43 px), with click-to-expand original content. Native Workers/notes tabs switched, closed and reopened through the existing menu. The started mode had no editable checkbox. Earlier capsule groups remained in place; the later task initially showed Exporter only and included Docs after its actual rework assignment/result. Each capsule retained one icon and one status, matching the same two sidebar children.
+
+The creation-time timeline failure is covered by a red/green component regression: an actual not-ready-to-ready transition reopens the failed subscription once; normal activity does not reopen healthy streams, and a ready-state history error still requires explicit Retry. This browser run observed successful fresh creation and cold reopening, rather than forcing that timing failure. Stop That Shit review removed unused Host wiring and unreachable UI branches while preserving the native inbox, result receipts, workspace ownership and completion controls that have concrete responsibilities.
+
+Both public READMEs and the GitHub About/topics were updated. The overview distinguishes the pending runtime from the historical tag/media, links to the correct branch, and uses a self-contained static collaboration diagram. Raw profiles, trajectories, screenshots and local acceptance reports remain outside Git. These tasks establish the recorded collaboration and correctness paths; they are not an intelligence or speed benchmark.
+
 ## Published preview evidence
 
 The sections below concern the earlier tagged releases. They used DSH 0.2.1-rc.3 with the original three extensions, not the current branch's expanded runtime. The v0.1.23 change added isolated onboarding and public task evidence; its coordination behavior was unchanged from v0.1.22.
@@ -98,7 +115,7 @@ The earlier audit confirmed both defects in 0.1.21; those findings are now cover
 
 A separately installed 0.1.22 bundle ran in a new temporary workspace under Desktop 0.2.1-rc.3. The Coordinator called list then spawn; one Worker wrote two reusable facts and updated the shared index. The full final committed Worker AI payload matched the canonical received result exactly. There was one Worker turn, one Coordinator turn, one canonical result and a completed native Coordinator closure after 50 seconds, with result consumption before closure. The Coordinator independently read the index/facts and updated notes/archived. The visible capsule and collapsed Markdown timeline were inspected.
 
-The initial timeline observation briefly returned a native session-not-found error for the newly created Worker; the existing Retry action recovered the timeline. This UI read timing issue remains a limitation and is separate from the fixed turn/error-isolation path. The task explicitly requested delegation, so it does not establish general natural-delegation quality. No test prompt was sent to an existing user conversation.
+The initial timeline observation briefly returned a native session-not-found error for the newly created Worker; the existing Retry action recovered the timeline. That release required manual Retry. The unreleased readiness-triggered correction is covered by the latest regression and product acceptance above; the historical capture is unchanged. The task explicitly requested delegation, so it does not establish general natural-delegation quality. No test prompt was sent to an existing user conversation.
 
 ## 0.1.21 historical verification
 
