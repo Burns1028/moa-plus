@@ -1,187 +1,119 @@
 # MoA+
 
-**通过多智能体协作，让智能更进一步。** MoA+ 希望构建一个真正的多智能体系统（Mixture of Agents），探索 Agent 之间的相互协作如何把整个系统的智能能力推向下一个台阶。
+**通过多智能体协作，让智能更进一步。**
+
+MoA+ 以 DeepSeek Harness 插件的形式构建多智能体系统（Mixture of Agents）。常驻的 Coordinator 统筹方向，专长不同的 Workers 探索、执行、提问和审阅。它们保有各自的会话，可以直接交换消息，并把有价值的发现沉淀为下一次任务能复用的知识。
 
 [English](README.md) | 简体中文
 
-[![Project Mode 实际结果：两个 Worker、生成的笔记和通过的九项测试](docs/media/workflow-result.png)](docs/media/project-workflow.mp4)
+[架构与角色][roles] · [试用新运行时](#试用新运行时) · [观看真实协作](docs/media/project-workflow.mp4) · [验证记录][verification]
 
-当前预览版以非官方 DeepSeek Harness 插件的形式实现，提供 Coordinator、持久化 Worker 会话、共享上下文和结果审阅。这些能力是系统继续演进的起点。
+**开发预览**：新 MoA 运行时位于 `feat/moa-whitepaper` 分支，正在 [PR #3](https://github.com/Burns1028/moa-plus/pull/3) 中接受审阅，需要配套的 DSH **0.2.1-rc.3 兼容运行时**。最新已发布 tag **v0.1.23** 是此前的 Project Mode 预览版。详见[版本与兼容说明][compatibility]。
 
-[观看 60 秒协作演示](docs/media/project-workflow.mp4) · [查看界面效果](#实际效果) · [安装使用](#快速开始)
+## 为什么要组织一支团队？
 
-**非官方源码预览版，最新已发布标签为 v0.1.23。** 需要 DSH **0.2.1-rc.3 及本仓库列出的三个兼容扩展**，下方的独立环境脚本会准备好这些扩展；原版 rc.3 无法直接启用插件。详见[兼容说明](docs/compatibility.md)。
+长程任务会持续消耗 Agent 的上下文、判断力和吞吐。MoA+ 从协作方式上应对这三个问题：
 
-原 Project Mode。v0.1.23 运行时和演示仍使用 **Project** 标识，原有包名保持兼容。
+- **让全局判断保持清楚。** 工具输出与反复试错留在 Worker 的执行上下文中，Coordinator 持续掌握目标、决策与进度。
+- **保留独立视角。** 用干净上下文重新审视一个方向，或继承有用历史探索另一条路径；独立审阅从原始要求出发，检查实际结果。
+- **让并行工作产生积累。** 隔离 worktree 分开互相冲突的改动，共享知识索引把确认过的发现带到后续任务。
 
-## 目录
+目标是通过 Agent 之间的配合，提升整个系统解决复杂问题的能力。这套架构为协作提供持续的记忆、通信和控制。
 
-- [当前实现](#当前实现)
-- [实际效果](#实际效果)
-- [快速开始](#快速开始)
-- [使用指南](#使用指南)
-- [项目记忆](#项目记忆)
-- [DSH 界面功能](#dsh-界面功能)
-- [项目结构](#项目结构)
-- [开发](#开发)
-- [API 与文档](#api-与文档)
-- [当前限制](#当前限制)
-- [许可证](#许可证)
+![Coordinator 统筹持久化 Workers，同伴互发消息并共享索引知识；主、子 Agent 使用同一套 DSH 原生运行时。](docs/media/moa-collaboration.svg)
 
-## 当前实现
+Coordinator 与 Worker 使用相同的原生 Agent Loop，由身份、工具集合和继承权限形成不同职责。用户也可以进入 Worker 直接下达指令，再回到 Coordinator。
 
-在当前实现中，用户把目标交给 Coordinator，由它创建或复用 Workers、引导工作、审阅结果并维护共享上下文。下文介绍已经可用的能力，后续协作机制将随着设计和验证继续演进。
+## 协作工具
 
-| 能力               | 带来的帮助                                                                      |
-| ------------------ | ------------------------------------------------------------------------------- |
-| 持续协调           | 同一个 Coordinator 会话维护项目工作记录，判断下一步。                           |
-| 完整的 Worker 控制 | 派生或复用 Worker、引导当前工作、排队下发后续指令、查看状态与历史、打断或删除。 |
-| 共享项目知识       | Coordinator 与 Workers 共同维护索引，按需渐进加载上下文。                       |
-| 自动返回结果       | Worker 每轮结束后自动返回完整的最终 AI 消息，交给 Coordinator 审阅。            |
-| 用户直接参与       | 进入 Worker 直接引导工作，再返回 Coordinator 继续协调。                         |
-| DSH 原生执行       | Session、Agent Loop、工具、权限、消息投递和 Stop 均由 DSH 承担。                |
+| 原语 | 团队可以做什么 |
+| --- | --- |
+| `Task` | 以干净上下文创建承担明确职责的专家。 |
+| `Fork` | 从选定 Agent 已提交的历史中派生另一条工作分支。 |
+| `SendMessage` | 通知同伴、引导当前工作、排队追加指令，或提出需要明确答复的阻塞问题。 |
+| `QueryAgent` | 查看状态和指定范围的人类／AI 消息，或等待进展与新来信。 |
+| `KillAgent` | 停止并等待当前执行退出；保留会话以便继续，也可以显式销毁。 |
 
-## 实际效果
+Worker 在多次分工之间保留会话与工作目录。每轮真正结束后，系统把**本轮最后一条完整 AI 消息**送给指定的汇报对象。Coordinator 可以审阅结果、沿用这个 Worker，或调整方向。团队工作期间，新的用户输入仍能及时接入。
 
-用一个小型 CLI 改动展示协作过程：Exporter 实现标题排序并补测试，Docs 维护使用说明，Coordinator 审阅两边的结果。用户进入 Exporter 会话更改排序要求，下一轮再沿用约定，加入一篇笔记。
+运行时还提供隔离／共享工作区、慢工具转后台及结果自动回流、共享知识和独立完成审阅。Coordinator 保留普通执行工具，自行判断如何分工；确实需要多级团队时，再显式开启嵌套派生。详见[角色与操作流程][roles]、[工具 API][tools]。
 
-[![实际协作任务：派发 Worker、人工更新需求、接回结果并在下一轮复用上下文](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
+## 协作仍然发生在对话中
 
-这段剪辑展示真实的 CLI 任务：**派发 Workers → 人工进入 Exporter 改排序要求 → Coordinator 接回变化 → 下一轮复用已有 Workers 和共享上下文**。等待过程经过剪辑并全程标注，不代表任务在 60 秒内完成；最终示例通过了 9 项真实测试。可以[复现任务](docs/demo-workflow.md)，也可以[查看实际产物](docs/demo-result)。可以[打开 MP4](docs/media/project-workflow.mp4)控制播放，也可以[查看工作台原图](docs/media/project-workspace.png)。
-[![完整任务的实际结果：沿用排序约定生成四篇笔记，9 项测试通过](docs/media/workflow-result.png)](docs/media/workflow-result.png)
+MoA+ 沿用 DSH 原生界面：
 
-### 看清每个 Worker 做了什么
+- **胶囊就是子会话。** 点击胶囊进入 Worker；原生左侧列表中，同一个 Worker 显示在 Coordinator 下。胶囊保留在它参与工作的 turn／消息段中。
+- **对话里能看到 Agent 来信。** 主会话、Worker 与同伴的来信标明发送者；先展示原文预览，点击展开完整 Markdown。
+- **工作过程可以检查。** 右侧默认打开可关闭的 Workers 与 notes.md 标签页，展示工作轴和当前记录；输入与输出使用紧凑、可展开的预览。
+- **用户可以直接参与。** Worker 继承权限，通过 Back 返回 Coordinator。删除后隐藏对应有效列表项及胶囊，归档则跟随 Coordinator 的会话家族。
 
-选中 Worker，按由近到远的顺序查看每一轮工作。需要时展开原始指令和最终 AI 回复，打开记录的产物，或直接进入子会话引导它。
+[![v0.1.23 真实任务：派发、人工介入、结果审阅与上下文复用](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
 
-[![Worker 工作时间轴：两轮记录、展开的原始输入与最终输出、产物文件链接](docs/media/worker-timeline.png)](docs/media/worker-timeline.png)
+这段 **v0.1.23** 录屏展示真实任务：Exporter 修改 CLI 的标题排序；用户进入它的会话调整约定；Docs 对齐文档；Coordinator 审阅结果。下一次任务继续复用这些 Workers 与已经达成的上下文。[实际产物](docs/demo-result)通过了九项测试。
 
-### 下一次继续时，项目记录还在
+这是省去等待并加以标注的 60 秒剪辑，展示此前的协作流程，保留当时的 Project 标识。新运行时的证据单列在[验证记录][verification]中，也可以[复现这次演示](docs/demo-workflow.md)。
 
-`notes.md` 就在对话旁边，保留目标、已交付工作、当前状态和下一步。Coordinator 负责维护工作记录，可复用的知识则持续积累到共享上下文索引中。
+| Worker 工作轴 | 共享工作记录 |
+| --- | --- |
+| ![原始输入、最终 AI 回复与产物](docs/media/worker-timeline.png) | ![原生对话旁的 notes.md](docs/media/project-notes.png) |
 
-[![DSH 中渲染的 notes.md：项目目标、交付文件、当前状态和后续工作](docs/media/project-notes.png)](docs/media/project-notes.png)
+这两张细节图来自 v0.1.22 的虚构 Project Atlas 验收工作区；当前模式名称为 MoA+。
 
-协作视频使用 v0.1.23 独立环境和公开的 Note Bundle 示例；较早的细节图来自 v0.1.22 的虚构项目 **Project Atlas**。这些均为真实 DSH 界面，不是概念图，也不作为速度基准。[素材来源与复用说明](docs/media/README.md)。
+## 试用新运行时
 
-## 快速开始
-
-当前源码预览版从 `main` 安装，推荐创建一个独立的**兼容 DSH Web 环境**。需要 Node **24.9+**、npm 和 Git：
+需要 **Node 24.9+**、npm 和 Git。通过待审分支，在独立 Web 环境中试用：
 
 ```sh
-git clone https://github.com/Burns1028/moa-plus.git
-cd moa-plus
-node scripts/moa.mjs setup
-node scripts/moa.mjs start
-```
-
-Setup 会安装锁定版本的 rc.3 运行时，并且只在 `~/.dsh-project-mode/rc3` 内应用三个已审计的扩展。不复用日常 Desktop 应用、`~/.dsh`、全局 Agent 配置和工作区。原生 Web 界面在本地打开；配置模型后新建会话，在发送第一条消息前选择 **MoA**。
-
-已有环境会被复用。测试修改后的源码时，即使插件版本号相同，也要为 setup 和 start 指定同一个全新空目录 `--dir`，具体命令见下方首次运行指南。
-
-运行 `node scripts/moa.mjs doctor` 可以检查准备结果。[首次运行指南](docs/quickstart.md)说明了路径、重启和恢复方式，也可以直接尝试[可复现的项目任务](docs/demo-workflow.md)。
-
-如果已有准备好的兼容 Desktop／运行时，仍可通过它的原生 CLI 安装插件：
-
-```sh
-dsh plugin --profile desktop add "git+https://github.com/Burns1028/moa-plus.git#v0.1.23"
-```
-
-固定版本 v0.1.23 仍使用旧 Project 标签和 `scripts/project-mode.mjs` 入口。原版 rc.3 仍不兼容。Setup 是显式运行的脚本，不是 npm 安装钩子，也不会修改已有的 Desktop 应用。[兼容说明](docs/compatibility.md)保留了三个原生扩展和手工准备方式；各版本安装包见 [Releases](https://github.com/Burns1028/moa-plus/releases)。
-
-## 使用指南
-
-| 角色        | 职责                                                                                                                         |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 用户        | 提出目标、作出决定、与 Coordinator 沟通，也可以进入 Worker 会话直接引导工作。                                                |
-| Coordinator | 选择和引导 Workers、供给上下文、审阅结果、维护工作记录、整理共享知识并汇报进展。澄清、汇总和简单独立操作也可以由它自己完成。 |
-| Worker      | 完成分配的调查或执行任务，补充可复用的发现，以一条自包含的最终 AI 消息返回结果。                                             |
-
-常见流程：
-
-1. 用户把目标交给 Coordinator。它查看 Workers 状态和相关项目记忆，了解用户对子会话的直接操作。
-2. 它判断复用已有 Worker 还是派生新 Worker，下发目标和上下文，再更新 `notes.md`。
-3. 工作发生变化时，用 **steer** 引导当前工作，用 **queue** 将指令留到当前 turn 结束后处理。打断和删除是另外的操作。
-4. Worker 每轮结束自动返回最后一条完整 AI 消息。没有 AI 消息的轮次，也会通知 Worker 身份、轮次和结果状态，并返回空的 AI 结果。
-5. Coordinator 审阅后继续下发或结束工作，更新工作记录和可复用上下文。正常情况下，相关工作和结果接收完成后，在同一个原生 Coordinator turn 内收口。
-
-用户直接操作 Worker 后，再与 Coordinator 沟通时，它可以查看当前状态并按需回看对话。
-
-## 项目记忆
-
-```text
-.dsh/project-mode/<project-id>/
-├── notes.md                 待办、分工、进度、阻塞和下一步
-├── archived.md              完成或告一段落的工作及其结果
-└── context/
-    ├── context.md           共享索引：文件路径和简短介绍
-    ├── decisions.md         可复用的决定与依据，按需创建
-    └── ...                  其他可复用的项目知识
-```
-
-当前实现中的 `notes.md` 和 `archived.md` 由 Coordinator 维护，让它知道项目进行到了哪里、还有什么需要推进。
-
-上下文由 Coordinator 和 Workers 共同维护。Agent 先读 `context/context.md`，再按当前任务需要读取具体文件。Workers 补充有价值、可复用的发现，并更新索引；Coordinator 更多负责整理、合并、删除过时或重复的内容。日常进度保留在工作记录中。
-
-这些文件随项目持续积累，采用渐进式加载，不会在每次请求中全量展开。详细说明见[目标与当前角色职责](docs/moa-architecture.md)。
-
-## DSH 界面功能
-
-- 新建会话，在发送第一条消息前选择 **MoA**。首次 turn 启动后，该会话保持启用 MoA。
-- 在原生工作区侧栏展开 Coordinator，打开其 Workers。每个 Worker 都有稳定的身份图标和当前状态。
-- 点击主会话里的 Worker 胶囊进入子会话。胶囊保留在派发、更新或接收结果所对应的对话段，后续普通回复不会搬动旧胶囊。
-- 右侧默认打开 **Workers** 和 **notes.md**。Workers 按由近到远的顺序展示每轮原始输入、最终 AI 输出和记录的产物；每条正文默认显示最多两行文字，超出部分显示省略号，点击正文展开完整 Markdown 或收起。两个 Tab 都允许关闭。
-- Worker 输入框提供返回 Coordinator 的 **Back**，沿用原生派生权限，不提供独立权限选择器。归档主会话时，其管理的 Workers 一起归档。
-
-原生派生和控制工具仅在 Coordinator 的 Agent 作用域中替换，Workers 与普通会话保留原生工具组合。Stop 保持可用，不会自动停止所有 Workers。
-
-## 项目结构
-
-```text
-packages/moa/
-├── src/host/       项目生命周期、Worker 操作和结果投递
-├── src/client/     侧栏、胶囊和项目页签
-├── src/shared/     共享类型与接口契约
-└── lib/            插件构建产物
-compat/rc3/         经审计的运行时兼容补丁
-scripts/            构建、兼容和验证脚本
-tests/              回归与原生接口测试
-docs/               模型、架构、API 和验证文档
-```
-
-## 开发
-
-需要 Node **24.9+**、npm 和 Git。
-
-```sh
-git clone https://github.com/Burns1028/moa-plus.git
+git clone --branch feat/moa-whitepaper --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
-npm test -- --maxWorkers=1
+npm run build
+node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
 
-`npm test` 会先构建插件。修改 `packages/moa/src`，通过构建重新生成并提交 `lib` 产物。类型检查、原生接口测试、安装包验证和测试地图见[贡献指南](CONTRIBUTING.md)。
+启动器准备独立的运行时、home、配置和文档目录。在原生设置中配置模型，新会话发送首条消息前选择 **MoA+**；启动后模式身份固定。隔离 Worker 需要 Git 工作区；需要直接操作父目录时显式选择 `shared`。
 
-## API 与文档
+配套兼容清单目前覆盖 13 个原生包、31 个文件路径。安装流程在选定环境内备份并应用经过审阅的扩展，不安装到个人 Desktop 应用。原版 rc.3 或其他插件版本准备的运行时不能替代。模型配置、`doctor`、环境选择和回滚步骤见[首次运行指南][quickstart]。
 
-Coordinator 通过 `control_workers` 使用 `spawn`、`list`、`get`、`send`、`history`、`interrupt` 和 `delete`。`send` 区分引导当前工作的 **steer** 与留待下一轮处理的 **queue**。参数、示例和结果语义见工具 API。
+试用**此前已发布的预览版**，请使用 [v0.1.23 tag 及其安装说明](https://github.com/Burns1028/moa-plus/tree/v0.1.23#quick-start)。它保留 Project 标识，使用此前的三个兼容扩展，不包含这里介绍的新运行时。
 
-| 文档 | 内容 |
-| --- | --- |
-| [目标与当前角色](docs/moa-architecture.md) | 系统目标、当前角色职责与渐进式共享上下文 |
-| [代码架构](docs/architecture.md) | 模块、函数、数据结构和执行路径 |
-| [工具 API](docs/tool-api.md) | Worker 控制、消息投递和历史窗口 |
-| [兼容说明](docs/compatibility.md) | rc.3 所需的显式运行时扩展 |
-| [验证记录](docs/verification.md)／[手工验收](docs/manual-verification.md) | 已验证内容与真实应用检查方法 |
+## 让记忆延续到下一次工作
 
-## 当前限制
+```text
+workspace/
+├── notes.md                 当前目标、分工、进度和阻塞
+├── archived.md              告一段落的工作及结果
+├── rubrics.md               独立生成的验收标准
+└── context/
+    ├── index.md             共享知识的位置与简短介绍
+    └── ...                  可复用的发现、决策和方法
+```
 
-分工仍由模型判断，预览版不保证每次都作出理想选择，也不使用任务关键词、命令次数或时间阈值强迫派发。
+Coordinator 维护 notes 与 archive。Host 在它**每次推理前完整注入 notes**；超过 8,000 字符的软预算时提醒整理归档，保留全文。Workers 把有复用价值的发现写入 Context，Coordinator 负责整体合并、整理和删除过时信息。Agent 先读索引，再按需读主题文件；隔离 worktree 中也能访问同一份共享知识。
 
-欢迎用一个小项目试用，并在 [试用反馈](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml) 分享使用场景或安装反馈。如果希望持续关注项目，点一个 Star 也能帮助更多人发现它。
+已有保存路径与旧上下文索引继续兼容。独立项目使用独立工作区；相同工作区中的会话共享工作记录和知识。
 
-## 许可证
+## 阅读与参与
 
-MIT。参见 [LICENSE](LICENSE) 和[第三方声明](THIRD_PARTY_NOTICES.md)。
+[代码架构][architecture]说明模块、结构体、权责和六条控制流。[验证记录][verification]区分自动测试、真实模型任务、浏览器验收与历史版本证据，覆盖请求与回复、后台结果、取消、独立审阅、正常收口和重启去重。
+
+- [角色、生命周期与常见流程][roles]
+- [工具契约][tools]
+- [兼容与回滚][compatibility]
+- [构建、测试与贡献指南][contributing]
+- [反馈真实试用或安装问题](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml)
+
+MoA+ 是非官方 DSH 插件。历史包名 `dsh-plugin-project-mode` 与已保存的协议标识保持稳定。我们希望通过协作提升系统智能，具体团队的表现仍取决于模型判断和实际任务结果。
+
+MIT。见 [LICENSE](LICENSE) 与[第三方声明](THIRD_PARTY_NOTICES.md)。
+
+[roles]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/moa-architecture.md
+[architecture]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/architecture.md
+[tools]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/tool-api.md
+[verification]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/verification.md
+[compatibility]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/compatibility.md
+[quickstart]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/docs/quickstart.md
+[contributing]: https://github.com/Burns1028/moa-plus/blob/feat/moa-whitepaper/CONTRIBUTING.md
