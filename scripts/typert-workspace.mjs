@@ -10,7 +10,7 @@ export async function withProtocolWorkspace(run) {
   // Start from the normal host compiler program. Unrelated installed Client
   // packages never become roots of the build-only declaration workspace.
   const parsed = ts.getParsedCommandLineOfConfigFile(
-    resolve("packages/project-mode/tsconfig.json"),
+    resolve("packages/moa/tsconfig.json"),
     {},
     {
       ...ts.sys,

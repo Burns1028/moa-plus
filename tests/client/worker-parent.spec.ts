@@ -7,7 +7,7 @@ import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/clie
 import {
   apply,
   inject,
-} from "../../packages/project-mode/src/client/index.tsx";
+} from "../../packages/moa/src/client/index.tsx";
 import { nativeLoader } from "./native-loader.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { submissionFixture } from "./submission-fixture.ts";
@@ -88,7 +88,7 @@ async function bench() {
   const client = (slots.entries("conversation.input.left")[0].inject?.() as any)
     .client;
   await vi.waitFor(() =>
-    expect(client.store.project(sid("parent"))).toBeDefined(),
+    expect(client.store.get(sid("parent"))).toBeDefined(),
   );
   const show = (counts: Record<string, Record<string, number>>) =>
     list.set({
@@ -113,7 +113,7 @@ it("opens the native parent in the background for a visible worker and releases 
   expect(b.retain).not.toHaveBeenCalled();
   b.show({ child: { mainView: 1 } });
   expect(b.retain).toHaveBeenCalledExactlyOnceWith(sid("parent"), {
-    source: "projectModeParent",
+    source: "moaParent",
   });
   b.client.store.accept({
     ...snapshot(),

@@ -16,7 +16,7 @@ import SessionQueryEngine from "@deepseek-ai/dsh-session-query";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import ProjectMode from "../../packages/project-mode/src/host/index.ts";
+import MoAPlugin from "../../packages/moa/src/host/index.ts";
 
 export function response(text: string): StreamChunk[] {
   return [
@@ -87,7 +87,7 @@ export async function fixture(
       : { maxActiveSubagents: options.maxActiveSubagents },
   );
   await ctx.plugin(Spawn, { providerName: "spawn" });
-  const plugin = await ctx.plugin(ProjectMode, {});
+  const plugin = await ctx.plugin(MoAPlugin, {});
   return {
     ctx,
     root,

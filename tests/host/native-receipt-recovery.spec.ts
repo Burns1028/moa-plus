@@ -1,8 +1,8 @@
 import { expect, it, vi } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { fixture, response } from "./fixture.ts";
-import ProjectMode from "../../packages/project-mode/src/host/index.ts";
-import { steerHostSubagentPrompt } from "../../packages/project-mode/src/host/native.ts";
+import MoAPlugin from "../../packages/moa/src/host/index.ts";
+import { steerHostSubagentPrompt } from "../../packages/moa/src/host/native.ts";
 
 it.each(["reload", "restart"] as const)(
   "does not wake the coordinator again for a native result after %s",
@@ -73,7 +73,7 @@ it.each(["reload", "restart"] as const)(
           agentOptions: { provider: "test", model: "test" },
         }));
         requests = 0;
-      } else await f.ctx.plugin(ProjectMode, {});
+      } else await f.ctx.plugin(MoAPlugin, {});
       await f.ctx.projectMode.snapshot(agent.id);
       await agent.whenIdle();
       expect(f.adapter.requests).toHaveLength(requests);

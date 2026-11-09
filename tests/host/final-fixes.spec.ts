@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import ProjectMode from "../../packages/project-mode/src/host/index.ts";
+import MoAPlugin from "../../packages/moa/src/host/index.ts";
 import { fixture, response } from "./fixture.ts";
 
 const names = [
@@ -106,7 +106,7 @@ it("reconciles all six late native tools synchronously through registration, rem
     for (const name of names)
       expect(f.ctx.tools.get(name, agent)).toBeDefined();
     expect(f.ctx.tools.get("control_workers", agent)).toBeUndefined();
-    await f.ctx.plugin(ProjectMode, {});
+    await f.ctx.plugin(MoAPlugin, {});
     for (const name of names)
       expect(f.ctx.tools.get(name, agent)).toBeUndefined();
     expect(

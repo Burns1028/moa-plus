@@ -9,7 +9,7 @@ import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/clie
 import {
   apply,
   inject,
-} from "../../packages/project-mode/src/client/index.tsx";
+} from "../../packages/moa/src/client/index.tsx";
 import { nativeLoader } from "./native-loader.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { submissionFixture } from "./submission-fixture.ts";

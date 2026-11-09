@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
-import ProjectMode from "../../packages/project-mode/src/host/index.ts";
+import MoAPlugin from "../../packages/moa/src/host/index.ts";
 import { fixture, response } from "./fixture.ts";
 
 const input = () =>
@@ -128,7 +128,7 @@ it("recovers legacy enabled history as fixed mode without waking it", async () =
     const before = agent.session.snapshotEvents();
     const requests = f.adapter.requests.length;
     await f.plugin.dispose();
-    await f.ctx.plugin(ProjectMode, {});
+    await f.ctx.plugin(MoAPlugin, {});
     await f.ctx.projectMode.snapshot(agent.id);
     expect(f.ctx.projectMode.mode(agent.id)).toMatchObject({
       modeLocked: true,
@@ -159,7 +159,7 @@ it.each(["draft", "disabled-history"] as const)(
         return { ...r, project };
       });
       await f.plugin.dispose();
-      await f.ctx.plugin(ProjectMode, {});
+      await f.ctx.plugin(MoAPlugin, {});
       await f.ctx.projectMode.snapshot(agent.id);
       const mode = f.ctx.projectMode.mode(agent.id);
       expect(mode).toMatchObject({

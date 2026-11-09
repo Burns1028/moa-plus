@@ -8,7 +8,7 @@ import type * as Renderer from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/client";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import { nativeLoader } from "./native-loader.ts";
-import projectModeRemote from "../../packages/project-mode/lib/typert.remote-client.js";
+import moaRemoteDefinition from "../../packages/moa/lib/typert.remote-client.js";
 import { submissionFixture } from "./submission-fixture.ts";
 import { snapshot, sid } from "./fixture.ts";
 
@@ -193,7 +193,7 @@ it("boots the shipped Client through native namespace injection and owns UI/subs
   const remount = b.root.plugin({
     inject: ["remote"],
     apply: async (ctx: Context) => {
-      await ctx.remote.$mount(projectModeRemote);
+      await ctx.remote.$mount(moaRemoteDefinition);
     },
   });
   await remount;

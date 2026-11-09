@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import { ProjectClient } from "../../packages/project-mode/src/client/runtime.ts";
+import { MoAClient } from "../../packages/moa/src/client/runtime.ts";
 import { snapshot, sid } from "./fixture.ts";
 const ok = (value: unknown) => ({ ok: true, value });
 it("owns one follow per root across consumers, restarts generations, and disposes streams on unload", async () => {
@@ -26,7 +26,7 @@ it("owns one follow per root across consumers, restarts generations, and dispose
     setEnabled: vi.fn(),
     snapshot: vi.fn(),
   };
-  const client = new ProjectClient(remote as any);
+  const client = new MoAClient(remote as any);
   client.watchRoots([sid("parent")]);
   client.watchRoots([sid("parent")]);
   await Promise.resolve();
@@ -55,7 +55,7 @@ it("toggle uses Host revision and response as authority, reports refusal without
     ),
     setEnabled,
   };
-  const client = new ProjectClient(remote as any);
+  const client = new MoAClient(remote as any);
   await client.refreshMode(sid("parent"));
   const pending = client.toggle(sid("parent"), true);
   expect(client.mode(sid("parent")).value?.enabled).toBe(false);
@@ -83,14 +83,14 @@ it("late catalog cannot roll a newer follow baseline back to another stream epoc
       },
     }),
   };
-  const client = new ProjectClient(remote as any);
+  const client = new MoAClient(remote as any);
   const pending = client.loadCatalog();
   client.watchRoots([sid("parent")]);
   await Promise.resolve();
   await Promise.resolve();
   finish({ ok: true, value: [s] });
   await pending;
-  expect(client.store.project(sid("parent"))?.streamEpoch).toBe("new");
+  expect(client.store.get(sid("parent"))?.streamEpoch).toBe("new");
   client.dispose();
 });
 function deferred<T = any>() {
@@ -110,14 +110,14 @@ it("accepts only the latest catalog request even when an older epoch resolves la
       .mockReturnValueOnce(a.promise)
       .mockReturnValueOnce(b.promise),
   };
-  const client = new ProjectClient(remote as any);
+  const client = new MoAClient(remote as any);
   const first = client.loadCatalog(),
     second = client.loadCatalog();
   b.resolve(ok([{ ...snapshot(), streamEpoch: "new", revision: 10 }]));
   await second;
   a.resolve(ok([{ ...snapshot(), streamEpoch: "old" }]));
   await first;
-  expect(client.store.project(sid("parent"))?.streamEpoch).toBe("new");
+  expect(client.store.get(sid("parent"))?.streamEpoch).toBe("new");
   client.dispose();
 });
 it.each(["throw", "domain"] as const)(
@@ -125,7 +125,7 @@ it.each(["throw", "domain"] as const)(
   async (kind) => {
     const a = deferred(),
       b = deferred();
-    const client = new ProjectClient({
+    const client = new MoAClient({
       catalog: vi
         .fn()
         .mockReturnValueOnce(a.promise)
@@ -159,7 +159,7 @@ it("refreshes Host revision after refusal, preserves the action error and waits 
       ? { ok: false, error: { message: "Revision changed" } }
       : ok({ ...(mode().value as object), enabled: true }),
   );
-  const client = new ProjectClient({
+  const client = new MoAClient({
     mode: vi.fn(async () => mode()),
     setEnabled,
     catalog: async () => ok([]),
@@ -179,7 +179,7 @@ it.each(["throw", "domain"] as const)(
   async (kind) => {
     const a = deferred(),
       b = deferred(),
-      client = new ProjectClient({
+      client = new MoAClient({
         catalog: vi
           .fn()
           .mockReturnValueOnce(a.promise)

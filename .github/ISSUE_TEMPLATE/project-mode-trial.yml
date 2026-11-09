@@ -1,4 +1,4 @@
-name: Project Mode trial feedback
+name: MoA+ trial feedback
 description: Help improve the developer preview with a concrete task and its outcome.
 title: "[Trial] "
 labels: ["trial-feedback"]
@@ -13,7 +13,7 @@ body:
     attributes:
       label: Versions
       description: Plugin version and DSH version; paste the launcher's doctor summary if available.
-      placeholder: "Project Mode 0.1.23; DSH 0.2.1-rc.3"
+      placeholder: "MoA+ / Project Mode 0.1.23; DSH 0.2.1-rc.3"
     validations:
       required: true
   - type: dropdown

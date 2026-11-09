@@ -8,9 +8,9 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { ProjectBranch } from "../../packages/project-mode/src/client/branch.tsx";
-import { ProjectClient } from "../../packages/project-mode/src/client/runtime.ts";
-import { en } from "../../packages/project-mode/src/client/locales.ts";
+import { MoABranch } from "../../packages/moa/src/client/branch.tsx";
+import { MoAClient } from "../../packages/moa/src/client/runtime.ts";
+import { en } from "../../packages/moa/src/client/locales.ts";
 import { snapshot, sid } from "./fixture.ts";
 
 afterEach(() => {
@@ -23,7 +23,7 @@ const t = (key: keyof typeof en, args?: Record<string, unknown>) =>
     en[key] as string,
   );
 function fixture() {
-  const client = new ProjectClient({} as any);
+  const client = new MoAClient({} as any);
   client.store.accept(snapshot());
   const open = vi.fn(),
     parentOpen = vi.fn();
@@ -66,15 +66,15 @@ it("keeps an archived Project as a native row without clickable worker branches 
       select({ archivedSessionIds: archived }),
   };
   try {
-    const view = render(<ProjectBranch {...(props as any)} />);
+    const view = render(<MoABranch {...(props as any)} />);
     expect(screen.getByText("Coordinator")).toBeTruthy();
     expect(screen.queryByRole("group")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
     archived = [];
-    view.rerender(<ProjectBranch {...(props as any)} />);
+    view.rerender(<MoABranch {...(props as any)} />);
     expect(screen.getByRole("button", { name: "BuilderWorking" })).toBeTruthy();
     archived = [sid("child")];
-    view.rerender(<ProjectBranch {...(props as any)} />);
+    view.rerender(<MoABranch {...(props as any)} />);
     expect(screen.queryByText("Builder")).toBeNull();
   } finally {
     f.client.dispose();
@@ -83,7 +83,7 @@ it("keeps an archived Project as a native row without clickable worker branches 
 it("adds only expandable worker rows and preserves the native child address and stable identity", () => {
   const f = fixture();
   try {
-    const view = render(<ProjectBranch {...(f.props as any)} />);
+    const view = render(<MoABranch {...(f.props as any)} />);
     expect(screen.queryByText("Builder")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand Workers" }));
     expect(f.parentOpen).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ it("adds only expandable worker rows and preserves the native child address and 
     fireEvent.click(screen.getByRole("button", { name: "Collapse Workers" }));
     expect(screen.queryByText("Renamed")).toBeNull();
     view.unmount();
-    render(<ProjectBranch {...(f.props as any)} />);
+    render(<MoABranch {...(f.props as any)} />);
     expect(screen.queryByText("Renamed")).toBeNull();
   } finally {
     f.client.dispose();
@@ -117,7 +117,7 @@ it("reveals the current native worker, clears selection for an active panel, and
   const f = fixture();
   try {
     const view = render(
-      <ProjectBranch
+      <MoABranch
         {...({ ...f.props, currentSessionId: sid("child") } as any)}
       />,
     );
@@ -127,7 +127,7 @@ it("reveals the current native worker, clears selection for an active panel, and
         .getAttribute("aria-current"),
     ).toBe("page");
     view.rerender(
-      <ProjectBranch
+      <MoABranch
         {...({ ...f.props, currentSessionId: undefined } as any)}
       />,
     );
@@ -151,7 +151,7 @@ it("reveals the current native worker, clears selection for an active panel, and
 it("shows native running motion only while the worker runs and keeps its identity", () => {
   const f = fixture();
   try {
-    render(<ProjectBranch {...(f.props as any)} />);
+    render(<MoABranch {...(f.props as any)} />);
     fireEvent.click(screen.getByRole("button", { name: "Expand Workers" }));
     const row = screen.getByRole("button", { name: "BuilderWorking" });
     const identity = row.querySelector(".pm-worker-icon")!.outerHTML;

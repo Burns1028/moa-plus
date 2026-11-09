@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const nested = join(root, "packages/project-mode");
+const nested = join(root, "packages/moa");
 const dist = join(root, "dist");
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 const workspace = await json(join(root, "package.json"));
@@ -71,7 +71,7 @@ try {
     assert.ok(
       !files.some((p) => /lib\/types\/(?:host|client)\/.*\.js$/.test(p)),
     );
-    const prefix = label === "npm" ? "" : "packages/project-mode/";
+    const prefix = label === "npm" ? "" : "packages/moa/";
     for (const file of [
       "lib/index.js",
       "lib/client.js",
@@ -127,7 +127,7 @@ try {
   );
   const fixture = ts.transpileModule(
     (await readFile(join(root, "tests/host/fixture.ts"), "utf8")).replace(
-      "../../packages/project-mode/src/host/index.ts",
+      "../../packages/moa/src/host/index.ts",
       bundle.name,
     ),
     {
@@ -202,15 +202,18 @@ try {
       join(consumer, "types.mts"),
       `import Host from 'dsh-plugin-project-mode';
 import remote from 'dsh-plugin-project-mode/remote';
-import type { ProjectSnapshot } from 'dsh-plugin-project-mode/shared';
+import type { MoASnapshot, ProjectSnapshot } from 'dsh-plugin-project-mode/shared';
 import type { Context } from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-api-gateway/client';
 declare const ctx: Context;
 const list = ctx.remote.projectMode.catalog();
 const descriptor = remote.methods['projectMode/catalog'];
 const plugin: typeof Host = Host;
-const snapshot: ProjectSnapshot | null = null;
-void [list, descriptor, plugin, snapshot];
+const snapshot: MoASnapshot | null = null;
+declare const legacySnapshot: ProjectSnapshot;
+const compatibleSnapshot: MoASnapshot = legacySnapshot;
+const compatibleLegacy: ProjectSnapshot = compatibleSnapshot;
+void [list, descriptor, plugin, snapshot, compatibleSnapshot, compatibleLegacy];
 `,
     );
     await writeFile(

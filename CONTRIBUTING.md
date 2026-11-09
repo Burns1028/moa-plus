@@ -1,6 +1,6 @@
 # Contributing
 
-Start with [MOA responsibilities](docs/moa-architecture.md), the [code architecture and data model](docs/architecture.md), and the [tool contract](docs/tool-api.md). Preserve the Coordinator's existing judgment; do not add task-specific routing gates or human read/ack machinery.
+Start with [MoA responsibilities](docs/moa-architecture.md), the [code architecture and data model](docs/architecture.md), and the [tool contract](docs/tool-api.md). Preserve the Coordinator's existing judgment; do not add task-specific routing gates or human read/ack machinery.
 
 ## Local setup
 
@@ -16,7 +16,7 @@ These commands modify only this checkout's native dependencies. They do not modi
 
 ## Make a focused change
 
-Edit `packages/project-mode/src`; generated `lib` artifacts are committed for Git installation. Build to regenerate them. Keep plugin state schemas separate from public view types, and keep execution state owned by DSH.
+Edit `packages/moa/src`; generated `lib` artifacts are committed for Git installation. Build to regenerate them. Keep plugin state schemas separate from public view types, and keep execution state owned by DSH.
 
 For behavior changes, add a regression covering a meaningful native or UI boundary, and run the relevant checks. Start with a focused test; before releasing, run the full integration and package checks:
 
@@ -34,21 +34,21 @@ The single-worker command is useful on a busy machine because several native int
 
 ## Test map
 
-| Concern | Relevant tests |
-| --- | --- |
-| Coordinator tool replacement and native UI row contract | `tests/native-contract/standard-tool-isolation.spec.ts`, `sidebar-branch.spec.tsx` |
-| Background failure isolation and Worker membership | `tests/host/fault-isolation.spec.ts`, `review.spec.ts` |
-| Same-turn closure, Stop and continuation | `tests/host/native.spec.ts`, `native-tool-continuation.spec.ts` |
-| Result identity and recovery deduplication | `tests/host/native-receipt.spec.ts`, `native-receipt-recovery.spec.ts` |
-| Capsule turn/segment ownership | `tests/host/capsule-provenance.spec.ts`, `tests/client/store.spec.ts` |
-| Direct human operation of Workers | `tests/host/worker-sync.spec.ts` |
-| Dialogue windows and final output | `tests/host/history-window.spec.ts`, `worker-timeline.spec.ts` |
-| Shared progressive context and role prompts | `tests/host/project-memory.spec.ts`, `coordinator-guidance.spec.ts` |
-| Mode lock, archival and parent retention | `tests/host/mode-lock.spec.ts`, `project-archive.spec.ts`, `tests/client/worker-parent.spec.ts` |
-| Native right-side tabs and Markdown expansion | `tests/client/panels.spec.tsx` |
-| Browser factory and native Remote discovery | `tests/client/boot.spec.ts`, `bundle.spec.ts`, `tests/integration/native-discovery.spec.ts` |
-| Installation into fresh consumers | `scripts/verify-package.mjs` |
-| Isolated runtime preparation, ownership, retry and verification | `tests/launcher/project-mode.test.mjs` |
+| Concern                                                         | Relevant tests                                                                              |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Coordinator tool replacement and native UI row contract         | `tests/native-contract/standard-tool-isolation.spec.ts`, `sidebar-branch.spec.tsx`          |
+| Background failure isolation and Worker membership              | `tests/host/fault-isolation.spec.ts`, `review.spec.ts`                                      |
+| Same-turn closure, Stop and continuation                        | `tests/host/native.spec.ts`, `native-tool-continuation.spec.ts`                             |
+| Result identity and recovery deduplication                      | `tests/host/native-receipt.spec.ts`, `native-receipt-recovery.spec.ts`                      |
+| Capsule turn/segment ownership                                  | `tests/host/capsule-provenance.spec.ts`, `tests/client/store.spec.ts`                       |
+| Direct human operation of Workers                               | `tests/host/worker-sync.spec.ts`                                                            |
+| Dialogue windows and final output                               | `tests/host/history-window.spec.ts`, `worker-timeline.spec.ts`                              |
+| Shared progressive context and role prompts                     | `tests/host/moa-memory.spec.ts`, `coordinator-guidance.spec.ts`                             |
+| Mode lock, archival and parent retention                        | `tests/host/mode-lock.spec.ts`, `moa-archive.spec.ts`, `tests/client/worker-parent.spec.ts` |
+| Native right-side tabs and Markdown expansion                   | `tests/client/panels.spec.tsx`                                                              |
+| Browser factory and native Remote discovery                     | `tests/client/boot.spec.ts`, `bundle.spec.ts`, `tests/integration/native-discovery.spec.ts` |
+| Installation into fresh consumers                               | `scripts/verify-package.mjs`                                                                |
+| Isolated runtime preparation, ownership, retry and verification | `tests/launcher/moa.test.mjs`                                                               |
 
 Use [manual verification](docs/manual-verification.md) for real application changes. `tests/application/acceptance-provider` is a scripted model adapter, not proof of natural delegation quality. Do not send test prompts to an existing personal conversation.
 

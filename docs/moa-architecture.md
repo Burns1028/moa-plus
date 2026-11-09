@@ -27,7 +27,7 @@ Agent 先读 `context/context.md`，了解有哪些信息，再按当前任务�
 1. 新用户消息到达，先 list Workers，了解状态和用户对子会话的直接操作；按需 get 或读取指定窗口的 history。
 2. 读取工作记录和上下文索引，判断已有 Worker 的上下文是否适合继续承担任务，或为新的责任派生 Worker。
 3. 下发完整目标、必要上下文引用、约束和预期结果，再更新 notes.md。
-4. 根据进展作出投递判断：steer 引导当前工作，queue 留待当前 turn 结束后处理；interrupt 停止执行，delete 从 Project 移除 Worker。
+4. 根据进展作出投递判断：steer 引导当前工作，queue 留待当前 turn 结束后处理；interrupt 停止执行，delete 从团队中移除 Worker。
 5. 保持对用户输入的响应。等待时汇报进展并交还控制；Worker 每轮结束自动回传完整最后一条 AI 消息，Coordinator 随后审阅结果和证据。
 6. 对具体缺口继续引导同一 Worker，必要时派生其他 Worker或请用户决定；更新工作记录，整理有复用价值的上下文。相关结果均已处理且无需继续协调时收口。
 

@@ -6,20 +6,18 @@ import {
   screen,
   fireEvent,
   act,
+  waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Context } from "@deepseek-ai/cordis";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type * as Renderer from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/client";
-import {
-  apply,
-  inject,
-} from "../../packages/project-mode/src/client/index.tsx";
+import { apply, inject } from "../../packages/moa/src/client/index.tsx";
 import { nativeLoader } from "./native-loader.ts";
 import { submissionFixture } from "./submission-fixture.ts";
 import { snapshot, sid } from "./fixture.ts";
-import { en } from "../../packages/project-mode/src/client/locales.ts";
+import { en } from "../../packages/moa/src/client/locales.ts";
 
 const dispose: (() => unknown)[] = [];
 afterEach(async () => {
@@ -146,9 +144,7 @@ async function bench(inputText?: string) {
   await fiber;
   const client = (slots.entries("conversation.input.left")[0].inject?.() as any)
     .client;
-  await vi.waitFor(() =>
-    expect(client.store.project(sid("parent"))).toBeDefined(),
-  );
+  await vi.waitFor(() => expect(client.store.get(sid("parent"))).toBeDefined());
   return {
     root,
     fiber,
@@ -211,9 +207,13 @@ it.each([
     }
     fireEvent.click(summary);
     expect(disclosure.open).toBe(false);
-    await screen.findByText(preview);
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.queryByRole("button", { name: en.copy })).toBeNull();
+    // Native details toggles notify React asynchronously; expanded code can
+    // already match the same plain text, so wait for its controls to unmount.
+    await waitFor(() => {
+      expect(screen.queryByRole("table")).toBeNull();
+      expect(screen.queryByRole("button", { name: en.copy })).toBeNull();
+    });
+    expect(screen.getByText(preview)).toBeTruthy();
   },
 );
 
@@ -403,7 +403,7 @@ it("omits removed and uncreated workers, switches away from a deleted selection 
   await screen.findByText("Output child");
   expect(originalSignal.aborted).toBe(true);
   expect(screen.queryByText("Output recoverable")).toBeNull();
-  expect(b.client.store.project(sid("parent"))!.workers).toHaveLength(4);
+  expect(b.client.store.get(sid("parent"))!.workers).toHaveLength(4);
   act(() =>
     b.client.store.accept({
       ...next,

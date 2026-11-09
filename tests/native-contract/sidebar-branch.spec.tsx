@@ -416,16 +416,16 @@ it("keeps native two-pixel sibling spacing when every branch selector declines",
   }
 });
 
-it("exports the real ProjectBranch with native coordinator, ordinary and worker rows", async () => {
-  const [{ ProjectBranch }, { ProjectClient }, { snapshot, sid }, { en }] =
+it("exports the real MoABranch with native coordinator, ordinary and worker rows", async () => {
+  const [{ MoABranch }, { MoAClient }, { snapshot, sid }, { en }] =
     await Promise.all([
-      import("../../packages/project-mode/src/client/branch.tsx"),
-      import("../../packages/project-mode/src/client/runtime.ts"),
+      import("../../packages/moa/src/client/branch.tsx"),
+      import("../../packages/moa/src/client/runtime.ts"),
       import("../client/fixture.ts"),
-      import("../../packages/project-mode/src/client/locales.ts"),
+      import("../../packages/moa/src/client/locales.ts"),
     ]);
   const f = await fixture();
-  const client = new ProjectClient({} as any);
+  const client = new MoAClient({} as any);
   const data = snapshot();
   data.workers.push({
     ...data.workers[0],
@@ -490,7 +490,7 @@ it("exports the real ProjectBranch with native coordinator, ordinary and worker 
           owner.sessionId === "parent" ? { coordinator: true } : null,
       },
       (props: any) => (
-        <ProjectBranch {...props} client={client} open={open} t={t} />
+        <MoABranch {...props} client={client} open={open} t={t} />
       ),
     );
     const view = render(f.slots.renderSlot("root", {}));

@@ -98,7 +98,7 @@ it("creates an owned continuable worker immediately with role context before its
     await new Promise((r) => setTimeout(r, 10));
     expect(
       JSON.stringify(f.adapter.requests.find((r) => r.sessionId === workerId)),
-    ).toContain("Project worker");
+    ).toContain("MoA worker");
     expect(f.ctx.tools.get("control_workers", worker)).toBeUndefined();
     expect(
       (await f.ctx.subagents.listChildren(agent.id)).map((c) => c.id),
@@ -710,10 +710,10 @@ it("reopens durable outbox without delivering already committed results again", 
       .map((e) => e.data.id);
     expect(before).toHaveLength(1);
     await f.plugin.dispose();
-    const { default: ProjectMode } = await import(
-      "../../packages/project-mode/src/host/index.ts"
+    const { default: MoAPlugin } = await import(
+      "../../packages/moa/src/host/index.ts"
     );
-    await f.ctx.plugin(ProjectMode, {});
+    await f.ctx.plugin(MoAPlugin, {});
     await f.ctx.projectMode.snapshot(agent.id);
     await agent.whenIdle();
     const after = agent.session
@@ -768,10 +768,10 @@ it("reconciles an accepted spawn whose operation receipt was interrupted before 
       workers: r.workers.map((w: any) => ({ ...w, lifecycle: "provisioning" })),
     }));
     await f.plugin.dispose();
-    const { default: ProjectMode } = await import(
-      "../../packages/project-mode/src/host/index.ts"
+    const { default: MoAPlugin } = await import(
+      "../../packages/moa/src/host/index.ts"
     );
-    await f.ctx.plugin(ProjectMode, {});
+    await f.ctx.plugin(MoAPlugin, {});
     const snapshot = await f.ctx.projectMode.snapshot(agent.id);
     expect(snapshot?.workers[0]?.lifecycle).toBe("active");
     expect(
@@ -912,7 +912,7 @@ it("initializes context through the coordinator scoped sandbox filesystem and pr
       }),
     );
     await agent.whenIdle();
-    expect(await readFile(index, "utf8")).toContain("# Project context");
+    expect(await readFile(index, "utf8")).toContain("# MoA context");
     expect(await readFile(mode.paths!.notes, "utf8")).toBe("keep my notes");
   } finally {
     await f.dispose();

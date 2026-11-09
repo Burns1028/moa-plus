@@ -8,7 +8,7 @@
   "scripts": {
     "test": "vitest run tests/host tests/client tests/integration",
     "test:native-contract": "vitest run tests/native-contract",
-    "typecheck": "tsc -p packages/project-mode/tsconfig.json --noEmit && tsc -p packages/project-mode/tsconfig.client.json",
+    "typecheck": "tsc -p packages/moa/tsconfig.json --noEmit && tsc -p packages/moa/tsconfig.client.json",
     "build": "node scripts/build.mjs",
     "pretest": "npm run build",
     "verify:package": "node scripts/verify-package.mjs",
@@ -114,7 +114,7 @@
     "node": ">=24.9.0"
   },
   "version": "0.1.23",
-  "description": "Unofficial Project Mode for DeepSeek Harness: persistent Coordinator, reusable Workers and shared context. Preview; requires patched DSH 0.2.1-rc.3.",
+  "description": "Unofficial MoA+ for DeepSeek Harness: persistent Coordinator, reusable Workers and shared context. Preview; requires patched DSH 0.2.1-rc.3.",
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -126,37 +126,37 @@
     "typescript"
   ],
   "license": "MIT",
-  "main": "./packages/project-mode/lib/index.js",
-  "types": "./packages/project-mode/lib/types/host/index.d.ts",
+  "main": "./packages/moa/lib/index.js",
+  "types": "./packages/moa/lib/types/host/index.d.ts",
   "exports": {
     ".": {
-      "types": "./packages/project-mode/lib/types/host/index.d.ts",
-      "default": "./packages/project-mode/lib/index.js"
+      "types": "./packages/moa/lib/types/host/index.d.ts",
+      "default": "./packages/moa/lib/index.js"
     },
     "./shared": {
-      "types": "./packages/project-mode/lib/types/shared/index.d.ts",
-      "default": "./packages/project-mode/lib/types/shared/index.js"
+      "types": "./packages/moa/lib/types/shared/index.d.ts",
+      "default": "./packages/moa/lib/types/shared/index.js"
     },
     "./typert": {
-      "types": "./packages/project-mode/lib/typert.host.d.ts",
-      "default": "./packages/project-mode/lib/typert.host.js"
+      "types": "./packages/moa/lib/typert.host.d.ts",
+      "default": "./packages/moa/lib/typert.host.js"
     },
     "./remote": {
-      "types": "./packages/project-mode/lib/typert.remote-client.d.ts",
-      "default": "./packages/project-mode/lib/typert.remote-client.js"
+      "types": "./packages/moa/lib/typert.remote-client.d.ts",
+      "default": "./packages/moa/lib/typert.remote-client.js"
     },
     "./package.json": "./package.json",
-    "./icon": "./packages/project-mode/assets/icon.svg",
-    "./locale/*.json": "./packages/project-mode/locale/*.json",
+    "./icon": "./packages/moa/assets/icon.svg",
+    "./locale/*.json": "./packages/moa/locale/*.json",
     "./client": {
-      "types": "./packages/project-mode/lib/types/client/index.d.ts",
-      "default": "./packages/project-mode/lib/client.js"
+      "types": "./packages/moa/lib/types/client/index.d.ts",
+      "default": "./packages/moa/lib/client.js"
     }
   },
-  "icon": "./packages/project-mode/assets/icon.svg",
+  "icon": "./packages/moa/assets/icon.svg",
   "dsh": {
     "bundle": {
-      "patch": "./packages/project-mode/cordis.patch.yml"
+      "patch": "./packages/moa/cordis.patch.yml"
     },
     "client": {
       "platform": "web",
@@ -228,25 +228,25 @@
     }
   },
   "files": [
-    "packages/project-mode/package.json",
-    "packages/project-mode/lib/index.js",
-    "packages/project-mode/lib/types/shared/**/*.js",
-    "packages/project-mode/lib/types/**/*.d.ts",
-    "packages/project-mode/lib/typert.host.js",
-    "packages/project-mode/lib/typert.host.d.ts",
-    "packages/project-mode/lib/typert.remote-client.js",
-    "packages/project-mode/lib/typert.remote-client.d.ts",
-    "packages/project-mode/locale",
-    "packages/project-mode/assets",
-    "packages/project-mode/cordis.patch.yml",
-    "packages/project-mode/LICENSE",
-    "packages/project-mode/README.md",
-    "packages/project-mode/lib/client.js",
-    "packages/project-mode/README.zh.md",
-    "packages/project-mode/THIRD_PARTY_NOTICES.md",
-    "packages/project-mode/CHANGELOG.md",
-    "packages/project-mode/docs",
-    "packages/project-mode/lib/typert.remote-client.d.ts.map",
+    "packages/moa/package.json",
+    "packages/moa/lib/index.js",
+    "packages/moa/lib/types/shared/**/*.js",
+    "packages/moa/lib/types/**/*.d.ts",
+    "packages/moa/lib/typert.host.js",
+    "packages/moa/lib/typert.host.d.ts",
+    "packages/moa/lib/typert.remote-client.js",
+    "packages/moa/lib/typert.remote-client.d.ts",
+    "packages/moa/locale",
+    "packages/moa/assets",
+    "packages/moa/cordis.patch.yml",
+    "packages/moa/LICENSE",
+    "packages/moa/README.md",
+    "packages/moa/lib/client.js",
+    "packages/moa/README.zh.md",
+    "packages/moa/THIRD_PARTY_NOTICES.md",
+    "packages/moa/CHANGELOG.md",
+    "packages/moa/docs",
+    "packages/moa/lib/typert.remote-client.d.ts.map",
     "docs",
     "README.zh.md",
     "THIRD_PARTY_NOTICES.md",
@@ -254,10 +254,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Burns1028/dsh-plugin-project-mode.git"
+    "url": "git+https://github.com/Burns1028/moa-plus.git"
   },
-  "homepage": "https://github.com/Burns1028/dsh-plugin-project-mode#readme",
+  "homepage": "https://github.com/Burns1028/moa-plus#readme",
   "bugs": {
-    "url": "https://github.com/Burns1028/dsh-plugin-project-mode/issues"
+    "url": "https://github.com/Burns1028/moa-plus/issues"
   }
 }

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { consumedNativeReceipts } from "../../packages/project-mode/src/host/native-receipt.ts";
+import { consumedNativeReceipts } from "../../packages/moa/src/host/native-receipt.ts";
 
 const completion = (
   turn: number,

@@ -11,7 +11,7 @@ import { MessageId } from "@deepseek-ai/dsh-llm/brand";
 import {
   apply,
   inject,
-} from "../../packages/project-mode/src/client/index.tsx";
+} from "../../packages/moa/src/client/index.tsx";
 import { nativeLoader } from "./native-loader.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { submissionFixture } from "./submission-fixture.ts";

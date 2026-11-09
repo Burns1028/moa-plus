@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { ProjectStore } from "../../packages/project-mode/src/client/store.ts";
+import { MoAStore } from "../../packages/moa/src/client/store.ts";
 import { snapshot, sid } from "./fixture.ts";
 describe("shared project store", () => {
   it.each(["live", "closed", "closing-gap"] as const)(
     "removes a deleted worker's %s capsule while preserving its peer and original facts",
     (kind) => {
-      const store = new ProjectStore(),
+      const store = new MoAStore(),
         s = snapshot();
       s.workers.push({ ...s.workers[0], workerId: sid("peer"), name: "Peer" });
       s.turnMemberships.push({
@@ -36,13 +36,13 @@ describe("shared project store", () => {
       const next = store.turn(sid("parent"), 3, closed);
       expect(next.map((c) => c.workerId)).toEqual(["peer"]);
       expect(next[0]).toEqual(previous[1]);
-      expect(store.project(sid("parent"))!.turnMemberships).toHaveLength(2);
-      expect(store.project(sid("parent"))!.workers).toHaveLength(2);
+      expect(store.get(sid("parent"))!.turnMemberships).toHaveLength(2);
+      expect(store.get(sid("parent"))!.workers).toHaveLength(2);
       store.dispose();
     },
   );
   it("drops a cached closed capsule when the worker is absent from membership", () => {
-    const store = new ProjectStore(), s = snapshot();
+    const store = new MoAStore(), s = snapshot();
     store.accept(s);
     expect(store.turn(sid("parent"), 3, false)).toHaveLength(1);
     expect(store.turn(sid("parent"), 3, true)).toHaveLength(1);
@@ -51,7 +51,7 @@ describe("shared project store", () => {
     store.dispose();
   });
   it("selects durable participation by human segment and keeps both historical instances of a reused worker", () => {
-    const store = new ProjectStore(),
+    const store = new MoAStore(),
       s = snapshot();
     const first = {
         ...s.turnMemberships[0],
@@ -90,14 +90,14 @@ describe("shared project store", () => {
     });
     expect(store.turn(sid("parent"), 3, true, 10)[0].text).toBe("first result");
     expect(store.turn(sid("parent"), 3, true, 20)[0].text).toBe("later result");
-    const refreshed = new ProjectStore();
-    refreshed.accept(store.project(sid("parent"))!);
+    const refreshed = new MoAStore();
+    refreshed.accept(store.get(sid("parent"))!);
     expect(refreshed.turn(sid("parent"), 3, true, 10)).toEqual(
       store.turn(sid("parent"), 3, true, 10),
     );
   });
   it("accepts equal durable revision progress and full baseline gaps/epochs while rejecting old baselines", () => {
-    const store = new ProjectStore();
+    const store = new MoAStore();
     const s = snapshot();
     store.accept(s);
     const old = store.turn(sid("parent"), 3, false);
@@ -108,14 +108,14 @@ describe("shared project store", () => {
     });
     expect(store.turn(sid("parent"), 3, false)[0].text).toBe("Tool title");
     store.accept({ ...s, revision: 8, workers: [] });
-    expect(store.project(sid("parent"))?.revision).toBe(8);
+    expect(store.get(sid("parent"))?.revision).toBe(8);
     store.accept(s);
-    expect(store.project(sid("parent"))?.revision).toBe(8);
+    expect(store.get(sid("parent"))?.revision).toBe(8);
     store.accept({ ...s, streamEpoch: "b", revision: 0 });
-    expect(store.project(sid("parent"))?.streamEpoch).toBe("b");
+    expect(store.get(sid("parent"))?.streamEpoch).toBe("b");
   });
   it("never falls back to live status when native closure beats the outcome frame, freezes old outcomes across reuse", () => {
-    const store = new ProjectStore();
+    const store = new MoAStore();
     const s = snapshot();
     store.accept(s);
     expect(store.turn(sid("parent"), 3, true)).toEqual([]);
@@ -141,10 +141,10 @@ describe("shared project store", () => {
   });
   it("structurally reuses unchanged workers and turn lists, throttles text only, flushes terminal changes", () => {
     vi.useFakeTimers();
-    const store = new ProjectStore(150);
+    const store = new MoAStore(150);
     const s = snapshot();
     store.accept(s);
-    const before = store.project(sid("parent"))!;
+    const before = store.get(sid("parent"))!;
     const closed = store.turn(sid("parent"), 4, true);
     const notify = vi.fn();
     store.subscribe(notify);
@@ -154,7 +154,7 @@ describe("shared project store", () => {
     expect(notify).toHaveBeenCalledTimes(1);
     expect(store.turn(sid("parent"), 4, true)).toBe(closed);
     store.accept({ ...s, revision: 2 });
-    expect(store.project(sid("parent"))?.turnMemberships).toBe(
+    expect(store.get(sid("parent"))?.turnMemberships).toBe(
       before.turnMemberships,
     );
     store.push({
@@ -162,7 +162,7 @@ describe("shared project store", () => {
       revision: 3,
       workers: [{ ...s.workers[0], phase: "failed" }],
     });
-    expect(store.project(sid("parent"))?.workers[0].phase).toBe("failed");
+    expect(store.get(sid("parent"))?.workers[0].phase).toBe("failed");
     store.dispose();
     vi.useRealTimers();
   });

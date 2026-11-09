@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
-import ProjectMode from "../../packages/project-mode/src/host/index.ts";
+import MoAPlugin from "../../packages/moa/src/host/index.ts";
 import { fixture, response } from "./fixture.ts";
 
 it("unloads and reloads without permanently closing the surviving coordinator native child admission", async () => {
@@ -14,7 +14,7 @@ it("unloads and reloads without permanently closing the surviving coordinator na
     });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "on");
     await f.plugin.dispose();
-    await f.ctx.plugin(ProjectMode, {});
+    await f.ctx.plugin(MoAPlugin, {});
     const receipt = (await f.ctx.projectMode.controlForAgent(
       agent,
       { action: "spawn", name: "after-reload", task: "work" },
@@ -76,7 +76,7 @@ it("records native capacity rejection as failed provisioning and lets the admitt
           { action: "list" },
           "list-after-rejection",
           signal,
-        )) as import("../../packages/project-mode/src/shared/index.ts").WorkerView[];
+        )) as import("../../packages/moa/src/shared/index.ts").WorkerView[];
         expect(listed.map((w) => w.name)).toEqual(["accepted"]);
         const failed = (f.ctx.projectMode as any)
           .record(agent.id)
@@ -301,7 +301,7 @@ it("keeps an existing Worker visible when its native execution fails", async () 
       { action: "list" },
       "list",
       signal,
-    )) as import("../../packages/project-mode/src/shared/index.ts").WorkerView[];
+    )) as import("../../packages/moa/src/shared/index.ts").WorkerView[];
     expect(listed).toEqual([
       expect.objectContaining({
         workerId: receipt.workerId,

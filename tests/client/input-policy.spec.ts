@@ -4,9 +4,9 @@ import { Context } from "@deepseek-ai/cordis";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type * as Renderer from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { SessionModeView } from "../../packages/project-mode/src/shared/index.ts";
-import { ProjectClient } from "../../packages/project-mode/src/client/runtime.ts";
-import { bindCoordinatorInputPolicy } from "../../packages/project-mode/src/client/input-policy.ts";
+import type { SessionModeView } from "../../packages/moa/src/shared/index.ts";
+import { MoAClient } from "../../packages/moa/src/client/runtime.ts";
+import { bindCoordinatorInputPolicy } from "../../packages/moa/src/client/input-policy.ts";
 import { nativeLoader } from "./native-loader.ts";
 import { snapshot, sid } from "./fixture.ts";
 
@@ -63,7 +63,7 @@ async function bench() {
   await vi.waitFor(() => expect(root.get("conversation")).toBeDefined());
   const bar = slots.entries("conversation.composer.bar")[0];
   const modes = new Map<string, SessionModeView>();
-  const client = new ProjectClient({
+  const client = new MoAClient({
     mode: vi.fn(async (id: string) => ({ ok: true, value: modes.get(id)! })),
   } as any);
   cleanups.push(() => client.dispose());
@@ -190,7 +190,7 @@ it("restores an existing native owner and removes listeners before later Project
 });
 
 it("rejects a host missing the native policy capability before registering Project listeners", () => {
-  const client = new ProjectClient({} as any);
+  const client = new MoAClient({} as any);
   expect(() =>
     bindCoordinatorInputPolicy(
       client,

@@ -11,10 +11,10 @@ import {
 } from "@testing-library/react";
 import {
   WorkerCapsuleList,
-  ProjectToggle,
-} from "../../packages/project-mode/src/client/components.tsx";
-import { ProjectClient } from "../../packages/project-mode/src/client/runtime.ts";
-import { en } from "../../packages/project-mode/src/client/locales.ts";
+  MoAToggle,
+} from "../../packages/moa/src/client/components.tsx";
+import { MoAClient } from "../../packages/moa/src/client/runtime.ts";
+import { en } from "../../packages/moa/src/client/locales.ts";
 import { snapshot, sid } from "./fixture.ts";
 afterEach(cleanup);
 const t = (key: keyof typeof en, args?: Record<string, unknown>) =>
@@ -23,7 +23,7 @@ const t = (key: keyof typeof en, args?: Record<string, unknown>) =>
     en[key] as string,
   );
 it("membership alone makes mounted tail visible and native closure avoids live historical fallback; click uses address", async () => {
-  const client = new ProjectClient({} as any),
+  const client = new MoAClient({} as any),
     open = vi.fn();
   const s = snapshot();
   const { rerender } = render(
@@ -69,7 +69,7 @@ it("membership alone makes mounted tail visible and native closure avoids live h
 });
 it("native checkbox stays unchecked during request, exposes busy and localized Host error", async () => {
   let finish: (v: unknown) => void = () => {};
-  const client = new ProjectClient({
+  const client = new MoAClient({
     mode: async () => ({
       ok: true,
       value: {
@@ -83,7 +83,7 @@ it("native checkbox stays unchecked during request, exposes busy and localized H
     setEnabled: () => new Promise((r) => (finish = r)),
   } as any);
   render(
-    <ProjectToggle
+    <MoAToggle
       client={client}
       sessionId={sid("parent")}
       running={false}
@@ -104,7 +104,7 @@ it("native checkbox stays unchecked during request, exposes busy and localized H
 });
 
 it("shows one completed label without duplicating a missing progress fallback", () => {
-  const client = new ProjectClient({} as any);
+  const client = new MoAClient({} as any);
   const data = snapshot();
   data.closedTurnOutcomes = [
     {

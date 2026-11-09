@@ -1,6 +1,6 @@
 # A project across Workers, human input and a later turn
 
-The [Note Bundle starter](../examples/note-bundle) is a small dependency-free CLI with an intentionally unfinished `--sort title` option. Work on a copy in a new Project conversation using the [isolated quick start](quickstart.md).
+The [Note Bundle starter](../examples/note-bundle) is a small dependency-free CLI with an intentionally unfinished `--sort title` option. Work on a copy in a new MoA conversation using the [isolated quick start](quickstart.md).
 
 1. Ask the Coordinator:
 

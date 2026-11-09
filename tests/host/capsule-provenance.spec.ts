@@ -5,7 +5,7 @@ import {
   type SessionEvent,
 } from "@deepseek-ai/dsh-session";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
-import { projection } from "../../packages/project-mode/src/host/state.ts";
+import { projection } from "../../packages/moa/src/host/state.ts";
 import { fixture, response } from "./fixture.ts";
 
 const input = (text: string) =>
@@ -141,7 +141,7 @@ it("passive human steer/get/list leave earlier membership in place; received com
 
 it("rebuilds pre-upgrade capsule ownership from canonical tool sequence identities and retains frozen outcomes", async () => {
   const { repairCapsuleOwnership } = await import(
-    "../../packages/project-mode/src/host/capsule-participation.ts"
+    "../../packages/moa/src/host/capsule-participation.ts"
   );
   const { snapshot } = await import("../client/fixture.ts");
   const s = snapshot(),
@@ -325,7 +325,7 @@ it("deduplicates repeated steer/queue assignments and later results per human se
 
 it("replaying an accepted assignment retains its original native turn and segment after later human input", async () => {
   const { WorkerOperations } = await import(
-    "../../packages/project-mode/src/host/worker-operations.ts"
+    "../../packages/moa/src/host/worker-operations.ts"
   );
   const { snapshot } = await import("../client/fixture.ts");
   let record: any = {
@@ -388,7 +388,7 @@ it("replaying an accepted assignment retains its original native turn and segmen
 
 it("anchors parallel native dispatch to its encoded tool-call event rather than another call's latest seq", async () => {
   const { WorkerOperations } = await import(
-    "../../packages/project-mode/src/host/worker-operations.ts"
+    "../../packages/moa/src/host/worker-operations.ts"
   );
   const { snapshot } = await import("../client/fixture.ts");
   let record: any = {
@@ -437,10 +437,10 @@ it("anchors parallel native dispatch to its encoded tool-call event rather than 
 
 it("recovers frozen outcomes for result-only segments in later closed turns without rewriting the interrupted original", async () => {
   const { repairCapsuleOwnership } = await import(
-    "../../packages/project-mode/src/host/capsule-participation.ts"
+    "../../packages/moa/src/host/capsule-participation.ts"
   );
-  const { ProjectStore } = await import(
-    "../../packages/project-mode/src/client/store.ts"
+  const { MoAStore } = await import(
+    "../../packages/moa/src/client/store.ts"
   );
   const { snapshot, sid } = await import("../client/fixture.ts");
   const s = snapshot(),
@@ -566,7 +566,7 @@ it("recovers frozen outcomes for result-only segments in later closed turns with
     ...original,
     segmentStartSeq: 3,
   });
-  const store = new ProjectStore();
+  const store = new MoAStore();
   store.accept({
     ...s,
     turnMemberships: repaired.memberships as any,

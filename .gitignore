@@ -9,8 +9,8 @@ packages/_build-*/
 
 dist/
 # Release preparation creates tarball documentation copies.
-packages/project-mode/README*.md
-packages/project-mode/LICENSE
-packages/project-mode/THIRD_PARTY_NOTICES.md
-packages/project-mode/CHANGELOG.md
-packages/project-mode/docs/
+packages/moa/README*.md
+packages/moa/LICENSE
+packages/moa/THIRD_PARTY_NOTICES.md
+packages/moa/CHANGELOG.md
+packages/moa/docs/

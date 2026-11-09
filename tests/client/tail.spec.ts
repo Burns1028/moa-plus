@@ -9,7 +9,7 @@ import {
   humanBoundaryDefinition,
   segmentTail,
   segmentHistoryTarget,
-} from "../../packages/project-mode/src/client/tail.ts";
+} from "../../packages/moa/src/client/tail.ts";
 import type {
   SessionEvent,
   SessionEventType,
@@ -23,7 +23,7 @@ import {
   LlmAttemptId,
 } from "@deepseek-ai/dsh-llm/brand";
 import { nativeLoader } from "./native-loader.ts";
-import { ProjectStore } from "../../packages/project-mode/src/client/store.ts";
+import { MoAStore } from "../../packages/moa/src/client/store.ts";
 import { snapshot, sid } from "./fixture.ts";
 const event = <K extends SessionEventType>(
   type: K,
@@ -184,7 +184,7 @@ it("loads the canonical native boundary for a partial turn without moving its wo
   );
   const chat = capture<typeof Chat>("@deepseek-ai/dsh-client-ui-chat");
   const ctx = new Context();
-  const store = new ProjectStore();
+  const store = new MoAStore();
   try {
     const service = new conv.UiConversation(ctx, {} as any),
       noop = () => () => {};
