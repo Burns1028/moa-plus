@@ -345,6 +345,109 @@ it("offers explicit reopen actions only while a Project is selected", async () =
   expect(screen.queryByRole("menuitem", { name: "Workers" })).toBeNull();
 });
 
+it("reopens a failed first timeline when the same Worker becomes natively ready, without restarting healthy streams on later activity", async () => {
+  const b = await bench();
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((e: any) => e.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  const initial = snapshot();
+  b.client.store.accept({
+    ...initial,
+    revision: 2,
+    workers: initial.workers.map((worker) => ({
+      ...worker,
+      lifecycle: "provisioning" as const,
+      availability: "unavailable" as const,
+      phase: "starting" as const,
+    })),
+  });
+  b.remote.timeline.mockImplementationOnce(() => ({
+    dispose: b.streamDisposals,
+    async *[Symbol.asyncIterator]() {
+      throw new Error("Native session not found before activation");
+    },
+  }));
+  const signal = new AbortController().signal;
+  render(
+    <Component
+      {...entry.inject?.()}
+      sessionId={sid("parent")}
+      t={t}
+      useTabInfo={() => ({ tab: { visible: true, signal, actions: {} } })}
+    />,
+  );
+  await screen.findByText("Native session not found before activation");
+  expect(b.remote.timeline).toHaveBeenCalledTimes(1);
+  act(() => b.client.store.accept({ ...initial, revision: 3 }));
+  await screen.findByText("Output child");
+  expect(
+    screen.queryByText("Native session not found before activation"),
+  ).toBeNull();
+  expect(b.remote.timeline).toHaveBeenCalledTimes(2);
+  for (const [revision, availability, status, phase] of [
+    [4, "cold", "idle", "idle"],
+    [5, "live", "busy", "working"],
+  ] as const) {
+    act(() =>
+      b.client.store.accept({
+        ...initial,
+        revision,
+        workers: initial.workers.map((worker) => ({
+          ...worker,
+          availability,
+          status,
+          phase,
+        })),
+      }),
+    );
+  }
+  expect(b.remote.timeline).toHaveBeenCalledTimes(2);
+});
+
+it("keeps a ready Worker's actual timeline failure visible until explicit retry", async () => {
+  const b = await bench();
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((e: any) => e.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  b.remote.timeline.mockImplementationOnce(() => ({
+    dispose: b.streamDisposals,
+    async *[Symbol.asyncIterator]() {
+      throw new Error("Native history is unreadable");
+    },
+  }));
+  const signal = new AbortController().signal;
+  render(
+    <Component
+      {...entry.inject?.()}
+      sessionId={sid("parent")}
+      t={t}
+      useTabInfo={() => ({ tab: { visible: true, signal, actions: {} } })}
+    />,
+  );
+  await screen.findByText("Native history is unreadable");
+  for (const [revision, availability] of [
+    [2, "cold"],
+    [3, "live"],
+  ] as const) {
+    act(() =>
+      b.client.store.accept({
+        ...snapshot(),
+        revision,
+        workers: snapshot().workers.map((worker) => ({
+          ...worker,
+          availability,
+        })),
+      }),
+    );
+  }
+  expect(b.remote.timeline).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: en.retry }));
+  await screen.findByText("Output child");
+  expect(b.remote.timeline).toHaveBeenCalledTimes(2);
+});
+
 it("omits removed and uncreated workers, switches away from a deleted selection and clears the final removed timeline", async () => {
   const b = await bench();
   const entry = b.slots
