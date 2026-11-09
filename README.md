@@ -1,8 +1,12 @@
+![MoA+ — Intelligence, multiplied. Persistent Agents, direct collaboration, and shared context for DeepSeek Harness.](docs/media/moa-plus-banner.png)
+
 # MoA+
 
 **Advancing intelligence through multi-agent collaboration.**
 
-MoA+ builds a Mixture of Agents system as a DeepSeek Harness plugin. A persistent Coordinator directs the work; specialists explore, implement, question, and review. They keep their own conversations, exchange messages directly, and build shared knowledge that the next task can reuse.
+MoA+ brings a powerful **Mixture of Agents architecture** to DeepSeek Harness. A persistent Coordinator holds the goal, chooses the direction, and brings the results together. Workers investigate, build, challenge, and review in their own conversations, remaining available for the next assignment.
+
+The architecture connects independent execution with **direct communication, shared knowledge, and native lifecycle control**. The Coordinator decides how the team works; the runtime delivers messages, preserves conversations, returns results, and supports independent verification. The goal is to raise what the whole system can accomplish through collaboration.
 
 English | [简体中文](README.zh.md)
 
@@ -10,15 +14,18 @@ English | [简体中文](README.zh.md)
 
 **Developer preview:** the new MoA runtime is available on `main` following [PR #3](https://github.com/Burns1028/moa-plus/pull/3), and has not yet been tagged as a new release. It requires the matching DSH **0.2.1-rc.3 compatibility runtime**. The latest published tag, **v0.1.23**, is the earlier Project Mode preview. [Version and setup details][compatibility].
 
-## Why organize a team?
+## How the MoA architecture works
 
-Long tasks put pressure on an Agent's context, judgment, and throughput. MoA+ addresses all three through the way the team works:
+Long tasks put pressure on context, judgment, and throughput. MoA+ gives the team an architecture for keeping global decisions clear, exploring independently, and making parallel work accumulate:
 
-- **Keep global judgment clear.** Tool output and retries stay in Workers' execution contexts; the Coordinator keeps the goal, decisions, and progress in view.
-- **Preserve independent perspectives.** Start a clean specialist to question an approach, or fork useful history to explore a different one. Independent review starts from the requirements and checks the actual result.
-- **Make parallel work accumulate.** Isolated worktrees separate competing changes. Shared, indexed knowledge carries confirmed findings into later work.
+- **Persistent teams, independent contexts.** Coordinator and Workers share the native Agent Loop. Tool output, experiments, and retries stay in Workers' execution contexts; the Coordinator keeps the goal, decisions, and progress in view. Retained conversations and workspaces let the team continue across assignments.
+- **Deliberate delegation and parallel work.** `Task` starts a specialist with a fresh context; `Fork` branches selected committed history. Isolated Git worktrees separate parallel changes, while an explicit shared workspace supports work in the parent's directory.
+- **Direct Agent-to-Agent communication.** `SendMessage` carries notifications, current guidance, queued assignments, and blocking questions. Interruptible Request waits for an explicit reply; `QueryAgent` inspects state and selected history, or waits for progress and new input.
+- **Knowledge that compounds.** The Coordinator maintains `notes.md` and `archived.md`; full notes refresh before each Coordinator inference. Both roles contribute reusable findings through `context/index.md`, loading relevant files progressively instead of copying entire backgrounds into every assignment.
+- **Responsive execution and lifecycle control.** Slow tools can move to the background and return results automatically. `KillAgent` stops execution and waits for resources to exit before continuation. Each real ended Worker turn returns its complete final AI message to its reporting Agent.
+- **Independent, evidence-based completion review.** A Rubric Builder derives acceptance criteria from the original requirements and specification. An Outcome Verifier checks actual deliverables with native tools; incomplete results and missing evidence return as concrete gaps for rework.
 
-The goal is a system that solves harder problems through cooperation. The architecture gives that cooperation durable memory, communication, and control.
+These mechanisms give the team durable memory, independent perspectives, and control over ongoing work. The [architecture guide][architecture] maps their ownership and the six native control flows; the [Tool API][tools] covers configuration and exact behavior.
 
 ![Coordinator directs persistent Workers; peers exchange messages and share indexed knowledge on the same native DSH runtime.](docs/media/moa-collaboration.svg)
 
