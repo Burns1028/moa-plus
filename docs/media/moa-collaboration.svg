@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title description">
+  <title id="title">MoA+ collaboration architecture</title>
+  <desc id="description">A user works with a Coordinator. The Coordinator directs two persistent Workers, which exchange messages with each other. All three share indexed knowledge. The Coordinator maintains notes and archive. Coordinator and Workers use the same native DeepSeek Harness Agent Loop.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#71849a"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #203449; }
+      .heading { font-size: 18px; font-weight: 600; }
+      .body { font-size: 13px; fill: #52667b; }
+      .edge { fill: none; stroke: #71849a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .owned { marker-start: none; }
+    </style>
+  </defs>
+  <rect width="960" height="420" rx="12" fill="#ffffff"/>
+  <rect x="185" y="16" width="759" height="388" rx="16" fill="#f8fafc" stroke="#d6e0e9"/>
+
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 160 106 H 220"/>
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 315 140 V 205"/>
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 410 140 L 545 205"/>
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 400 240 H 465"/>
+  <path class="edge owned" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" d="M 445 83 H 700"/>
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 445 116 H 663 V 222 H 700"/>
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 645 246 H 700"/>
+  <path class="edge" fill="none" stroke="#71849a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)" d="M 310 275 V 318 H 676 V 274 H 700"/>
+
+  <rect x="18" y="75" width="142" height="62" rx="12" fill="#ffffff" stroke="#b8c6d4"/>
+  <text x="89" y="100" text-anchor="middle" class="heading">You</text>
+  <text x="89" y="121" text-anchor="middle" class="body">goal and feedback</text>
+
+  <rect x="220" y="52" width="225" height="88" rx="12" fill="#edf4ff" stroke="#7e9fc8"/>
+  <text x="332.5" y="81" text-anchor="middle" class="heading">Coordinator</text>
+  <text x="332.5" y="105" text-anchor="middle" class="body">plan · direct · synthesize</text>
+  <text x="332.5" y="124" text-anchor="middle" class="body">review and deliver</text>
+
+  <rect x="220" y="205" width="180" height="70" rx="12" fill="#ffffff" stroke="#96aec7"/>
+  <text x="310" y="234" text-anchor="middle" class="heading">Worker A</text>
+  <text x="310" y="256" text-anchor="middle" class="body">persistent specialist</text>
+  <rect x="465" y="205" width="180" height="70" rx="12" fill="#ffffff" stroke="#96aec7"/>
+  <text x="555" y="234" text-anchor="middle" class="heading">Worker B</text>
+  <text x="555" y="256" text-anchor="middle" class="body">persistent specialist</text>
+
+  <rect x="700" y="48" width="220" height="70" rx="12" fill="#fff8eb" stroke="#c7b38c"/>
+  <text x="810" y="77" text-anchor="middle" class="heading">Work records</text>
+  <text x="810" y="99" text-anchor="middle" class="body">notes.md · archived.md</text>
+  <rect x="700" y="196" width="220" height="96" rx="12" fill="#eff8f3" stroke="#9cbba8"/>
+  <text x="810" y="225" text-anchor="middle" class="heading">Shared knowledge</text>
+  <text x="810" y="249" text-anchor="middle" class="body">context/index.md → topic files</text>
+  <text x="810" y="273" text-anchor="middle" class="body">reusable facts and decisions</text>
+
+  <path d="M 209 343 H 920" stroke="#d6e0e9"/>
+  <text x="210" y="367" font-size="15" font-weight="600">Native DSH runtime</text>
+  <text x="210" y="388" class="body">Same Agent Loop · sessions · inboxes · tools · jobs · permissions</text>
+</svg>

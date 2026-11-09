@@ -20,20 +20,7 @@ Long tasks put pressure on an Agent's context, judgment, and throughput. MoA+ ad
 
 The goal is a system that solves harder problems through cooperation. The architecture gives that cooperation durable memory, communication, and control.
 
-```mermaid
-flowchart TB
-    U["You: goal and feedback"] <--> C["Coordinator<br/>plan · direct · synthesize · deliver"]
-    C <--> W1["Worker / specialist A"]
-    C <--> W2["Worker / specialist B"]
-    W1 <-->|"direct messages and questions"| W2
-    C <--> M["Shared knowledge<br/>context/index.md + topic files"]
-    W1 <--> M
-    W2 <--> M
-    C --> N["Work records<br/>notes.md + archived.md"]
-    C --> K["One native DSH runtime<br/>Agent Loop · sessions · inboxes · tools · jobs · permissions"]
-    W1 --> K
-    W2 --> K
-```
+![Coordinator directs persistent Workers; peers exchange messages and share indexed knowledge on the same native DSH runtime.](docs/media/moa-collaboration.svg)
 
 Coordinator and Workers use the same native Agent Loop. Identity, tools, and delegated permissions define their responsibilities. You can open a Worker, give it instructions directly, and return to the Coordinator.
 

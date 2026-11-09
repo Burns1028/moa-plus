@@ -20,20 +20,7 @@ MoA+ 以 DeepSeek Harness 插件的形式构建多智能体系统（Mixture of A
 
 目标是通过 Agent 之间的配合，提升整个系统解决复杂问题的能力。这套架构为协作提供持续的记忆、通信和控制。
 
-```mermaid
-flowchart TB
-    U["用户：目标与反馈"] <--> C["Coordinator<br/>规划 · 引导 · 综合 · 交付"]
-    C <--> W1["Worker / 专家 A"]
-    C <--> W2["Worker / 专家 B"]
-    W1 <-->|"直接通信与提问"| W2
-    C <--> M["共享知识<br/>context/index.md 与主题文件"]
-    W1 <--> M
-    W2 <--> M
-    C --> N["工作记录<br/>notes.md 与 archived.md"]
-    C --> K["同一套 DSH 原生运行时<br/>Agent Loop · 会话 · 收件箱 · 工具 · 后台任务 · 权限"]
-    W1 --> K
-    W2 --> K
-```
+![Coordinator 统筹持久化 Workers，同伴互发消息并共享索引知识；主、子 Agent 使用同一套 DSH 原生运行时。](docs/media/moa-collaboration.svg)
 
 Coordinator 与 Worker 使用相同的原生 Agent Loop，由身份、工具集合和继承权限形成不同职责。用户也可以进入 Worker 直接下达指令，再回到 Coordinator。
 
