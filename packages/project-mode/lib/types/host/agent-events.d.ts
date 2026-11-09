@@ -11,7 +11,7 @@ interface AgentEventOptions {
     attach(agent: Agent): void;
     disposeAgent(agent: Agent): void;
     recover(id: SessionId): Promise<void>;
-    guardTurn(agent: Agent, turn: number, signal: AbortSignal): Promise<void>;
+    guardTurn(agent: Agent, signal: AbortSignal): Promise<void>;
     freezeTurn(id: SessionId, turn: number, reason: string): Promise<void>;
     refreshWorkersForInput(agent: Agent, messageIds: string[], signal: AbortSignal): Promise<void>;
 }

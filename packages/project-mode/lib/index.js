@@ -525,7 +525,7 @@ function bindProjectMemory(host) {
 // src/host/agent-events.ts
 /** Bind native lifecycle notifications in their original registration order. */
 function bindAgentEvents(host, options) {
-	const { outbox, workers, progress } = options;
+	const { outbox, progress } = options;
 	bindProjectMemory(host);
 	host.ctx.on("tools/change", options.reconcileTools);
 	host.ctx.on("agent/created", async ({ agent }) => {
@@ -574,8 +574,8 @@ function bindAgentEvents(host, options) {
 		}
 		host.notify();
 	});
-	host.ctx.on("agent/turn-stopping", async ({ agent, turn, signal }) => {
-		if (host.record(agent.id)?.project.mode === "enabled") await options.guardTurn(agent, turn, signal);
+	host.ctx.on("agent/turn-stopping", async ({ agent, signal }) => {
+		if (host.record(agent.id)?.project.mode === "enabled") await options.guardTurn(agent, signal);
 	});
 	host.ctx.on("agent/pre-step", ({ agent, signal }, next) => normalizeCoordinatorStep(host, options, agent, signal, next));
 	host.ctx.on("agent/disposed", ({ agent }) => options.disposeAgent(agent));
@@ -4147,7 +4147,7 @@ var TurnCoordination = class {
 	constructor(host) {
 		this.host = host;
 	}
-	async guardTurn(agent, turn, signal) {
+	async guardTurn(agent, signal) {
 		const lifetime = AbortSignal.any([signal, this.host.closing.signal]);
 		const inputReady = new AbortController();
 		const control = AbortSignal.any([lifetime, inputReady.signal]);
@@ -4986,7 +4986,7 @@ let ProjectMode = (() => {
 					this.mounted.delete(agent);
 				},
 				recover: (id) => this.recover(id),
-				guardTurn: (agent, turn, signal) => this.guardTurn(agent, turn, signal),
+				guardTurn: (agent, signal) => this.guardTurn(agent, signal),
 				freezeTurn: (id, turn, reason) => this.freezeTurn(id, turn, reason),
 				refreshWorkersForInput: (agent, ids, signal) => this.refreshWorkersForInput(agent, ids, signal)
 			});
@@ -5353,14 +5353,11 @@ let ProjectMode = (() => {
 		ingest(id) {
 			return this.outbox.ingest(id);
 		}
-		consume(id, messageId) {
-			return this.outbox.consume(id, messageId);
-		}
 		deliver(id) {
 			return this.outbox.deliver(id);
 		}
-		guardTurn(agent, turn, signal) {
-			return this.turns.guardTurn(agent, turn, signal);
+		guardTurn(agent, signal) {
+			return this.turns.guardTurn(agent, signal);
 		}
 		freezeTurn(id, turn, reason) {
 			return this.turns.freezeTurn(id, turn, reason);

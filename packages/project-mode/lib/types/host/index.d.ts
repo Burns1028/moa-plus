@@ -91,7 +91,6 @@ export default class ProjectMode extends TypertRemoteService {
     private inspect;
     private view;
     private ingest;
-    private consume;
     private deliver;
     private guardTurn;
     private freezeTurn;

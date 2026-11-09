@@ -1701,7 +1701,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 824,
+						"line": 820,
 						"column": 9
 					}
 				},
@@ -1979,7 +1979,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 840,
+						"line": 836,
 						"column": 9
 					}
 				},
@@ -2460,7 +2460,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 787,
+						"line": 783,
 						"column": 10
 					}
 				},
@@ -2516,7 +2516,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 814,
+						"line": 810,
 						"column": 10
 					}
 				},
@@ -2653,7 +2653,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 852,
+						"line": 848,
 						"column": 9
 					}
 				},
@@ -2745,7 +2745,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 906,
+						"line": 902,
 						"column": 3
 					}
 				},
@@ -2887,7 +2887,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 911,
+						"line": 907,
 						"column": 9
 					}
 				},
@@ -3358,7 +3358,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 762,
+						"line": 758,
 						"column": 9
 					}
 				},
@@ -3551,7 +3551,7 @@ window.__ModuleLoader__.load({
 					},
 					sourceLocation: {
 						"file": "packages/project-mode/src/host/index.ts",
-						"line": 875,
+						"line": 871,
 						"column": 10
 					}
 				}
@@ -4320,6 +4320,7 @@ window.__ModuleLoader__.load({
 			const [chosen, choose] = react.useState();
 			const axisRef = react.useRef(null);
 			const workers = (project?.workers ?? []).filter(isVisibleWorker), worker = workers.find((w) => w.workerId === chosen) ?? workers[0];
+			const nativeReady = worker?.lifecycle === "active" && worker.availability === "live";
 			const [windowSize, setWindowSize] = react.useState(10), [retry, setRetry] = react.useState(0);
 			const [state, setState] = react.useState();
 			const labels = react.useMemo(() => ({
@@ -4342,7 +4343,8 @@ window.__ModuleLoader__.load({
 					} catch (error) {
 						if (!signal.aborted) setState({
 							workerId: worker.workerId,
-							error: error instanceof Error ? error.message : String(error)
+							error: error instanceof Error ? error.message : String(error),
+							readyWhenFailed: nativeReady
 						});
 					} finally {
 						stream.dispose();
@@ -4363,6 +4365,14 @@ window.__ModuleLoader__.load({
 				generation
 			]);
 			const current = state?.workerId === worker?.workerId ? state : void 0, page = current?.page;
+			react.useEffect(() => {
+				if (current?.error && current.readyWhenFailed === false && nativeReady) setRetry((value) => value + 1);
+			}, [
+				worker?.workerId,
+				current?.error,
+				current?.readyWhenFailed,
+				nativeReady
+			]);
 			if (!workers.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "pm-workers-panel pm-workers-panel-empty",
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: panelStyles }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
@@ -4374,10 +4384,10 @@ window.__ModuleLoader__.load({
 				className: "pm-workers-panel",
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: panelStyles }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("nav", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("nav", {
 						className: "pm-workers-list",
 						"aria-label": t("workers"),
-						children: [workers.map((w) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+						children: workers.map((w) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 							type: "button",
 							"aria-pressed": w.workerId === worker?.workerId,
 							onClick: () => {
@@ -4403,10 +4413,7 @@ window.__ModuleLoader__.load({
 									children: t(w.phase)
 								})]
 							})]
-						}, w.workerId)), !workers.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-							className: "pm-axis-empty",
-							children: t("noWorkers")
-						})]
+						}, w.workerId))
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						ref: axisRef,
@@ -4422,10 +4429,6 @@ window.__ModuleLoader__.load({
 								}),
 								children: t("openConversation")
 							})] }),
-							!worker && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-								className: "pm-axis-empty",
-								children: t("selectWorker")
-							}),
 							worker && !page && !current?.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								className: "pm-axis-empty",
 								children: t("loadingTimeline")

@@ -6,6 +6,6 @@ export declare class TurnCoordination {
     private host;
     readonly waiting: Set<string>;
     constructor(host: HostAccess);
-    guardTurn(agent: Agent, turn: number, signal: AbortSignal): Promise<void>;
+    guardTurn(agent: Agent, signal: AbortSignal): Promise<void>;
     freezeTurn(parentId: SessionId, turn: number, parentReason: string): Promise<void>;
 }
