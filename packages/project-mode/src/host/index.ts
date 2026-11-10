@@ -554,8 +554,12 @@ export default class ProjectMode extends TypertRemoteService {
 
   private roleText(agent: Agent): string {
     const own = this.record(agent.id);
-    if (own?.project.mode === "enabled")
-      return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}`;
+    if (own?.project.mode === "enabled") {
+      const completion = this.config.completionVerification
+        ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery."
+        : "Automatic outcome verification is not enabled in this runtime.";
+      return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}\n${completion}`;
+    }
     const parent = this.owner(agent.id);
     return parent
       ? parent.operations[`moa:agent:${agent.id}`]

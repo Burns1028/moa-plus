@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes the current checkout, including the unreleased Worker attachment extension. The published v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes the current checkout, including the unreleased Worker attachment extension, Adaptive coordination guidance, and bundled orchestration prompts. The published v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
@@ -25,12 +25,15 @@ flowchart TB
 
 Patterns are decisions made through these tools and role prompts: create a clean specialist, branch useful history, ask a peer, compare results, or continue an existing Worker. The Coordinator retains ordinary execution tools and decides task ownership. Native DSH owns execution ordering, inbox admission, resource cleanup, and permissions; the plugin composes the collaboration around those guarantees.
 
+The default Adaptive guidance prefers suitable retained context through SendMessage, useful committed history through Fork, and clean Task contexts when independence matters. Ready independent work can start in parallel; incoming results unlock dependent work. QueryAgent supplies the native interruptible wait. Simple work can remain with the Coordinator. The five optional [orchestration prompts](orchestration.md) add task-specific collaboration instructions as editable user text, while the native runtime continues to own execution.
+
 ## Reading order
 
 | File | Responsibility and main entry points |
 | --- | --- |
 | [host/index.ts](../packages/project-mode/src/host/index.ts) | `ProjectMode[Service.init]`, `prepareAgent`, `attach`, `recover`, and authorized Remote methods compose the plugin. |
 | [host/prompts/](../packages/project-mode/src/host/prompts/) | Coordinator/Worker policies, Builder/Verifier instructions, identity/reporting text, and interrupt-judge instructions. Constants and pure text constructors live here; native message admission, source serialization, attachments and runtime state stay with their services. |
+| [shared/orchestration.ts](../packages/project-mode/src/shared/orchestration.ts) | Bundled titles, descriptions, and prompt text for fan-out, panel-team, blackboard-team, critique-loop, and auto-orchestration. This catalog owns text, with no persisted workflow state, remote service, or Skill loader. |
 | [host/moa/tools.ts](../packages/project-mode/src/host/moa/tools.ts) | Model-facing definitions for Task, Fork, SendMessage, QueryAgent, KillAgent, and ProjectContext; validate arguments and call the responsible service. |
 | [host/moa/agents.ts](../packages/project-mode/src/host/moa/agents.ts) | `MoAAgents.task`, `fork`, `query`, `kill`, `context`, `recover`, and `lifecycle` implement controls through existing native capabilities. |
 | [host/moa/roles.ts](../packages/project-mode/src/host/moa/roles.ts) | `applyRoleRestrictions` mounts each specialist's execution-tool boundary. |
@@ -53,6 +56,7 @@ Patterns are decisions made through these tools and role prompts: create a clean
 | [host/project-archive.ts](../packages/project-mode/src/host/project-archive.ts) | Family archival through the native workspace registry. |
 | [client/runtime.ts](../packages/project-mode/src/client/runtime.ts), [store.ts](../packages/project-mode/src/client/store.ts) | Remote subscriptions/reconnect and derived complete-snapshot/capsule caches. |
 | [client/index.tsx](../packages/project-mode/src/client/index.tsx), [branch.tsx](../packages/project-mode/src/client/branch.tsx), [components.tsx](../packages/project-mode/src/client/components.tsx) | Native slot contributions: original sidebar rows, capsules, MoA+/Back controls. |
+| [client/orchestration-input.ts](../packages/project-mode/src/client/orchestration-input.ts) | `bindOrchestrationInput` registers a native `@` input-trigger source for enabled Coordinators, returns catalog candidates, and expands a picked candidate into composer text. Native Send remains the composer owner's operation. |
 | [client/tail.ts](../packages/project-mode/src/client/tail.ts), [agent-message.tsx](../packages/project-mode/src/client/agent-message.tsx) | Existing Worker-tail renderer displays incoming MoA messages with their actual sender and expandable original Markdown, retaining the same capsule seats. |
 | [client/panels.tsx](../packages/project-mode/src/client/panels.tsx), [worker-timeline.tsx](../packages/project-mode/src/client/worker-timeline.tsx) | Default closable native tabs and expandable original Markdown input/output. |
 
@@ -88,6 +92,8 @@ Five-state lifecycle is derived from native activity, approval/query waits, canc
 `ProjectLifecycle.setEnabled → native maintenance → memory files/project record → prepareAgent → scoped tools/background/completion bindings`.
 
 The first owned turn locks mode identity. Creation and mode enable await bindings before native tool-schema assembly. Role identity is dialogue: Task first; Fork after inherited history. The five controls replace alternative native delegation in managed scopes; nested control tools default off. Draft disable/unload reverses scoped contributions and drains owned work without editing global preferences.
+
+Orchestration expansion is a Client input contribution, not a Host scheduling path. Click, Enter, or Tab selection produces editable text before sending. The source is scoped to enabled MoA Coordinators; Workers and ordinary conversations keep their native input behavior. Ordinary file references, uploads, queue/steer, and native Send are unchanged. The selected text instructs the Coordinator to pass each member its own responsibility through `tasks[].task` (or Fork's `task`), using existing role presets. A Lead or Keeper is created first so later members can use its actual ID as `reportTo`; that reporting edge does not transfer direct-child management authority. The catalog does not enforce communication topology or add runtime state.
 
 Task/Fork reserve stable identities and persist descriptor/workspace facts before native activation. `WorkerOperations` prepares an assignment before accepting input, records its native receipt, and establishes capsule participation. Per-Worker mutation ordering ends after admission; it is not held for the whole model task. Fork's temporary recovery seed is removed only after confirmed native acceptance. Uncertain acceptance is reconciled against persisted native evidence before retrying.
 
@@ -133,6 +139,10 @@ AfterSeconds without new input returns control within the current turn. A messag
 Completion helpers are native owned Agents, hidden from the managed Worker catalog. Builder sees original human inputs and captured source references, not implementation output. Explicit human re-references capture chronological source versions while retaining earlier snapshots; implementation edits alone do not revise requirements. Its only tool, `submit_rubric`, submits validated criteria; it cannot read files, run Bash, or delegate. The Host writes that submission to `rubrics.md`, without parsing free-text tool markup. Verifier inherits the native preset's actual execution tools, reads the authoritative rubric, and checks deliverables. Its `read_candidate` tool reads the complete frozen final-answer text for this attempt, so a chat answer is inspectable without pretending that a file exists. Artifact and build/test requirements still need actual native evidence. Promise/source records survive interrupted work and restart; candidate snapshots end with their review attempt. Internal gate notices have a separate source kind so they cannot become new human requirements or capsule segments. Helpers are retired/drained through native ownership; new human input is not held behind an obsolete verifier.
 
 The Builder uses the selected model's lowest supported reasoning effort for structured extraction. This scoped request adjustment runs after native model selection, so a later session selection cannot restore the parent's higher effort on the Builder. Models without reasoning metadata retain their native configuration. The Coordinator and evidence-gathering Verifier keep the user's selected effort; no model-call or token quota is added.
+
+The Verifier submits its decision through a private `submit_verdict` tool and concludes its native turn. The existing frozen-candidate object holds that attempt's structured decision; it is replaced for the next attempt and released on exit or cancellation. Legacy plain/fenced JSON remains a fallback. Submission itself is excluded from inspection evidence, and the rubric-read, artifact inspection and required successful Bash checks still apply. Coordinator facts explain this automatic workflow using the same `completionVerification` setting that installs the gate; Workers do not receive the Coordinator-only guarantee.
+
+Generation and rubric-write sequencing are weakly keyed by the native Agent object, so these side tables do not retain disposed conversations. Unload replaces the generation table to invalidate earlier callbacks; live-Agent write ordering is unchanged.
 
 Both helpers run before the parent turn can close normally. A passing verdict permits native closure; the Host owns the actual inbox, resource-exit and turn-end checks. The rubric therefore evaluates task deliverables without requiring its own finished review or a later parent `turn/end` to exist already. Original human inputs retain chronological scope: later clarifications supersede conflicting earlier instructions, while commands about future work apply from their arrival unless explicitly retroactive. Explicit artifact, build and test requirements remain independently verified.
 

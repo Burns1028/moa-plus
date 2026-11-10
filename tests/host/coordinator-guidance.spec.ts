@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { createUserMessage, type GenerateOptions } from "@deepseek-ai/dsh-llm";
+import { createUserMessage, type GenerateOptions, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import Loader from "@deepseek-ai/cordis-plugin-loader";
 import Presets from "@deepseek-ai/dsh-agent-preset-registry";
 import { fixture, response } from "./fixture.ts";
@@ -42,6 +42,72 @@ function policyCopies(request: GenerateOptions) {
       .split(coordinatorPrompt).length - 1
   );
 }
+
+it.each([true, false])("describes configured automatic outcome verification in Coordinator facts only (enabled=%s)", async (completionVerification) => {
+  const f = await fixture(undefined, { completionVerification });
+  try {
+    const call = (name: string, args: object): StreamChunk[] => {
+      const argumentsValue = JSON.stringify(args);
+      return [
+        { type: "block-start", index: 0, blockType: "tool-call" },
+        { type: "tool-call-delta", index: 0, id: "call", name, argumentsDelta: argumentsValue },
+        { type: "block-end", index: 0, block: { type: "tool-call", id: "call", name, arguments: argumentsValue } },
+        { type: "finish", reason: { kind: "tool-calls" } },
+      ];
+    };
+    let verifierStep = 0;
+    f.adapter.handler = (request) => {
+      const id = String(request.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the requested report [human requirement]", tests_required: false });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifierStep === 1) return call("read_rubric", {});
+        if (verifierStep === 2) return call("read_candidate", {});
+        return response('{"status":"Pass","issues":[]}');
+      }
+      return response("The completed report");
+    };
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("guidance-completion"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(prompt("Deliver the report"));
+    await agent.whenIdle();
+    const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
+    const facts = runtimeText(request);
+    expect(request.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
+    if (completionVerification) {
+      expect(facts).toContain("MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots");
+      expect(facts).toContain("automatically runs an independent tool-backed Outcome Verifier");
+      expect(facts).toContain("actual candidate answer and artifacts");
+      expect(facts).toContain("runs required checks");
+      expect(facts).toContain("return to you for continued work");
+      expect(facts).not.toContain("Automatic outcome verification is not enabled");
+      expect(verifierStep).toBe(3);
+    } else {
+      expect(facts).toContain("Automatic outcome verification is not enabled in this runtime");
+      expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
+      expect(f.adapter.requests.some((entry) => String(entry.sessionId).startsWith("moa-"))).toBe(false);
+    }
+
+    const receipt = await f.ctx.projectMode.controlForAgent(
+      agent,
+      { action: "spawn", name: "reviewer", task: "Review the existing report" },
+      "completion-facts-worker",
+      new AbortController().signal,
+    ) as { workerId: SessionId };
+    await agent.whenIdle();
+    const worker = f.adapter.requests.find((entry) => entry.sessionId === receipt.workerId)!;
+    expect(worker).toBeDefined();
+    expect(worker.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
+    const workerFacts = `${systemText(worker)}\n${runtimeText(worker)}`;
+    expect(workerFacts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
+    expect(workerFacts).not.toContain("Automatic outcome verification is not enabled");
+  } finally {
+    await f.dispose();
+  }
+});
 
 it("describes distinct work ownership and selective knowledge contributions in actual model inputs", async () => {
   const f = await fixture();
@@ -108,6 +174,53 @@ it("explains role execution capabilities and explicit reply syntax in native too
     expect(send).toContain("mode=notify");
     expect(send).toContain("reply_to");
     expect(send).toContain("not a new request");
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("assembles adaptive scheduling guidance with native wait and history contracts", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("guidance-adaptive"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(prompt("Continue familiar work and start the independent branches as their prerequisites finish."));
+    await agent.whenIdle();
+    const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
+    const policy = `${systemText(request)}\n${runtimeText(request)}`;
+    expect(policyCopies(request)).toBe(1);
+    expect(policy).toMatch(/prefer SendMessage.*familiar worker/);
+    expect(policy).toMatch(/then Fork.*useful committed history/);
+    expect(policy).toMatch(/Task.*clean independent context/);
+    expect(policy).toContain("ready work in parallel");
+    expect(policy).toContain("unlock downstream");
+    expect(policy).toContain("small self-contained actions");
+
+    const query = request.tools!.find((tool) => tool.name === "QueryAgent");
+    expect(query?.parameters).toMatchObject({
+      properties: {
+        wait: { enum: ["all", "selected"] },
+        timeout_ms: { type: "integer" },
+        history_offset: {
+          description: expect.stringContaining("Must be supplied together with history_limit"),
+        },
+        history_limit: {
+          description: expect.stringContaining("Must be supplied together with history_offset"),
+        },
+      },
+    });
+    expect(policy).toContain('wait="all"');
+    expect(policy).toContain('wait="selected"');
+    expect(policy).toContain("timeout_ms");
+    expect(policy).not.toContain("wait_timeout");
+    expect(policy).toContain("timeout alone is not failure");
+    expect(policy).toMatch(/reasonable.*duration.*progress/);
+    expect(policy).toMatch(/request.*blocker.*ETA/);
+    expect(policy).toMatch(/KillAgent only.*evidence/);
   } finally {
     await f.dispose();
   }
@@ -223,6 +336,7 @@ it("keeps one coordinator policy in required context when the native preset owns
     expect(policyCopies(request)).toBe(1);
     expect(runtimeText(request)).toContain(coordinatorPrompt);
     expect(runtimeText(request)).toContain("Paths:");
+    expect(runtimeText(request)).toContain("Automatic outcome verification is not enabled in this runtime");
     expect(runtimeText(request)).toContain(`${f.root}/context/index.md`);
     expect(runtimeText(request)).toContain("Worker state sampled for this user input");
 

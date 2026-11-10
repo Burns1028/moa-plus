@@ -24,7 +24,7 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 Worker 的 Bash 记录保护使用 macOS Seatbelt 或 Linux bubblewrap。Linux、Windows 安装前请查看[后端要求][compatibility]。
 
-下方命令安装已发布的 v0.2.0。使用视频中的最新字标控件时，将克隆分支从 `v0.2.0` 改为 `main`。
+下方命令安装已发布的 v0.2.0。最新字标控件与编排指引属于当前分支的未发布改动；跟进开发版本时，将克隆分支从 `v0.2.0` 改为 `main`。
 
 克隆项目，准备独立的 Web 运行环境：
 
@@ -57,6 +57,14 @@ Coordinator 与 Workers 使用同一套原生 Agent Loop，由身份、工具与
 
 Worker 每轮工作结束时，系统把**本轮最后一条完整 AI 消息**送给指定汇报对象。Coordinator 可以审阅结果、沿用这个 Worker，或调整方向。保留的会话与工作区让团队能够继续下一轮分工。
 
+### Adaptive 协调与可选编排
+
+未发布的 Adaptive 指引保留简单任务直接完成的方式。需要分工时，Coordinator 优先用 `SendMessage` 复用合适的 Worker；新分支需要已有历史时用 `Fork`；需要干净上下文时用 `Task`。它在原生容量内并行派发已就绪的独立分支，结果到达后继续解锁后续工作，需要等待时使用原生 `QueryAgent` 等待。
+
+已启用 MoA+ 的 Coordinator 还提供五个内置 `@` 提示：`@fan-out` 用于独立切片，`@panel-team` 用于争议决策，`@blackboard-team` 用于交织探索，`@critique-loop` 用于制品迭代审阅，`@auto-orchestration` 用于多阶段协作。输入 `@` 后，点击候选项或按 Enter、Tab 选择。提示会展开为可编辑的输入框文本，补充任务后照常发送。Worker 和普通会话不提供这些提示。
+
+这些本地提示文本沿用现有工具与角色预设。原生发送、文件引用、上传、queue 和 steer 保持原有行为。模式边界与用法见[编排指南][orchestration]。
+
 ### 共享知识，独立审阅
 
 Coordinator 维护 `notes.md` 和 `archived.md`，Host 在它每次推理前完整刷新 notes。Coordinator 与 Workers 通过 `context/index.md` 共同积累可复用发现，再按需读取相关文件。隔离 Worker 也能访问同一份共享知识，让后续工作沿用已经确认的发现，执行细节则留在各自的上下文中。
@@ -76,6 +84,7 @@ Agent 来信标明发送者，从原文预览展开为完整 Markdown。可关�
 ## 文档与参与
 
 - [角色、生命周期与常见流程][roles]
+- [Adaptive 协调与可选 `@` 编排][orchestration]（未发布）
 - [代码架构][architecture]与[工具 API][tools]
 - [首次运行指南][quickstart]与[兼容及回滚说明][compatibility]
 - [验证记录][verification]
@@ -87,6 +96,7 @@ MoA+ 是非官方 DSH 插件。包名 `dsh-plugin-project-mode` 与已保存的�
 MIT。见 [LICENSE](LICENSE) 与[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 [roles]: https://github.com/Burns1028/moa-plus/blob/main/docs/moa-architecture.md
+[orchestration]: docs/orchestration.md
 [architecture]: https://github.com/Burns1028/moa-plus/blob/main/docs/architecture.md
 [tools]: https://github.com/Burns1028/moa-plus/blob/main/docs/tool-api.md
 [verification]: https://github.com/Burns1028/moa-plus/blob/main/docs/verification.md

@@ -87,7 +87,8 @@
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-rc.3",
     "@deepseek-ai/dsh-tool-present": "0.2.1-rc.3",
     "@deepseek-ai/dsh-jobs": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-shell": "0.2.1-rc.3"
+    "@deepseek-ai/dsh-shell": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-client-ui-input-trigger": "0.2.1-rc.3"
   },
   "dependencies": {
     "zod": "4.4.3"
@@ -137,7 +138,8 @@
         "@deepseek-ai/dsh-client-ui-chat",
         "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-client-ui-renderer",
-        "@deepseek-ai/dsh-client-locale"
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-input-trigger"
       ]
     }
   },

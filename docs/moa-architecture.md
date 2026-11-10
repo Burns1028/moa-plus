@@ -78,4 +78,6 @@ Coordinator 与 Workers 共同维护 Context。Agent 先读索引，再按需读
 
 `set_completion_criteria` 可以绑定任务完成标准和完整承诺原文，Ralph 在结束出口检查。Coordinator 还有独立出卷和判卷：Builder 只看原始人类需求与规格快照，使用模型支持的最低推理档位提取标准；Verifier 读 `rubrics.md` 并通过原生工具检查产物，保留用户选择的推理设置。未通过、缺证据或不完整的承诺会触发继续工作。内部催办消息不变成新的原始需求，避免验收标准被实现过程污染。
 
+Verifier 通过私有的 `submit_verdict` 工具提交本次判词，直接结束原生审查轮次。提交不算取证，也不能代替必需的成功测试；旧的合法 JSON 判词格式继续兼容。判词与当前候选绑定，中断或下一次审查不会复用旧的 Pass。Coordinator 会收到与实际配置一致的自动验收说明，知道 `rubrics.md` 由宿主管理、最终验收如何运行；关闭配置时则明确说明未启用，不给 Worker 注入这项 Coordinator 专属保证。
+
 原生循环仍负责并行工具的前台屏障、取消后结果配对和结束前收件箱检查。详细的结构体、函数及原生边界见[代码架构](architecture.md)与[工具 API](tool-api.md)。
