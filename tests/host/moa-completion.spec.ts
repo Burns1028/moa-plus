@@ -249,9 +249,10 @@ it.each(["plain", "fenced"])("rejects a self-declared Pass without actual tool w
 });
 
 it.each([
-  ["malformed", 'Review complete.\n```json\n{"status":"Pass","issues":[]} trailing\n```'],
-  ["ambiguous", '```json\n{"status":"Pass","issues":[]}\n```\nDifferent result:\n```json\n{"status":"Block","issues":["Not complete"]}\n```'],
-])("reports a %s verdict as a JSON-format problem after actual inspection", async (_format, body) => {
+  ["malformed", 'Review complete.\n```json\n{"status":"Pass","issues":[]} trailing\n```', "valid JSON verdict"],
+  ["ambiguous", '```json\n{"status":"Pass","issues":[]}\n```\nDifferent result:\n```json\n{"status":"Block","issues":["Not complete"]}\n```', "valid JSON verdict"],
+  ["whole-fence JSON with code markers in an issue", '```json\n{"status":"Block","issues":["Fix ```bash npm test``` example"]}\n```', "Fix ```bash npm test``` example"],
+])("preserves the specific failure reason for a %s verdict after actual inspection", async (_format, body, reason) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-verdict-format"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
@@ -275,7 +276,7 @@ it.each([
     await agent.whenIdle();
     expect(main).toBe(2);
     expect(verifier).toBe(3);
-    expect(notice).toContain("valid JSON verdict");
+    expect(notice).toContain(reason);
     expect(notice).not.toContain("Verifier must read the rubric, inspect actual results using tools");
     expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
   } finally { await f.dispose(); }

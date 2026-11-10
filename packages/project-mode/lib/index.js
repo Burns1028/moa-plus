@@ -1572,7 +1572,7 @@ function bindCompletion(host) {
 			try {
 				const body = lastText(pair.verifier.agent, offset).trim();
 				try {
-					verdict = JSON.parse(body);
+					verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, ""));
 				} catch {
 					const fenced = body.split("```");
 					if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");

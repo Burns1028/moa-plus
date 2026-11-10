@@ -2,7 +2,13 @@
 
 # MoA+
 
-**通过 Agent 协作，探索更强的智能。**
+**强大的多智能体架构，让智能更进一步。**
+
+先看一个真实任务：两个 Worker 一起完成 CLI，直接交换消息，再把用户对子会话的补充要求同步回 Coordinator。
+
+[![MoA+ v0.2.0：派发、协作、人工介入与结果审阅](docs/media/moa-plus-workflow.gif)](docs/media/moa-plus-workflow.mp4)
+
+[观看 MP4](docs/media/moa-plus-workflow.mp4) · [复现这个任务](docs/demo-moa-plus.md)。基于 **MoA+ v0.2.0** 的真实任务演示，由原生界面采样片段与关键帧组成；等待时间已剪去并标注。
 
 MoA+ 是 DeepSeek Harness 的 **Mixture of Agents 多智能体协作插件**。它通过独立上下文、直接通信与共享知识，连接能够持续工作的 Agent，目标是通过协作提升整个系统解决复杂问题的能力。
 
@@ -61,9 +67,7 @@ MoA+ 沿用 DSH 原生界面。**胶囊就是子会话**：点击进入 Worker�
 
 Agent 来信标明发送者，从原文预览展开为完整 Markdown。可关闭的 Workers 与 notes.md 标签页展示输入、最终回复、产物和当前工作记录。团队工作期间，新的用户输入仍能及时接入。
 
-[![真实 CLI 任务中的分工、人工介入、结果审阅与上下文复用](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
-
-这段录制于 **v0.1.23**、保留 Project 标识的 60 秒剪辑展示了真实 CLI 任务：Exporter 修改标题排序，用户进入它的会话调整约定，Docs 对齐文档，Coordinator 审阅结果。下一次任务继续复用这些 Workers 与已有上下文。剪辑省去等待并加以标注。可以查看[实际产物](docs/demo-result)、[复现演示](docs/demo-workflow.md)，或阅读[当前运行时的验证记录][verification]。
+页首演示使用当前的 `Task`、直接 `SendMessage`、共享 Context 和完成审阅流程。Exporter 实现标题排序，Docs 编写指南；用户直接给 Docs 补充要求，Coordinator 查看 Worker 最新记录后核对最终结果。可以查看[任务与实际检查](docs/demo-moa-plus.md)或[运行时验证记录][verification]。早期 Project Mode 视频保留在 [v0.1.23 演示归档](docs/demo-workflow.md)中。
 
 ## 文档与参与
 

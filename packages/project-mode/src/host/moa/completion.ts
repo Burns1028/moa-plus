@@ -300,7 +300,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       let verdict: { status?: string; issues?: unknown };
       try {
         const body = lastText(pair.verifier.agent, offset).trim();
-        try { verdict = JSON.parse(body); } catch {
+        try { verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch {
           const fenced = body.split("```");
           if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
           verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));

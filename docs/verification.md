@@ -4,11 +4,17 @@
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
+### Release validation: 2026-11-10
+
+The final v0.2.0 runtime passed **345 tests across 59 files**: 284 Host/Client/integration cases and 61 native-contract cases. The production build, both typechecks and all **19 launcher checks with zero skips** passed. The current-release walkthrough is linked near the top of both READMEs; it combines sampled native UI clips with key frames, and its capture method and revision-specific acceptance are documented in [the demo record](demo-moa-plus.md).
+
 ### Verifier verdict format: 2026-11-10
 
 The current-release recording exposed a real completion failure: the Verifier had read its rubric and candidate, inspected artifacts and run the actual tests, then returned an explanatory answer followed by one fenced JSON Pass verdict. The old parser rejected that complete answer and incorrectly diagnosed missing tool work.
 
-Completion now accepts a plain JSON object or exactly one fenced JSON object with surrounding explanation. It does not guess brace ranges or choose among multiple verdict blocks. Malformed or ambiguous output reports a JSON-format problem; the existing rubric, native inspection and required Bash-success checks remain unchanged. A native promoted-Bash regression reproduced the extra parent iteration before the fix. Together with malformed/ambiguous diagnostic cases and missing-tool rejection, the focused completion suite passes **29 tests** after the fix.
+Completion retains plain JSON and whole-answer fenced JSON, including literal code markers inside issue strings, and also accepts exactly one fenced JSON object with surrounding explanation. It does not guess brace ranges or choose among multiple verdict blocks. Malformed or ambiguous output reports a JSON-format problem; the existing rubric, native inspection and required Bash-success checks remain unchanged. A native promoted-Bash regression reproduced the extra parent iteration before the fix. Together with malformed/ambiguous diagnostic cases and missing-tool rejection, the focused completion suite passes **30 tests** after the fix.
+
+After the initial parser fix was installed into the same isolated real-model conversation, a follow-up reused both existing Workers and their context without new assignments. It rechecked the outputs and 10 passing task tests. The Verifier read the rubric, candidate and artifacts, ran 20 native Bash calls, and returned a plain JSON Pass; the parent completed normally 30 ms later. That real-model continuation validates the deployed completion path, while the explanatory fenced-JSON form is covered by the native regression above. The final whole-answer compatibility adjustment is an additional scripted regression, not a claim of another model run.
 
 ### Structure and tool cleanup: 2026-11-10
 

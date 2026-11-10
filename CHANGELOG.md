@@ -2,7 +2,7 @@
 
 ## 0.2.0 — 2026-11-10
 
-- Release validation passed 340 tests across 59 files, Host/Client typechecks, the production build, and all 19 launcher checks with zero skips. Earlier revision-specific evidence remains identified below.
+- Release validation passed 345 tests across 59 files, Host/Client typechecks, the production build, and all 19 launcher checks with zero skips. Earlier revision-specific evidence remains identified below.
 
 ### Review corrections
 
