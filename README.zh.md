@@ -6,9 +6,9 @@
 
 先看一个真实任务：两个 Worker 一起完成 CLI，直接交换消息，再把用户对子会话的补充要求同步回 Coordinator。
 
-[![MoA+ v0.2.0：派发、协作、人工介入与结果审阅](docs/media/moa-plus-workflow.gif)](docs/media/moa-plus-workflow.mp4)
+[![MoA+：字标切换与真实协作任务](docs/media/moa-plus-workflow.gif)](docs/media/moa-plus-workflow.mp4)
 
-[观看 MP4](docs/media/moa-plus-workflow.mp4) · [复现这个任务](docs/demo-moa-plus.md)。基于 **MoA+ v0.2.0** 的真实任务演示，由原生界面采样片段与关键帧组成；等待时间已剪去并标注。
+[观看 MP4](docs/media/moa-plus-workflow.mp4) · [复现这个任务](docs/demo-moa-plus.md)。使用最新插件界面重新录制，回看已完成的真实协作任务。[录制说明](docs/demo-moa-plus.md#what-the-walkthrough-shows)。
 
 MoA+ 是 DeepSeek Harness 的 **Mixture of Agents 多智能体协作插件**。它通过独立上下文、直接通信与共享知识，连接能够持续工作的 Agent，目标是通过协作提升整个系统解决复杂问题的能力。
 
@@ -23,6 +23,8 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 需要 **Node 24.9+**、npm 和 Git。MoA+ **v0.2.0** 需要配套的 **DSH 0.2.1-rc.3 兼容运行时**，其显式清单扩展了 **19 个原生包、43 个文件路径**。原版 rc.3 或其他插件版本准备的运行时不能替代。
 
 Worker 的 Bash 记录保护使用 macOS Seatbelt 或 Linux bubblewrap。Linux、Windows 安装前请查看[后端要求][compatibility]。
+
+下方命令安装已发布的 v0.2.0。使用视频中的最新字标控件时，将克隆分支从 `v0.2.0` 改为 `main`。
 
 克隆项目，准备独立的 Web 运行环境：
 
@@ -63,11 +65,13 @@ Rubric Builder 根据原始需求与规格制定验收标准；Outcome Verifier 
 
 ## 在原生对话中协作
 
+首条消息前，点击小巧的 **MoA+ 字标**选择模式：灰色为关闭，绿色为开启。MoA+ 会话开始后，字标保留为固定身份标识。控件适配深浅主题，鼠标悬停时也保持透明背景。
+
 MoA+ 沿用 DSH 原生界面。**胶囊就是子会话**：点击进入 Worker，也可以在原生左侧列表的 Coordinator 下找到同一个 Worker。用户可以直接给它下达指令，通过 Back 回到 Coordinator。胶囊保留在 Worker 参与工作的 turn 或消息段中。
 
 Agent 来信标明发送者，从原文预览展开为完整 Markdown。可关闭的 Workers 与 notes.md 标签页展示输入、最终回复、产物和当前工作记录。团队工作期间，新的用户输入仍能及时接入。
 
-页首演示使用当前的 `Task`、直接 `SendMessage`、共享 Context 和完成审阅流程。Exporter 实现标题排序，Docs 编写指南；用户直接给 Docs 补充要求，Coordinator 查看 Worker 最新记录后核对最终结果。可以查看[任务与实际检查](docs/demo-moa-plus.md)或[运行时验证记录][verification]。早期 Project Mode 视频保留在 [v0.1.23 演示归档](docs/demo-workflow.md)中。
+页首演示先展示字标的开关状态和主题适配，再打开保留的 Note Bundle 任务，查看胶囊、Worker 会话、Agent 原始来信、Workers 时间线、notes 和结果。在这次真实执行中，Exporter 实现标题排序，Docs 编写指南；用户直接给 Docs 补充要求，Coordinator 查看 Worker 记录后核对最终结果。这次录制回看已有执行，没有新跑模型任务。可以查看[任务与实际检查](docs/demo-moa-plus.md)或[运行时验证记录][verification]。早期 Project Mode 视频保留在 [v0.1.23 演示归档](docs/demo-workflow.md)中。
 
 ## 文档与参与
 

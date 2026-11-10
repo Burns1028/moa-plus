@@ -11,7 +11,7 @@ import { sid } from "./fixture.ts";
 afterEach(cleanup);
 const t = (key: keyof typeof en) => en[key];
 
-it("keeps the MoA+ checkbox switchable before the first message", async () => {
+it("keeps the MoA+ wordmark switchable before the first message", async () => {
   let mode: SessionModeView = {
     sessionId: sid("parent"),
     role: "ordinary",
@@ -44,20 +44,22 @@ it("keeps the MoA+ checkbox switchable before the first message", async () => {
         t={t as any}
       />,
     );
-    const checkbox = (await screen.findByRole("checkbox", {
+    const button = (await screen.findByRole("button", {
       name: "MoA+",
-    })) as HTMLInputElement;
-    await waitFor(() => expect(checkbox.disabled).toBe(false));
+    })) as HTMLButtonElement;
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    await waitFor(() => expect(button.disabled).toBe(false));
     const user = userEvent.setup();
-    await user.click(checkbox);
+    await user.click(button);
     await waitFor(() => {
-      expect(checkbox.checked).toBe(true);
-      expect(checkbox.disabled).toBe(false);
+      expect(button.getAttribute("aria-pressed")).toBe("true");
+      expect(button.disabled).toBe(false);
     });
-    await user.click(checkbox);
+    button.focus();
+    await user.keyboard(" ");
     await waitFor(() => {
-      expect(checkbox.checked).toBe(false);
-      expect(checkbox.disabled).toBe(false);
+      expect(button.getAttribute("aria-pressed")).toBe("false");
+      expect(button.disabled).toBe(false);
     });
     expect(setEnabled.mock.calls.map((call) => call.slice(0, 2))).toEqual([
       ["parent", true],
@@ -96,8 +98,9 @@ it.each([true, false])(
           t={t as any}
         />,
       );
-      expect(screen.getByText("MoA+")).toBeTruthy();
+      expect(screen.getByRole("img", { name: "MoA+" })).toBeTruthy();
       expect(screen.queryByRole("checkbox")).toBeNull();
+      expect(screen.queryByRole("button")).toBeNull();
       expect(screen.getByTitle(en["blocked.session-mode-locked"])).toBeTruthy();
     } finally {
       client.dispose();

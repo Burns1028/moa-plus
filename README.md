@@ -6,9 +6,9 @@
 
 Watch two Workers build a CLI together, exchange messages directly, and bring a human change back to the Coordinator.
 
-[![MoA+ v0.2.0: delegate, collaborate, intervene, and review a real result](docs/media/moa-plus-workflow.gif)](docs/media/moa-plus-workflow.mp4)
+[![MoA+: the wordmark control and a real collaboration task](docs/media/moa-plus-workflow.gif)](docs/media/moa-plus-workflow.mp4)
 
-[Watch the MP4](docs/media/moa-plus-workflow.mp4) · [Reproduce this task](docs/demo-moa-plus.md). A real-task walkthrough on **MoA+ v0.2.0**, using sampled native UI clips and key frames. Waiting is edited out and labeled.
+[Watch the MP4](docs/media/moa-plus-workflow.mp4) · [Reproduce this task](docs/demo-moa-plus.md). Newly recorded in the native DSH interface, revisiting a completed real team task. [Recording details](docs/demo-moa-plus.md#what-the-walkthrough-shows).
 
 MoA+ is a **Mixture of Agents collaboration plugin for DeepSeek Harness**. It connects persistent agents through independent contexts, direct communication, and shared knowledge, with the goal of expanding what the whole system can accomplish together.
 
@@ -23,6 +23,8 @@ English | [简体中文](README.zh.md)
 Requires **Node 24.9+**, npm, and Git. MoA+ **v0.2.0** needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
 Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.
+
+The commands below install the published v0.2.0 release. For the latest wordmark control shown in the video, clone `main` instead of `v0.2.0`.
 
 Clone the project and prepare a separate Web runtime:
 
@@ -63,11 +65,13 @@ A Rubric Builder derives acceptance criteria from the original requirements and 
 
 ## See it in action
 
+Select the compact **MoA+ wordmark** before the first message: gray is off and green is on. A started MoA+ conversation keeps it as its fixed identity. The transparent control follows light and dark themes, including while hovered.
+
 MoA+ keeps collaboration in the native DSH interface. **Capsules are child conversations**: click one to open its Worker, or find the same Worker beneath the Coordinator in the sidebar. You can give the Worker instructions directly and use Back to return to the Coordinator. Capsules stay with the turn or message segment where the Worker participated.
 
 Agent messages show their sender and expand from an original-text preview to full Markdown. The closable Workers and notes.md tabs show inputs, final replies, artifacts, and current work records. New user input remains responsive while the team works.
 
-The demo at the top uses the current `Task`, direct `SendMessage`, shared Context, and completion-review flow. Exporter implements title sorting, Docs writes the guide, a human adds instructions inside Docs, and the Coordinator checks the current Worker history before verifying the result. See the [task and actual checks](docs/demo-moa-plus.md) or [runtime verification][verification]. The earlier Project Mode recording remains in the [v0.1.23 demo archive](docs/demo-workflow.md).
+The demo starts with the wordmark's off/on states and theme adaptation, then opens the retained Note Bundle task to show capsules, Worker conversations, original Agent messages, the Workers timeline, notes, and results. In that real run, Exporter implemented title sorting, Docs wrote the guide, a human added instructions inside Docs, and the Coordinator checked the Worker history before verifying the result. The recording revisits that execution without starting a new model task. See the [task and actual checks](docs/demo-moa-plus.md) or [runtime verification][verification]. The earlier Project Mode recording remains in the [v0.1.23 demo archive](docs/demo-workflow.md).
 
 ## Documentation and contribution
 

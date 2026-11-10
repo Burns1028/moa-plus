@@ -103,6 +103,7 @@ await build({
   format: "cjs",
   platform: "browser",
   target: "es2024",
+  loader: { ".png": "dataurl" },
   dts: false,
   clean: false,
   deps: {

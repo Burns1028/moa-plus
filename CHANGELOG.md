@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Replace the draft MoA+ checkbox with a compact cover-style wordmark button. The off state is gray; the on state is electric lime in the dark theme and a darker green in the light theme. Started conversations retain a fixed mode identity.
+
 ## 0.2.0 — 2026-11-10
 
 - Release validation passed 345 tests across 59 files, Host/Client typechecks, the production build, and all 19 launcher checks with zero skips. Earlier revision-specific evidence remains identified below.

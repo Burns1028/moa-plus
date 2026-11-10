@@ -25,5 +25,8 @@ it("ships a lazy public factory with own generated Remote descriptor inline and 
     "zod",
   ]);
   expect(source).not.toContain("/src/client/");
+  // Native factories have no relative image URL base. The mode artwork must
+  // travel inside the same browser bundle for every installation form.
+  expect(source).toContain("data:image/png;base64,");
   delete (window as any).__ModuleLoader__;
 });
