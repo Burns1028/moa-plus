@@ -4,16 +4,39 @@
 
 This branch adds the default Adaptive policy and five optional local prompt packs, using DSH's native input-trigger source and existing Agent tools. These changes are unreleased. The native compatibility manifest remains **21 packages / 49 paths**.
 
-The final build, both typechecks, **392 tests across 65 files**, and **20 launcher checks with zero skips** passed. The input regressions exercise the published rc.3 controller and composer shell, including references, attachment receipts, queue/steer, quoted file paths and candidate-query cancellation. These are scripted checks, separate from the model runs below.
+The final build, both typechecks, **401 tests across 65 files**, and **20 launcher checks with zero skips** passed. Fresh npm, forwarding-package and committed-Git consumers, including clean-checkout npm ci, passed. [macOS and Ubuntu CI](https://github.com/Burns1028/moa-plus/actions/runs/42908101320) includes the completion-submission regressions. The input regressions exercise the published rc.3 controller and composer shell, including references, attachment receipts, queue/steer, quoted file paths and candidate-query cancellation. These are scripted checks, separate from the model runs below.
 
 Separate real Ego-browser acceptance used an isolated DSH 0.2.1-rc.3 runtime with DeepSeek-V4.1-Flash / High:
 
 - All five packs expanded in the native composer. MoA+ off and Worker conversations offered no pack candidates. A native `spec.md` reference chip survived template expansion, and a normal TXT upload reached the model with its original receipt and exact check code.
 - A real fan-out task created two independent ledger Workers and a fresh Verifier. The sources were unchanged; counts were 3 and 2 rows, sums 20 and 24, and integrated total 44. All three complete final AI messages returned exactly once and the Coordinator turn closed naturally.
-- The next simple question returned `42` with no tool calls or new Workers. Old capsules retained their original turn and human-message segment; passive inspection created no new participation.
+- The next simple question returned `42` with no Coordinator tool calls or new execution Workers; automatic completion helpers are accounted for separately. Old capsules retained their original turn and human-message segment; passive inspection created no new participation.
 - A real panel created its Lead before three Panelists, each reporting to that actual Lead ID. Panelist results reached the Lead once each, with no peer-to-peer messaging. The Lead's synthesis retained conditional recommendations and real tradeoffs; its full final message reached the Coordinator and the main turn closed naturally.
 
 These observations establish native input and two real collaboration flows, rather than all five patterns' model performance. The Blackboard Builder's immediate-idle requirement remains an open lifecycle decision in this draft branch; its current prompt retains native wait-and-delivery closure. Private transcripts, screenshots and runtime profiles are excluded from the package.
+
+### Complex tasks and completion repair — 2026-11-11
+
+Six real-model runs compared ordinary DSH, Adaptive and auto-orchestration on two multi-file tasks: exact-cents ledger reconciliation and a multi-tenant incident repair with evidence-backed triage. Each case used the same initial tree, task, mid-task requirement update, official Flash/High selection and native permissions. The first six runs used `aa8f814`; their acceptance criteria were frozen before execution. All completed naturally before their delivered trees were copied for external grading. The operator supplied no grader feedback, solution edits, forced Worker count or experiment call/token quota.
+
+| Task | Mode | First delivered acceptance | Elapsed | Model streams |
+| --- | --- | --- | ---: | ---: |
+| Ledger | Ordinary | 75/75, 100/100 | 575.645 s | 32 |
+| Ledger | Adaptive | 75/75, 100/100 | 1456.355 s | 168 |
+| Ledger | Auto | 75/75, 100/100 | 2018.090 s | 239 |
+| Incident | Ordinary | 24/24, 100/100 | 274.664 s | 36 |
+| Incident | Auto | 23/24, 95/100 | 1513.176 s | 147 |
+| Incident | Adaptive | 24/24, 100/100; scorer-exposed | 1557.439 s | 202 |
+
+The Auto incident miss concerns whether a selected wrong endpoint counts as misrouting when deduplication prevented sending; the visible contract did not define that reporting category precisely. The frozen 23/24 result remains unchanged. During the last Adaptive run, the model itself found and read the private scorer and other runs, then ran the scorer before delivery. Its raw score is retained but excluded from unseen-scorer claims. Trace review found no such access in the first five runs; filesystem isolation against an adversarial model was not established. These exploratory samples show no quality or speed improvement over ordinary mode. Ledger Adaptive also has three transport attempts without usage, so its reported token total is a lower bound.
+
+The runs exposed a real closure defect: four Verifier answers mixed prose with a bare JSON Pass, failed the actual format contract, and sent the Coordinator into protocol debugging. The fix adds a private, per-candidate `submit_verdict` tool that concludes the native review turn. Legacy valid JSON remains supported; rubric reads, actual inspection, successful required tests, Stop and stale-attempt rejection remain enforced. Coordinator facts now describe automatic verification according to the actual configuration. QueryAgent's existing paired history parameters are explicit in the model-visible schema. No task-specific delegation gate, UI redesign or native patch was added.
+
+A fresh Incident Adaptive run on `50711b6` used the same frozen task/update/tree and normal native sandbox backend. Known local graders and prior answer artifacts were unavailable while its model host ran. It completed naturally in **1073.089 s**, with **126 streams**, one execution reviewer and an automatic Verifier that actually ran **38 passing task tests**, inspected evidence and replayed the incident. The private verdict was accepted once; the parent ended **24 ms** after submission, without another model call or completion-format notice. The complete Worker result returned once in the same parent turn, and the final user answer contained the task report rather than verification-protocol instructions. After real UI inspection, host exit and restoration of the private grading materials, the unchanged external scorer returned **24/24, 100/100**. Trace review found no grader, prior-answer or controller-material read in this run; this remains a single observed run, not an adversarial isolation or general performance guarantee.
+
+Real Ego-browser inspection confirmed live sidebar spinners, compact single-status capsules, Worker navigation/Back, original Markdown expansion and native closable tabs. At natural closure, Stop disappeared, Send returned, the capsule read completed and sidebar animation stopped. The native checklist still showed unfinished items: the model had not reconciled its bookkeeping with its final report. An earlier focused attempt was stopped after an outer acceptance sandbox prevented native nested shell enforcement; its submitted Pass was correctly rejected for missing successful Bash evidence. That attempt has no final quality score and is retained as an environment failure.
+
+The fresh run reported 10,407,017 total tokens, including 10,021,888 cache-read tokens; all 126 streams supplied usage. Totals include the Coordinator, execution Worker and automatic helpers and are not a dollar-cost estimate. This repair establishes the tested execution and closure path; it does not establish that enabling MoA+ always improves results or latency. All owned evaluation hosts exited, temporary grading custody was restored with matching file/permission/symlink inventory, and private artifacts remain outside Git. PR #13 is still a draft pending the Blackboard lifecycle decision; no release or personal DSH replacement is included.
 
 ## Current checkout: Worker attachments — 2026-11-10
 
