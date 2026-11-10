@@ -8,7 +8,6 @@ export const styles = `
 .pm-capsule:focus-visible,.pm-mode-button:focus-visible,.pm-parent:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
 .pm-toggle [role=alert],.pm-toggle [role=status]{font-size:11px;margin-left:6px}
 .pm-mode-button{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);padding:6px 4px;cursor:pointer}
-.pm-mode-button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
 .pm-mode-button[aria-pressed=true],.pm-fixed{color:#526b00}
 body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-theme] .pm-fixed{color:#cbff45}
 .pm-mode-button:disabled{cursor:default;opacity:.65}
