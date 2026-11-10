@@ -297,8 +297,19 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
       const successfulCalls = calls.filter((e) => e.type === "tool/call" && results.some((result) => result.type === "tool/result" && result.data.step === e.data.step && result.data.message.toolCallId === e.data.callId));
       const passedBash = successfulCalls.some(call => successfulBash.has(call.seq)) || events.some(event => event.type === "job/settled" && event.data.kind === "bash" && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.type === "tool/call" && call.data.name.toLowerCase() === "bash" && call.data.callId === event.data.toolCall?.rootCallId));
-      let verdict: { status?: string; issues?: unknown } = {};
-      try { verdict = JSON.parse(lastText(pair.verifier.agent, offset).replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { /* malformed verdict blocks */ }
+      let verdict: { status?: string; issues?: unknown };
+      try {
+        const body = lastText(pair.verifier.agent, offset).trim();
+        try { verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch {
+          const fenced = body.split("```");
+          if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
+          verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+        }
+        if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
+      } catch {
+        agent.steer(msg("Outcome verification did not pass. Verifier must return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
+        return;
+      }
       if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || (testsRequired && !passedBash)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
     } catch (error) {
       signal.throwIfAborted();

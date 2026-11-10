@@ -126,7 +126,7 @@
   "engines": {
     "node": ">=24.9.0"
   },
-  "version": "0.1.23",
+  "version": "0.2.0",
   "description": "Multi-agent collaboration for DeepSeek Harness: persistent agents, shared knowledge, direct communication, and independent review. Requires the matching DSH 0.2.1-rc.3 runtime.",
   "keywords": [
     "deepseek",

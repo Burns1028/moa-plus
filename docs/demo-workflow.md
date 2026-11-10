@@ -1,5 +1,7 @@
 # A project across Workers, human input and a later turn
 
+This is the historical **v0.1.23 Project Mode** walkthrough. The [current MoA+ v0.2.0 demo](demo-moa-plus.md) uses the new collaboration runtime. [Historical MP4](media/project-workflow.mp4) · [historical GIF](media/project-workflow.gif).
+
 The [Note Bundle starter](../examples/note-bundle) is a small dependency-free CLI with an intentionally unfinished `--sort title` option. Work on a copy in a new Project conversation using the [isolated quick start](quickstart.md).
 
 1. Ask the Coordinator:

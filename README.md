@@ -4,6 +4,12 @@
 
 **Advancing intelligence through agent collaboration.**
 
+Watch two Workers build a CLI together, exchange messages directly, and bring a human change back to the Coordinator.
+
+[![MoA+ v0.2.0: delegate, collaborate, intervene, and review a real result](docs/media/moa-plus-workflow.gif)](docs/media/moa-plus-workflow.mp4)
+
+[Watch the MP4](docs/media/moa-plus-workflow.mp4) · [Reproduce this task](docs/demo-moa-plus.md). A real-task walkthrough on **MoA+ v0.2.0**, using sampled native UI clips and key frames. Waiting is edited out and labeled.
+
 MoA+ is a **Mixture of Agents collaboration plugin for DeepSeek Harness**. It connects persistent agents through independent contexts, direct communication, and shared knowledge, with the goal of expanding what the whole system can accomplish together.
 
 A Coordinator keeps the goal and overall direction in view. Workers investigate, build, challenge, and review in their own conversations, remaining available for the next assignment. The team can explore different approaches, work in parallel, and carry its findings into later tasks.
@@ -14,14 +20,14 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-Requires **Node 24.9+**, npm, and Git. The runtime on `main` needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+Requires **Node 24.9+**, npm, and Git. MoA+ **v0.2.0** needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
 Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.0 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -61,9 +67,7 @@ MoA+ keeps collaboration in the native DSH interface. **Capsules are child conve
 
 Agent messages show their sender and expand from an original-text preview to full Markdown. The closable Workers and notes.md tabs show inputs, final replies, artifacts, and current work records. New user input remains responsive while the team works.
 
-[![A real CLI task with delegation, human intervention, result review, and context reuse](docs/media/project-workflow.gif)](docs/media/project-workflow.mp4)
-
-Recorded on **v0.1.23** with the original Project label, this 60-second edit follows a real CLI task: Exporter changes title sorting, a human adjusts the accepted order inside its conversation, Docs aligns the guide, and the Coordinator reviews the result. The next task reuses the Workers and agreed context. Waits are omitted and labeled. [View the artifacts](docs/demo-result), [reproduce the demo](docs/demo-workflow.md), or read [current-runtime verification][verification].
+The demo at the top uses the current `Task`, direct `SendMessage`, shared Context, and completion-review flow. Exporter implements title sorting, Docs writes the guide, a human adds instructions inside Docs, and the Coordinator checks the current Worker history before verifying the result. See the [task and actual checks](docs/demo-moa-plus.md) or [runtime verification][verification]. The earlier Project Mode recording remains in the [v0.1.23 demo archive](docs/demo-workflow.md).
 
 ## Documentation and contribution
 

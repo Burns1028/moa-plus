@@ -225,7 +225,7 @@ it("lets incoming human steering escape a waiting verifier before any final turn
   } finally { release.resolve(); await f.dispose(); }
 });
 
-it("rejects a self-declared Pass without actual tool work", async () => {
+it.each(["plain", "fenced"])("rejects a self-declared Pass without actual tool work (verdict=%s)", async (format) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-unsupported-pass"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
@@ -234,7 +234,7 @@ it("rejects a self-declared Pass without actual tool work", async () => {
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
-      if (id.startsWith("moa-verifier-")) return response('{"status":"Pass","issues":[],"tests_required":false}');
+      if (id.startsWith("moa-verifier-")) return response(format === "plain" ? '{"status":"Pass","issues":[],"tests_required":false}' : 'Review complete.\n\n```json\n{"status":"Pass","issues":[]}\n```');
       if (++main === 2) {
         expect(JSON.stringify(options.messages)).toContain("Outcome verification did not pass");
         agent.cancel({ kind: "user" });
@@ -245,6 +245,40 @@ it("rejects a self-declared Pass without actual tool work", async () => {
     await agent.whenIdle();
     expect(main).toBe(2);
     expect(agent.session.snapshotEvents().filter((e) => e.type === "turn/end").some((e) => e.type === "turn/end" && e.data.reason.kind === "completed")).toBe(false);
+  } finally { await f.dispose(); }
+});
+
+it.each([
+  ["malformed", 'Review complete.\n```json\n{"status":"Pass","issues":[]} trailing\n```', "valid JSON verdict"],
+  ["ambiguous", '```json\n{"status":"Pass","issues":[]}\n```\nDifferent result:\n```json\n{"status":"Block","issues":["Not complete"]}\n```', "valid JSON verdict"],
+  ["whole-fence JSON with code markers in an issue", '```json\n{"status":"Block","issues":["Fix ```bash npm test``` example"]}\n```', "Fix ```bash npm test``` example"],
+])("preserves the specific failure reason for a %s verdict after actual inspection", async (_format, body, reason) => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-verdict-format"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0, notice = "";
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the report [human requirement]", tests_required: false });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("read_candidate", {});
+        return response(body);
+      }
+      if (++main === 2) {
+        notice = JSON.stringify(options.messages);
+        agent.cancel({ kind: "user" });
+      }
+      return response("The completed report");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver the report" }] }));
+    await agent.whenIdle();
+    expect(main).toBe(2);
+    expect(verifier).toBe(3);
+    expect(notice).toContain(reason);
+    expect(notice).not.toContain("Verifier must read the rubric, inspect actual results using tools");
+    expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
   } finally { await f.dispose(); }
 });
 
@@ -427,7 +461,11 @@ it("applies the bound promise to a Worker without spawning recursive outcome hel
   } finally { await f.dispose(); }
 });
 
-it.each([false, true])("accepts actual native Bash success from canonical exit facts (promotion=%s)", async (promote) => {
+it.each([
+  { promote: false, format: "plain" },
+  { promote: true, format: "plain" },
+  { promote: true, format: "fenced" },
+])("accepts actual native Bash success from canonical exit facts (promotion=$promote, verdict=$format)", async ({ promote, format }) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
@@ -446,7 +484,7 @@ it.each([false, true])("accepts actual native Bash success from canonical exit f
         if (++verifier === 1) return call("read_rubric", {});
         if (verifier === 2) return call("bash", { command: `${promote ? "sleep 0.12; " : ""}printf 'background capability is tested\\n'`, description: "Run verification", timeoutMs: promote ? 20 : 2000 });
         if (promote && verifier === 3) return call("job_output", { job_id: f.ctx.jobs.list(SessionId(id))[0].id, wait: true, timeout_ms: 2000 });
-        return response('{"status":"Pass","issues":[]}');
+        return response(format === "plain" ? '{"status":"Pass","issues":[]}' : 'I verified the candidate and ran the required command successfully.\n\n```json\n{"status":"Pass","issues":[]}\n```\nReady for delivery.');
       }
       if (++main > 1) { agent.cancel({ kind: "user" }); throw new Error("Native exit zero was rejected"); }
       return response("delivered");

@@ -1,8 +1,20 @@
 # Verification
 
-## Current main: unreleased MoA runtime
+## MoA+ v0.2.0
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
+
+### Release validation: 2026-11-10
+
+The final v0.2.0 runtime passed **345 tests across 59 files**: 284 Host/Client/integration cases and 61 native-contract cases. The production build, both typechecks and all **19 launcher checks with zero skips** passed. The current-release walkthrough is linked near the top of both READMEs; it combines sampled native UI clips with key frames, and its capture method and revision-specific acceptance are documented in [the demo record](demo-moa-plus.md).
+
+### Verifier verdict format: 2026-11-10
+
+The current-release recording exposed a real completion failure: the Verifier had read its rubric and candidate, inspected artifacts and run the actual tests, then returned an explanatory answer followed by one fenced JSON Pass verdict. The old parser rejected that complete answer and incorrectly diagnosed missing tool work.
+
+Completion retains plain JSON and whole-answer fenced JSON, including literal code markers inside issue strings, and also accepts exactly one fenced JSON object with surrounding explanation. It does not guess brace ranges or choose among multiple verdict blocks. Malformed or ambiguous output reports a JSON-format problem; the existing rubric, native inspection and required Bash-success checks remain unchanged. A native promoted-Bash regression reproduced the extra parent iteration before the fix. Together with malformed/ambiguous diagnostic cases and missing-tool rejection, the focused completion suite passes **30 tests** after the fix.
+
+After the initial parser fix was installed into the same isolated real-model conversation, a follow-up reused both existing Workers and their context without new assignments. It rechecked the outputs and 10 passing task tests. The Verifier read the rubric, candidate and artifacts, ran 20 native Bash calls, and returned a plain JSON Pass; the parent completed normally 30 ms later. That real-model continuation validates the deployed completion path, while the explanatory fenced-JSON form is covered by the native regression above. The final whole-answer compatibility adjustment is an additional scripted regression, not a claim of another model run.
 
 ### Structure and tool cleanup: 2026-11-10
 
@@ -41,7 +53,7 @@ Real-model and native UI acceptance used an isolated DSH runtime with DeepSeek-V
 
 The final UI-only bundle (`49e4b42345bf352265b89795f4b006022121c1d2d3d8d9e4bfa85fe28723858a`) was installed into that owned isolated runtime with backup and doctor verification. After restart, Worker results in the Coordinator and Coordinator messages in the Worker displayed right-aligned native-style bubbles with sender, two-line preview and original Markdown expansion. Sidebar children, capsules, Back and native closable tabs were retained. Private transcripts/screenshots are not packaged. The task explicitly requested delegation and included an acceptance delay; it does not establish universal model quality or natural delegation reliability. Earlier runtime evidence below remains attached to its original revisions.
 
-This is the unreleased runtime on main; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
+The evidence below predates the v0.2.0 release and is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
 
 ### Current automated evidence
 
@@ -152,7 +164,7 @@ The earlier audit confirmed both defects in 0.1.21; those findings are now cover
 
 A separately installed 0.1.22 bundle ran in a new temporary workspace under Desktop 0.2.1-rc.3. The Coordinator called list then spawn; one Worker wrote two reusable facts and updated the shared index. The full final committed Worker AI payload matched the canonical received result exactly. There was one Worker turn, one Coordinator turn, one canonical result and a completed native Coordinator closure after 50 seconds, with result consumption before closure. The Coordinator independently read the index/facts and updated notes/archived. The visible capsule and collapsed Markdown timeline were inspected.
 
-The initial timeline observation briefly returned a native session-not-found error for the newly created Worker; the existing Retry action recovered the timeline. That release required manual Retry. The unreleased readiness-triggered correction is covered by the latest regression and product acceptance above; the historical capture is unchanged. The task explicitly requested delegation, so it does not establish general natural-delegation quality. No test prompt was sent to an existing user conversation.
+The initial timeline observation briefly returned a native session-not-found error for the newly created Worker; the existing Retry action recovered the timeline. That release required manual Retry. The readiness-triggered correction included in v0.2.0 is covered by the latest regression and product acceptance above; the historical capture is unchanged. The task explicitly requested delegation, so it does not establish general natural-delegation quality. No test prompt was sent to an existing user conversation.
 
 ## 0.1.21 historical verification
 

@@ -34,7 +34,7 @@ The plugin's existing direct SendMessage/request exclusion in background.ts rema
 
 Remove the transient `MoAMessageBroker.hasPendingRequest` helper and Host-to-background callback added in b173dec. They no longer arbitrate composite roots. Ordinary run_code work retains the existing background strategies. Notify and explicit Notify replies remain eligible for ordinary background transfer as their own native calls.
 
-A model attempting `tools.SendMessage` in an old PTC program receives an ordinary tool/program error without sending a Request. The next inference sees the correct native schema. Persisted conversation history remains readable; programs are not replayed or rewritten. This is an unreleased branch change, not a migration of a released nested protocol API.
+A model attempting `tools.SendMessage` in an old PTC program receives an ordinary tool/program error without sending a Request. The next inference sees the correct native schema. Persisted conversation history remains readable; programs are not replayed or rewritten. This protocol change was introduced for v0.2.0, without migrating any released nested protocol API.
 
 ## Exact native scope
 
