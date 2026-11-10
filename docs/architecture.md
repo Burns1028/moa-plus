@@ -152,4 +152,6 @@ Worker addresses carry the actual native direct parent. For a visible nested Wor
 
 The Workers tab is read-only. It shows original input, final AI output, and artifacts with two-line expandable Markdown previews. It does not summarize via a model. Workers/notes defaults use native closable tab behavior. Native sidebar rows retain their alignment and controls.
 
+The draft mode control is a compact accessible wordmark toggle button, gray when off and green when on. The active letters use electric lime in the dark application theme and a darker green for contrast in the light theme; the selected raster artwork is embedded in the browser bundle. Starting the conversation replaces the button with the same fixed identity, preserving the permanent mode lock.
+
 The historical `ProjectMode`, `ProjectClient`, storage, package, and Remote names remain compatibility identifiers. They are not separate product modes or a reason to migrate user data. See [contributing](../CONTRIBUTING.md) for checks and [verification](verification.md) for evidence still required before release.

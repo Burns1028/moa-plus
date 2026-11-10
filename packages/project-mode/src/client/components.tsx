@@ -125,24 +125,28 @@ export function ProjectToggle({
     return (
       <span
         className="pm-toggle pm-fixed"
+        role="img"
+        aria-label={t("project")}
         title={t("blocked.session-mode-locked")}
       >
-        {t("project")}
+        <span className="pm-wordmark" aria-hidden="true" />
       </span>
     );
   return (
     <span className="pm-toggle" aria-busy={state.busy}>
-      <label title={reason ? t(`blocked.${reason}`) : state.value?.paths?.root}>
-        <input
-          type="checkbox"
-          checked={state.value?.enabled ?? false}
-          disabled={state.busy || !state.value?.canToggle}
-          onChange={(e) => {
-            void client.toggle(sessionId, e.currentTarget.checked);
-          }}
-        />
-        {t("project")}
-      </label>
+      <button
+        type="button"
+        className="pm-mode-button"
+        aria-label={t("project")}
+        aria-pressed={state.value?.enabled ?? false}
+        title={reason ? t(`blocked.${reason}`) : state.value?.paths?.root}
+        disabled={state.busy || !state.value?.canToggle}
+        onClick={() => {
+          void client.toggle(sessionId, !state.value?.enabled);
+        }}
+      >
+        <span className="pm-wordmark" aria-hidden="true" />
+      </button>
       {state.busy && <span role="status">{t("enabling")}</span>}
       {state.error && (
         <span role="alert">{t("error", { message: state.error })}</span>

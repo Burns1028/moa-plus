@@ -67,7 +67,7 @@ it("membership alone makes mounted tail visible and native closure avoids live h
   );
   client.dispose();
 });
-it("native checkbox stays unchecked during request, exposes busy and localized Host error", async () => {
+it("wordmark stays off during request, exposes busy and localized Host error", async () => {
   let finish: (v: unknown) => void = () => {};
   const client = new ProjectClient({
     mode: async () => ({
@@ -92,9 +92,9 @@ it("native checkbox stays unchecked during request, exposes busy and localized H
     />,
   );
   await act(async () => {});
-  const check = screen.getByRole("checkbox") as HTMLInputElement;
+  const check = screen.getByRole("button", { name: "MoA+" }) as HTMLButtonElement;
   fireEvent.click(check);
-  expect(check.checked).toBe(false);
+  expect(check.getAttribute("aria-pressed")).toBe("false");
   expect(check.disabled).toBe(true);
   await act(async () =>
     finish({ ok: false, error: { message: "Workers active" } }),
