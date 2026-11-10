@@ -1,5 +1,20 @@
 # Verification
 
+## Current branch: orchestration prompts — 2026-11-11
+
+This branch adds the default Adaptive policy and five optional local prompt packs, using DSH's native input-trigger source and existing Agent tools. These changes are unreleased. The native compatibility manifest remains **21 packages / 49 paths**.
+
+The final build, both typechecks, **392 tests across 65 files**, and **20 launcher checks with zero skips** passed. The input regressions exercise the published rc.3 controller and composer shell, including references, attachment receipts, queue/steer, quoted file paths and candidate-query cancellation. These are scripted checks, separate from the model runs below.
+
+Separate real Ego-browser acceptance used an isolated DSH 0.2.1-rc.3 runtime with DeepSeek-V4.1-Flash / High:
+
+- All five packs expanded in the native composer. MoA+ off and Worker conversations offered no pack candidates. A native `spec.md` reference chip survived template expansion, and a normal TXT upload reached the model with its original receipt and exact check code.
+- A real fan-out task created two independent ledger Workers and a fresh Verifier. The sources were unchanged; counts were 3 and 2 rows, sums 20 and 24, and integrated total 44. All three complete final AI messages returned exactly once and the Coordinator turn closed naturally.
+- The next simple question returned `42` with no tool calls or new Workers. Old capsules retained their original turn and human-message segment; passive inspection created no new participation.
+- A real panel created its Lead before three Panelists, each reporting to that actual Lead ID. Panelist results reached the Lead once each, with no peer-to-peer messaging. The Lead's synthesis retained conditional recommendations and real tradeoffs; its full final message reached the Coordinator and the main turn closed naturally.
+
+These observations establish native input and two real collaboration flows, rather than all five patterns' model performance. The Blackboard Builder's immediate-idle requirement remains an open lifecycle decision in this draft branch; its current prompt retains native wait-and-delivery closure. Private transcripts, screenshots and runtime profiles are excluded from the package.
+
 ## Current checkout: Worker attachments — 2026-11-10
 
 The current checkout implements the six-chapter MoA architecture and the [reviewed Worker attachment contract](native-worker-attachments-contract.md). Its matching compatibility manifest covers **21 native packages / 49 file paths**. The published **v0.2.0** release remains associated with its historical **19 packages / 43 paths** runtime and validation below; these revisions must not be mixed.

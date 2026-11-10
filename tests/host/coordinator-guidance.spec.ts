@@ -113,6 +113,47 @@ it("explains role execution capabilities and explicit reply syntax in native too
   }
 });
 
+it("assembles adaptive scheduling guidance with the native wait contract", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("guidance-adaptive"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    agent.followup(prompt("Continue familiar work and start the independent branches as their prerequisites finish."));
+    await agent.whenIdle();
+    const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
+    const policy = `${systemText(request)}\n${runtimeText(request)}`;
+    expect(policyCopies(request)).toBe(1);
+    expect(policy).toMatch(/prefer SendMessage.*familiar worker/);
+    expect(policy).toMatch(/then Fork.*useful committed history/);
+    expect(policy).toMatch(/Task.*clean independent context/);
+    expect(policy).toContain("ready work in parallel");
+    expect(policy).toContain("unlock downstream");
+    expect(policy).toContain("small self-contained actions");
+
+    const query = request.tools!.find((tool) => tool.name === "QueryAgent");
+    expect(query?.parameters).toMatchObject({
+      properties: {
+        wait: { enum: ["all", "selected"] },
+        timeout_ms: { type: "integer" },
+      },
+    });
+    expect(policy).toContain('wait="all"');
+    expect(policy).toContain('wait="selected"');
+    expect(policy).toContain("timeout_ms");
+    expect(policy).not.toContain("wait_timeout");
+    expect(policy).toContain("timeout alone is not failure");
+    expect(policy).toMatch(/reasonable.*duration.*progress/);
+    expect(policy).toMatch(/request.*blocker.*ETA/);
+    expect(policy).toMatch(/KillAgent only.*evidence/);
+  } finally {
+    await f.dispose();
+  }
+});
+
 it("puts coordinator policy in the actual system message and removes it on plugin disposal", async () => {
   const f = await fixture();
   try {
