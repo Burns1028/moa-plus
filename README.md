@@ -14,14 +14,14 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-Requires **Node 24.9+**, npm, and Git. The runtime on `main` needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+Requires **Node 24.9+**, npm, and Git. MoA+ **v0.2.0** needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
 Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.0 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run

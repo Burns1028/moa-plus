@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased review corrections
+## 0.2.0 — 2026-11-10
+
+### Review corrections
 
 - Organize role, review, identity and interrupt-judge prompts under `host/prompts/`, centralize collaboration tool definitions, and move shared Context I/O to the memory module without changing prompt output or native execution contracts.
 - Match accepted messages by their native source identity during recovery; unrelated message text can no longer hide a prior admission and cause duplicate insertion.
@@ -13,7 +15,7 @@
 - Enforce Worker read-only access to the Coordinator's actual notes/archive through native session policy, filesystem and Bash providers, while retaining ordinary writes and shared Context. Unsupported restriction backends fail explicitly; Linux restricted Bash requires bubblewrap.
 - Display received Agent messages in right-aligned native-style bubbles in Coordinator and Worker chats, retaining sender identity, expandable original Markdown, and existing capsule navigation.
 
-## Unreleased — MoA runtime
+### MoA runtime
 
 - Implement Task, Fork, SendMessage, QueryAgent, and KillAgent over the native Agent Loop, with specialist tool scopes, explicit nested delegation, reporting targets, shared workspaces, and owned isolated worktrees.
 - Preserve current Git state when preparing isolated worktrees, hydrate the true cold parent chain for delivery, and retain existing memory paths, turn/message capsule ownership, and native UI controls.
@@ -26,7 +28,7 @@
 - Show incoming Agent messages with their real sender and expandable two-line original Markdown inside existing Coordinator/Worker conversations. Preserve native ordinary messages, capsule seats, and synchronous Request Tool Results without adding a page or duplicate message.
 - Recover a creation-time timeline observation once the same Worker becomes natively ready, without periodic retries or reopening healthy streams on busy/idle changes; genuine ready-state errors retain explicit Retry. Remove unreachable empty states and unused Host closure wiring.
 - Align Git-install metadata with the publishable package and use one self-contained collaboration diagram in both READMEs.
-- Use the reviewed rc.3 compatibility manifest covering 13 native packages and 31 file paths. The existing package version remains 0.1.23; these changes are not a new published release.
+- Use the reviewed rc.3 compatibility manifest covering 19 native packages and 43 file paths. Keep this release and its native compatibility runtime together.
 - Record 55 regression files / 302 passing tests, Host/Client typechecks, a production build, and 19 passing launcher checks with no skips. Fresh npm, forwarding-package, and Git consumers plus clean-checkout npm ci passed at `1d24865`. The fresh Timer3 task passed independent artifact verification, normal Coordinator closure, and restart without replay; exact revisions and native UI evidence are recorded in [verification](docs/verification.md).
 
 ## 0.1.23 — 2026-11-02

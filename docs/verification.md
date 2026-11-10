@@ -1,6 +1,6 @@
 # Verification
 
-## Current main: unreleased MoA runtime
+## MoA+ v0.2.0
 
 The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
@@ -41,7 +41,7 @@ Real-model and native UI acceptance used an isolated DSH runtime with DeepSeek-V
 
 The final UI-only bundle (`49e4b42345bf352265b89795f4b006022121c1d2d3d8d9e4bfa85fe28723858a`) was installed into that owned isolated runtime with backup and doctor verification. After restart, Worker results in the Coordinator and Coordinator messages in the Worker displayed right-aligned native-style bubbles with sender, two-line preview and original Markdown expansion. Sidebar children, capsules, Back and native closable tabs were retained. Private transcripts/screenshots are not packaged. The task explicitly requested delegation and included an acceptance delay; it does not establish universal model quality or natural delegation reliability. Earlier runtime evidence below remains attached to its original revisions.
 
-This is the unreleased runtime on main; the existing 0.1.23 package version does not announce a new release. The evidence below is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
+The evidence below predates the v0.2.0 release and is a **2026-11-09 snapshot**. Fresh Timer3 independent verification, normal Coordinator closure, final restart and native UI inspection passed on real-app bundle `e982a59`. Fresh npm, forwarding-package, and committed-Git consumers passed at `231663c`. The subsequent message-display follow-up uses source `8546b3a` / bundle `ada2e01`. The latest focused cleanup and timeline-readiness correction use runtime bundle `9036551`; its fresh automated and product acceptance are recorded separately below.
 
 ### Current automated evidence
 
@@ -152,7 +152,7 @@ The earlier audit confirmed both defects in 0.1.21; those findings are now cover
 
 A separately installed 0.1.22 bundle ran in a new temporary workspace under Desktop 0.2.1-rc.3. The Coordinator called list then spawn; one Worker wrote two reusable facts and updated the shared index. The full final committed Worker AI payload matched the canonical received result exactly. There was one Worker turn, one Coordinator turn, one canonical result and a completed native Coordinator closure after 50 seconds, with result consumption before closure. The Coordinator independently read the index/facts and updated notes/archived. The visible capsule and collapsed Markdown timeline were inspected.
 
-The initial timeline observation briefly returned a native session-not-found error for the newly created Worker; the existing Retry action recovered the timeline. That release required manual Retry. The unreleased readiness-triggered correction is covered by the latest regression and product acceptance above; the historical capture is unchanged. The task explicitly requested delegation, so it does not establish general natural-delegation quality. No test prompt was sent to an existing user conversation.
+The initial timeline observation briefly returned a native session-not-found error for the newly created Worker; the existing Retry action recovered the timeline. That release required manual Retry. The readiness-triggered correction included in v0.2.0 is covered by the latest regression and product acceptance above; the historical capture is unchanged. The task explicitly requested delegation, so it does not establish general natural-delegation quality. No test prompt was sent to an existing user conversation.
 
 ## 0.1.21 historical verification
 

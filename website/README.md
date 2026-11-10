@@ -12,4 +12,4 @@ Open `http://localhost:4173`. Copy the contents of `website/` into any static ho
 
 The English/简中 switch translates the page and demo, and remembers the language locally. The four demo buttons work independently; replay advances through one sequence. The diagram is illustrative and does not connect to a model. It honors reduced-motion preferences. Installation commands match the main README, with clipboard and manual-selection fallbacks.
 
-The workflow link points to the historical **v0.1.23** recording on GitHub. The current main runtime remains an unreleased developer preview and requires its matching DSH rc.3 compatibility runtime.
+The workflow link points to the historical **v0.1.23** recording on GitHub. MoA+ v0.2.0 requires its matching DSH rc.3 compatibility runtime; the installation command selects that release tag.

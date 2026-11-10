@@ -1,8 +1,8 @@
 # Compatibility
 
-Target: **DSH 0.2.1-rc.3, Node 24.9+**. The unreleased MoA runtime in this checkout requires the matching explicit native extensions. Stock rc.3 is incompatible. These are local compatibility extensions, not claims of upstream acceptance.
+Target: **DSH 0.2.1-rc.3, Node 24.9+**. The MoA+ v0.2.0 runtime requires the matching explicit native extensions. Stock rc.3 is incompatible. These are local compatibility extensions, not claims of upstream acceptance.
 
-The published **v0.1.23** tag used three earlier extensions: Agent-local tool suppression, per-session steer submission, and native sidebar branches. It does not include the new Agent/background/residency runtime. Keep a plugin checkout, runtime template/lockfile, and compatibility manifest from the same revision. A current branch's existing package version is not proof of a published release.
+The published **v0.1.23** tag used three earlier extensions: Agent-local tool suppression, per-session steer submission, and native sidebar branches. It does not include the new Agent/background/residency runtime. Keep a plugin checkout, runtime template/lockfile, and compatibility manifest from the same revision. Use the v0.2.0 tag and its matching manifest for this release.
 
 ## Current native boundary
 
