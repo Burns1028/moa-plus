@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, realpathSync, readdirSync, existsSync } from "node:fs";
 import { resolve, dirname, join, parse } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -14,10 +14,26 @@ const modules = resolve(option("--modules") ?? join(here, "../node_modules"));
 const backup = option("--backup");
 const dryRun = args.includes("--dry-run");
 const runtimeOnly = args.includes("--runtime-only");
-const compat = resolve(here, "../compat/rc3");
-const manifest = JSON.parse(
-  readFileSync(join(compat, "manifest.json"), "utf8"),
-);
+const profilesRoot = resolve(here, "../compat");
+const profiles = readdirSync(profilesRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => join(profilesRoot, entry.name))
+  .filter((directory) => existsSync(join(directory, "manifest.json")))
+  .map((directory) => ({
+    directory,
+    manifest: JSON.parse(readFileSync(join(directory, "manifest.json"), "utf8")),
+  }));
+const agentVersion = JSON.parse(readFileSync(join(modules, "@deepseek-ai/dsh-agent/package.json"), "utf8")).version;
+const profile = profiles.find(({ manifest }) => manifest.some((entry) =>
+  entry.package === "@deepseek-ai/dsh-agent" && entry.version === agentVersion,
+));
+if (!profile) {
+  const supported = [...new Set(profiles.flatMap(({ manifest }) =>
+    manifest.filter((entry) => entry.package === "@deepseek-ai/dsh-agent").map((entry) => entry.version),
+  ))];
+  throw new Error(`Unsupported DSH runtime ${agentVersion}; available compatibility profiles: ${supported.join(", ")}; no files changed`);
+}
+const { directory: compat, manifest } = profile;
 const hash = (path) =>
   createHash("sha256").update(readFileSync(path)).digest("hex");
 const plans = [];
@@ -27,11 +43,11 @@ for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
   const installed = JSON.parse(
     readFileSync(join(root, "package.json"), "utf8"),
   );
-  if (installed.version !== "0.2.1-rc.3")
+  const variants = manifest.filter((entry) => entry.package === name && entry.version === installed.version);
+  if (!variants.length)
     throw new Error(
       `Unsupported ${name} version ${installed.version}; no files changed`,
     );
-  const variants = manifest.filter((entry) => entry.package === name);
   const selected = variants
     .map((entry) => ({
       ...entry,
@@ -58,14 +74,17 @@ for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
     throw new Error(
       `Mixed ${name} patch state; restore its backup before retrying`,
     );
-  const patch = join(
+  const patchFile = join(
     compat,
     runtimeOnly ? selected.runtimePatch : selected.patch,
   );
+  // Git checkouts on Windows may convert patch files to CRLF. The audited
+  // package bytes and unified diffs use LF; feed the normalized diff on stdin.
+  const patch = readFileSync(patchFile, "utf8").replaceAll("\r\n", "\n");
   execFileSync(
     "git",
-    ["apply", "--check", "--unsafe-paths", `--directory=${root}`, patch],
-    { cwd: parse(root).root, stdio: "pipe" },
+    ["-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply", "--check", "--unsafe-paths", `--directory=${root}`, "-"],
+    { cwd: parse(root).root, input: patch, stdio: "pipe" },
   );
   plans.push({ ...selected, root, patch });
 }
@@ -99,8 +118,8 @@ try {
   for (const plan of plans) {
     execFileSync(
       "git",
-      ["apply", "--unsafe-paths", `--directory=${plan.root}`, plan.patch],
-      { cwd: parse(plan.root).root, stdio: "pipe" },
+      ["-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply", "--unsafe-paths", `--directory=${plan.root}`, "-"],
+      { cwd: parse(plan.root).root, input: plan.patch, stdio: "pipe" },
     );
     for (const file of plan.files)
       if (hash(join(plan.root, file.file)) !== file.after)

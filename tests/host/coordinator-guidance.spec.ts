@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import { join } from "node:path";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, type GenerateOptions } from "@deepseek-ai/dsh-llm";
 import Loader from "@deepseek-ai/cordis-plugin-loader";
@@ -146,7 +147,7 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     expect(policyCopies(first)).toBe(1);
     expect(runtimeText(first)).not.toContain(coordinatorPrompt);
     expect(runtimeText(first)).toContain("Paths:");
-    expect(runtimeText(first)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(first)).toContain(JSON.stringify(join(f.root, "context", "index.md")));
     expect(runtimeText(first)).toContain("Worker state sampled for this user input");
 
     agent.followup(prompt("Continue with the latest team state"));
@@ -154,7 +155,7 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     const continued = f.adapter.requests.at(-1)!;
     expect(policyCopies(continued)).toBe(1);
     expect(runtimeText(continued)).not.toContain(coordinatorPrompt);
-    expect(runtimeText(continued)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(continued)).toContain(JSON.stringify(join(f.root, "context", "index.md")));
     expect(runtimeText(continued)).not.toBe(runtimeText(first));
 
     const snapshot = await f.ctx.projectMode.snapshot(agent.id);
@@ -223,7 +224,7 @@ it("keeps one coordinator policy in required context when the native preset owns
     expect(policyCopies(request)).toBe(1);
     expect(runtimeText(request)).toContain(coordinatorPrompt);
     expect(runtimeText(request)).toContain("Paths:");
-    expect(runtimeText(request)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(request)).toContain(JSON.stringify(join(f.root, "context", "index.md")));
     expect(runtimeText(request)).toContain("Worker state sampled for this user input");
 
     // Native history retains previous runtime snapshots. Check the current
@@ -234,7 +235,7 @@ it("keeps one coordinator policy in required context when the native preset owns
     const ordinary = f.adapter.requests.at(-1)!;
     expect(systemText(ordinary)).toContain(coordinatorPrompt);
     expect(runtimeText(ordinary)).not.toContain(coordinatorPrompt);
-    expect(runtimeText(ordinary)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(ordinary)).toContain(JSON.stringify(join(f.root, "context", "index.md")));
     expect(ordinary.messages).toContainEqual(fallbackSnapshot);
     expect(
       `${systemText(ordinary)}\n${runtimeText(ordinary)}`.split(coordinatorPrompt),
@@ -246,7 +247,7 @@ it("keeps one coordinator policy in required context when the native preset owns
     const restored = f.adapter.requests.at(-1)!;
     expect(systemText(restored)).toBe(completePrompt);
     expect(runtimeText(restored)).toContain(coordinatorPrompt);
-    expect(runtimeText(restored)).toContain(`${f.root}/context/index.md`);
+    expect(runtimeText(restored)).toContain(JSON.stringify(join(f.root, "context", "index.md")));
     expect(
       `${systemText(restored)}\n${runtimeText(restored)}`.split(coordinatorPrompt),
     ).toHaveLength(2);

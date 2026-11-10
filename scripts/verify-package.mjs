@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+import { npmInvocation } from "./project-mode.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const nested = join(root, "packages/project-mode");
@@ -32,13 +33,15 @@ assert.ok(
 const gitRef = process.argv
   .find((a) => a.startsWith("--git-ref="))
   ?.slice("--git-ref=".length);
-const run = (cmd, args, cwd) =>
-  execFileSync(cmd, args, {
+const run = (cmd, args, cwd) => {
+  const invocation = cmd === "npm" ? npmInvocation(args) : { command: cmd, args };
+  return execFileSync(invocation.command, invocation.args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 12 * 1024 * 1024,
   });
+};
 const temp = await mkdtemp(join(tmpdir(), "project-mode-release-"));
 const results = [];
 await mkdir(dist, { recursive: true });
@@ -47,7 +50,7 @@ try {
     ["npm", nested],
     ["forwarder", root],
   ]) {
-    const [pack] = JSON.parse(
+    const [pack] = Object.values(JSON.parse(
       run(
         "npm",
         [
@@ -60,7 +63,7 @@ try {
         ],
         cwd,
       ),
-    );
+    ));
     const files = pack.files.map((f) => f.path);
     assert.ok(files.length > 25);
     assert.ok(
@@ -164,7 +167,7 @@ try {
     );
     run(
       "npm",
-      ["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
+      ["install", "--prefer-offline", "--ignore-scripts", "--no-audit", "--no-fund"],
       consumer,
     );
     await writeFile(join(consumer, "native-fixture.mjs"), fixture);

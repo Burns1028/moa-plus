@@ -9,6 +9,12 @@ import { promisify } from "node:util";
 import { isAbsolute, join, relative } from "node:path";
 
 const exec = promisify(execFile);
+// The Host is a Node process (Desktop uses Electron's inherited Node mode).
+// Keep paths in argv and run these fixed operations through the native sandbox.
+const makeDirectory =
+  "require('node:fs/promises').mkdir(process.argv[1], { recursive: true }).catch(error => { console.error(error); process.exitCode = 1; });";
+const removeFile =
+  "require('node:fs/promises').rm(process.argv[1], { force: true }).catch(error => { console.error(error); process.exitCode = 1; });";
 
 export type MoAWorkspaceRecord =
   | {
@@ -237,7 +243,7 @@ export class MoAWorkspaceManager {
       if (!(await fs.stat(cwdTarget, input.signal)))
         await this.runCommand(
           directory,
-          ["mkdir", "-p", "--", fs.processPath(cwdTarget)],
+          [process.execPath, "-e", makeDirectory, "--", fs.processPath(cwdTarget)],
           input.signal,
         );
     } catch (error) {
@@ -323,7 +329,7 @@ export class MoAWorkspaceManager {
   }
 
   private async runRemove(cwd: string, path: string) {
-    await this.runCommand(cwd, ["rm", "-f", "--", path]);
+    await this.runCommand(cwd, [process.execPath, "-e", removeFile, "--", path]);
   }
 
   restore(record: MoAWorkspaceRecord): MoAWorkspaceRecord {
@@ -395,11 +401,17 @@ export class MoAWorkspaceManager {
       ["worktree", "list", "--porcelain"],
       signal,
     );
-    const entry = listing
-      .split("\n\n")
-      .find((item) =>
-        item.split("\n").includes(`worktree ${record.worktreeRoot}`),
-      );
+    const worktree = await fs.resolve(record.worktreeRoot, { signal });
+    let entry: string | undefined;
+    for (const item of listing.split("\n\n")) {
+      const path = item.split("\n").find((line) => line.startsWith("worktree "));
+      if (path === undefined) continue;
+      const listed = await fs.resolve(path.slice("worktree ".length), { signal });
+      if (listed.targetKey === worktree.targetKey) {
+        entry = item;
+        break;
+      }
+    }
     if (
       entry &&
       !entry.split("\n").includes(`branch refs/heads/${record.branch}`)

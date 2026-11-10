@@ -17,12 +17,13 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir, homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, delimiter } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const script = join(root, "scripts/project-mode.mjs");
 const markerName = ".project-mode-runtime.json";
+const fakeNpmName = process.platform === "win32" ? "npm-cli.js" : "npm";
 const digest = (path) =>
   createHash("sha256").update(readFileSync(path)).digest("hex");
 function temporary(t) {
@@ -182,7 +183,7 @@ test("setup rejects a symlink and a directory reached through a symlink", (t) =>
   const directory = temporary(t);
   const target = join(directory, "target");
   mkdirSync(target);
-  symlinkSync(target, join(directory, "link"), "dir");
+  symlinkSync(target, join(directory, "link"), process.platform === "win32" ? "junction" : "dir");
   for (const path of [
     join(directory, "link"),
     join(directory, "link", "child"),
@@ -196,7 +197,7 @@ test("setup rejects a symlink and a directory reached through a symlink", (t) =>
 
 test("setup rejects personal DSH and application paths before writing", (t) => {
   const bin = temporary(t);
-  const fakeNpm = join(bin, "npm");
+  const fakeNpm = join(bin, fakeNpmName);
   writeFileSync(fakeNpm, `#!${process.execPath}\nprocess.exit(97);\n`);
   chmodSync(fakeNpm, 0o755);
   for (const directory of [
@@ -211,7 +212,7 @@ test("setup rejects personal DSH and application paths before writing", (t) => {
       {
         cwd: root,
         encoding: "utf8",
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
       },
     );
     assert.notEqual(result.status, 0);
@@ -276,7 +277,7 @@ test("failed dependency setup stays unready and can retry without losing home da
   const bin = join(directory, "bin");
   mkdirSync(bin);
   const log = join(directory, "npm-calls.jsonl");
-  const fake = join(bin, "npm");
+  const fake = join(bin, fakeNpmName);
   writeFileSync(
     fake,
     `#!${process.execPath}\nimport {appendFileSync} from 'node:fs';\nif(process.argv[2]==='--version'){console.log('11.0.0');process.exit(0)}\nappendFileSync(${JSON.stringify(log)}, JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),home:process.env.DSH_HOME,agents:process.env.DSH_AGENTS_HOME})+'\\n');\nprocess.exit(37);\n`,
@@ -287,7 +288,7 @@ test("failed dependency setup stays unready and can retry without losing home da
     spawnSync(process.execPath, [script, "setup", "--dir", setup], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
     });
   const result = invoke();
   assert.notEqual(result.status, 0);
@@ -415,7 +416,7 @@ test("successful setup never embeds its runtime path in a shell command", (t) =>
   const setup = join(directory, "runtime-$(literal)-`literal`");
   const bin = join(directory, "bin");
   mkdirSync(bin);
-  const fake = join(bin, "npm");
+  const fake = join(bin, fakeNpmName);
   const version = JSON.parse(
     readFileSync(join(root, "package.json"), "utf8"),
   ).version;
@@ -431,7 +432,7 @@ test("successful setup never embeds its runtime path in a shell command", (t) =>
     {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
     },
   );
   assert.equal(result.status, 0, result.stderr);
@@ -542,10 +543,10 @@ test("retry never overwrites a file through an existing artifact symlink", (t) =
     readFileSync(join(root, "package.json"), "utf8"),
   ).version;
   const filename = `dsh-plugin-project-mode-${version}.tgz`;
-  symlinkSync(outside, join(setup, "artifacts", filename));
+  try { symlinkSync(outside, join(setup, "artifacts", filename)); } catch (error) { if (process.platform === "win32" && error.code === "EPERM") { t.skip("File symlinks require Windows Developer Mode or privilege"); return; } throw error; }
   const bin = join(directory, "bin");
   mkdirSync(bin);
-  const fake = join(bin, "npm");
+  const fake = join(bin, fakeNpmName);
   writeFileSync(
     fake,
     `#!${process.execPath}\nimport{writeFileSync}from'node:fs';import{join}from'node:path';const args=process.argv.slice(2);if(args[0]==='pack'){writeFileSync(join(args[args.indexOf('--pack-destination')+1],${JSON.stringify(filename)}),'packed');console.log(JSON.stringify([{name:'dsh-plugin-project-mode',version:${JSON.stringify(version)},filename:${JSON.stringify(filename)}}]));}else if(args[0]==='install')process.exit(37);else console.log('11.0.0');\n`,
@@ -557,7 +558,7 @@ test("retry never overwrites a file through an existing artifact symlink", (t) =
     {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
     },
   );
   assert.notEqual(result.status, 0);
@@ -587,13 +588,13 @@ test("setup retry validates one original backup per package despite upgrade prei
     const reverse = spawnSync(
       "git",
       [
-        "apply",
+        "-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply",
         "--reverse",
         "--unsafe-paths",
         `--directory=${stock}`,
-        join(root, "compat/rc3", entry.runtimePatch),
+        "-",
       ],
-      { cwd: root, encoding: "utf8" },
+      { cwd: root, encoding: "utf8", input: readFileSync(join(root, "compat/rc3", entry.runtimePatch), "utf8").replaceAll("\r\n", "\n") },
     );
     assert.equal(reverse.status, 0, reverse.stderr);
     const backup = join(
@@ -607,17 +608,17 @@ test("setup retry validates one original backup per package despite upgrade prei
     const bin = join(directory, "bin");
     mkdirSync(bin);
     writeFileSync(
-      join(bin, "npm"),
+      join(bin, fakeNpmName),
       `#!${process.execPath}\nif(process.argv[2]==='--version')console.log('11.0.0');else process.exit(37);\n`,
     );
-    chmodSync(join(bin, "npm"), 0o755);
+    chmodSync(join(bin, fakeNpmName), 0o755);
     const result = spawnSync(
       process.execPath,
       [script, "setup", "--dir", directory],
       {
         cwd: root,
         encoding: "utf8",
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
       },
     );
     assert.notEqual(result.status, 0);
@@ -633,7 +634,7 @@ test("setup retry validates one original backup per package despite upgrade prei
       {
         cwd: root,
         encoding: "utf8",
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
       },
     );
     assert.match(rejected.stderr, /backup integrity changed/);
@@ -642,7 +643,7 @@ test("setup retry validates one original backup per package despite upgrade prei
 
 test(
   "Ctrl+C reaches the native child and the launcher exits with it",
-  { timeout: 10_000 },
+  { timeout: 10_000, skip: process.platform === "win32" ? "process.kill(SIGINT) is termination on Windows, not a console Ctrl+C event" : false },
   async (t) => {
     const { directory, modules } = readyFixture(t);
     writeFileSync(

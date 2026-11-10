@@ -1,0 +1,12 @@
+diff --git a/lib/index.js b/lib/index.js
+index 8d9f3b0..b5f9719 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -34,6 +34,7 @@ const FS_ERROR_CODES = [
+ 	"FS_TOO_LARGE",
+ 	"FS_PERMISSION_DENIED",
+ 	"FS_SANDBOX_DENIED",
++	"FS_READ_ONLY_PATH",
+ 	"FS_IO_ERROR",
+ 	"FS_STALE_VERSION",
+ 	"FS_NOT_OBSERVED",

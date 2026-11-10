@@ -1093,7 +1093,7 @@ function outcomeVerifierPrompt(rubricPath) {
 
 This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
 
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require Bash merely to inspect it. Inspect file artifacts with available native tools and personally run relevant Bash/build/tests where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Rubric file: ${rubricPath}`;
+Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Inspect file artifacts with available native tools and personally run relevant shell/build/tests with the available native shell (Bash or PowerShell) where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1551,13 +1551,18 @@ function bindCompletion(host) {
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
 			control.throwIfAborted();
 			const offset = pair.verifier.agent.session.snapshotEvents().length;
-			const successfulBash = /* @__PURE__ */ new Set();
+			const shellKind = (name) => ["bash", "pwsh"].includes(name.toLowerCase());
+			const successfulShell = /* @__PURE__ */ new Set();
 			stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-				if (exec.agent !== pair.verifier.agent || exec.name.toLowerCase() !== "bash" || result.isError) return;
+				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || result.isError) return;
 				const value = result.value;
-				if (!value || typeof value !== "object" || Array.isArray(value) || value.kind !== "foreground" || value.exitCode !== 0 || value.timedOut !== false || value.aborted !== false || value.signal !== null) return;
+				const foregroundPassed = value && typeof value === "object" && !Array.isArray(value) && value.kind === "foreground" && value.exitCode === 0 && value.timedOut === false && value.aborted === false && value.signal === null;
+				const meta = result.meta;
+				const nativeShell = meta && typeof meta === "object" && !Array.isArray(meta) ? meta.nativeShell : void 0;
+				const persistentPassed = nativeShell && typeof nativeShell === "object" && !Array.isArray(nativeShell) && nativeShell.kind === exec.name.toLowerCase() && nativeShell.completed === true && nativeShell.exitCode === 0 && nativeShell.signal === null && nativeShell.timedOut === false && nativeShell.aborted === false;
+				if (!foregroundPassed && !persistentPassed) return;
 				const call = pair.verifier.agent.session.snapshotEvents().filter((event) => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
-				if (call) successfulBash.add(call.seq);
+				if (call) successfulShell.add(call.seq);
 			});
 			clearCandidate = pair.freezeCandidate(answer, control);
 			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
@@ -1567,7 +1572,7 @@ function bindCompletion(host) {
 			const calls = events.filter((e) => e.type === "tool/call");
 			const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
 			const successfulCalls = calls.filter((e) => e.type === "tool/call" && results.some((result) => result.type === "tool/result" && result.data.step === e.data.step && result.data.message.toolCallId === e.data.callId));
-			const passedBash = successfulCalls.some((call) => successfulBash.has(call.seq)) || events.some((event) => event.type === "job/settled" && event.data.kind === "bash" && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some((call) => call.type === "tool/call" && call.data.name.toLowerCase() === "bash" && call.data.callId === event.data.toolCall?.rootCallId));
+			const passedShell = successfulCalls.some((call) => successfulShell.has(call.seq)) || events.some((event) => event.type === "job/settled" && shellKind(event.data.kind) && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some((call) => call.type === "tool/call" && call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId));
 			let verdict;
 			try {
 				const body = lastText(pair.verifier.agent, offset).trim();
@@ -1583,7 +1588,7 @@ function bindCompletion(host) {
 				agent.steer(msg("Outcome verification did not pass. Verifier must return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
 				return;
 			}
-			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || testsRequired && !passedBash) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || testsRequired && !passedShell) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
 		} catch (error) {
 			signal.throwIfAborted();
 			if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -1753,6 +1758,8 @@ function workerReportingInstructions(contextIndex, notes, archived) {
 }
 // src/host/moa/workspaces.ts
 const exec = promisify(execFile);
+const makeDirectory = "require('node:fs/promises').mkdir(process.argv[1], { recursive: true }).catch(error => { console.error(error); process.exitCode = 1; });";
+const removeFile = "require('node:fs/promises').rm(process.argv[1], { force: true }).catch(error => { console.error(error); process.exitCode = 1; });";
 /** Persist the record and retry destroy when preparation cleanup itself fails. */
 var MoAWorkspacePrepareError = class extends Error {
 	record;
@@ -1892,8 +1899,9 @@ var MoAWorkspaceManager = class {
 			const cwdTarget = await fs.resolve(record.directory, { signal: input.signal });
 			if (!fs.contains(worktreeTarget, cwdTarget)) throw new Error("project-mode/path-escape");
 			if (!await fs.stat(cwdTarget, input.signal)) await this.runCommand(directory, [
-				"mkdir",
-				"-p",
+				process.execPath,
+				"-e",
+				makeDirectory,
 				"--",
 				fs.processPath(cwdTarget)
 			], input.signal);
@@ -1958,8 +1966,9 @@ var MoAWorkspaceManager = class {
 	}
 	async runRemove(cwd, path) {
 		await this.runCommand(cwd, [
-			"rm",
-			"-f",
+			process.execPath,
+			"-e",
+			removeFile,
 			"--",
 			path
 		]);
@@ -1992,11 +2001,21 @@ var MoAWorkspaceManager = class {
 			const markerContent = await fs.readText(marker, signal);
 			if (markerContent !== expectedMarker && markerContent !== legacyMarker) throw new Error("project-mode/workspace-not-owned");
 		}
-		const entry = (await this.git(directory, [
+		const listing = await this.git(directory, [
 			"worktree",
 			"list",
 			"--porcelain"
-		], signal)).split("\n\n").find((item) => item.split("\n").includes(`worktree ${record.worktreeRoot}`));
+		], signal);
+		const worktree = await fs.resolve(record.worktreeRoot, { signal });
+		let entry;
+		for (const item of listing.split("\n\n")) {
+			const path = item.split("\n").find((line) => line.startsWith("worktree "));
+			if (path === void 0) continue;
+			if ((await fs.resolve(path.slice(9), { signal })).targetKey === worktree.targetKey) {
+				entry = item;
+				break;
+			}
+		}
 		if (entry && !entry.split("\n").includes(`branch refs/heads/${record.branch}`)) throw new Error("project-mode/workspace-not-owned");
 		const branch = await this.git(directory, [
 			"branch",

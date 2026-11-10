@@ -280,13 +280,21 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       control.throwIfAborted();
       const offset = pair.verifier.agent.session.snapshotEvents().length;
-      const successfulBash = new Set<number>();
+      const shellKind = (name: string) => ["bash", "pwsh"].includes(name.toLowerCase());
+      const successfulShell = new Set<number>();
       stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-        if (exec.agent !== pair.verifier.agent || exec.name.toLowerCase() !== "bash" || result.isError) return;
+        if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || result.isError) return;
         const value = result.value;
-        if (!value || typeof value !== "object" || Array.isArray(value) || value.kind !== "foreground" || value.exitCode !== 0 || value.timedOut !== false || value.aborted !== false || value.signal !== null) return;
+        const foregroundPassed = value && typeof value === "object" && !Array.isArray(value) && value.kind === "foreground" && value.exitCode === 0 && value.timedOut === false && value.aborted === false && value.signal === null;
+        // Persistent shells keep their public string result. Their native
+        // command owner attaches exit facts for this exact execution token;
+        // console text itself never proves success.
+        const meta = result.meta;
+        const nativeShell = meta && typeof meta === "object" && !Array.isArray(meta) ? meta.nativeShell : undefined;
+        const persistentPassed = nativeShell && typeof nativeShell === "object" && !Array.isArray(nativeShell) && nativeShell.kind === exec.name.toLowerCase() && nativeShell.completed === true && nativeShell.exitCode === 0 && nativeShell.signal === null && nativeShell.timedOut === false && nativeShell.aborted === false;
+        if (!foregroundPassed && !persistentPassed) return;
         const call = pair.verifier.agent.session.snapshotEvents().filter(event => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
-        if (call) successfulBash.add(call.seq);
+        if (call) successfulShell.add(call.seq);
       });
       clearCandidate = pair.freezeCandidate(answer, control);
       pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
@@ -296,7 +304,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const calls = events.filter((e) => e.type === "tool/call");
       const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
       const successfulCalls = calls.filter((e) => e.type === "tool/call" && results.some((result) => result.type === "tool/result" && result.data.step === e.data.step && result.data.message.toolCallId === e.data.callId));
-      const passedBash = successfulCalls.some(call => successfulBash.has(call.seq)) || events.some(event => event.type === "job/settled" && event.data.kind === "bash" && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.type === "tool/call" && call.data.name.toLowerCase() === "bash" && call.data.callId === event.data.toolCall?.rootCallId));
+      const passedShell = successfulCalls.some(call => successfulShell.has(call.seq)) || events.some(event => event.type === "job/settled" && shellKind(event.data.kind) && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.type === "tool/call" && call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId));
       let verdict: { status?: string; issues?: unknown };
       try {
         const body = lastText(pair.verifier.agent, offset).trim();
@@ -310,7 +318,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         agent.steer(msg("Outcome verification did not pass. Verifier must return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
         return;
       }
-      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || (testsRequired && !passedBash)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || (testsRequired && !passedShell)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
     } catch (error) {
       signal.throwIfAborted();
       if (!wake.signal.aborted && !host.closing.signal.aborted) {

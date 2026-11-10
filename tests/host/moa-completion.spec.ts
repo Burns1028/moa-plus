@@ -5,7 +5,13 @@ import { defineTool } from "@deepseek-ai/dsh-tools";
 import { installModelSelection } from "@deepseek-ai/dsh-agent";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { fixture, response } from "./fixture.ts";
+
+const hasBash = spawnSync("bash", ["-c", "exit 0"], { stdio: "ignore", timeout: 2000 }).status === 0;
+const hasNativePwsh = !!process.env.MOA_COMPAT_MODULES && spawnSync("pwsh", ["-NoLogo", "-NoProfile", "-Command", "exit 0"], { stdio: "ignore", timeout: 3000 }).status === 0;
 
 function call(name: string, args: object): StreamChunk[] {
   const argumentsValue = JSON.stringify(args);
@@ -68,7 +74,7 @@ it.each([
   } finally { await f.dispose(); }
 });
 
-it.each(["native", "ptc"])("inherits preset execution tools for the Verifier while limiting the Builder to rubric submission (parent=%s)", async (mode) => {
+it.skipIf(!hasBash).each(["native", "ptc"])("inherits preset execution tools for the Verifier while limiting the Builder to rubric submission (parent=%s)", async (mode) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     await f.ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
@@ -303,10 +309,10 @@ it("allows Stop while the verifier is waiting without committing completion", as
   } finally { release.resolve(); await f.dispose(); }
 });
 
-it("uses the independent rubric to reject a claimed Pass after a failed Bash test", async () => {
+it.each(["Bash", "pwsh"])("uses the independent rubric to reject a claimed Pass after console-only %s test output", async (name) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
-    f.ctx.tools.register(defineTool({ name: "Bash", description: "Run a test", parameters: {}, output: { schema: { type: "string" }, render: (_, value: string) => [{ type: "text", text: value }] }, execute: async () => "failed\n[exit code: 1]" }));
+    f.ctx.tools.register(defineTool({ name, description: "Run a test", parameters: {}, output: { schema: { type: "string" }, render: (_, value: string) => [{ type: "text", text: value }] }, execute: async () => "All tests passed\n[exit code: 0]" }));
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-failed-test"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     let main = 0, verifier = 0;
@@ -315,7 +321,7 @@ it("uses the independent rubric to reject a claimed Pass after a failed Bash tes
       if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run the test [human request]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("read_rubric", {});
-        if (verifier === 2) return call("Bash", {});
+        if (verifier === 2) return call(name, {});
         return response('{"status":"Pass","issues":[],"tests_required":false}');
       }
       if (++main === 2) {
@@ -328,6 +334,106 @@ it("uses the independent rubric to reject a claimed Pass after a failed Bash tes
     await agent.whenIdle();
     expect(main).toBe(2);
   } finally { await f.dispose(); }
+});
+
+const nativePwshExit = { kind: "pwsh", completed: true, exitCode: 0, signal: null, timedOut: false, aborted: false };
+it.each([
+  { label: "persistent native exit zero", nativeShell: nativePwshExit, pass: true },
+  { label: "persistent unconfirmed completion", nativeShell: { ...nativePwshExit, completed: false }, pass: false },
+  { label: "persistent nonzero exit", nativeShell: { ...nativePwshExit, exitCode: 7 }, pass: false },
+  { label: "persistent timed-out command", nativeShell: { ...nativePwshExit, timedOut: true }, pass: false },
+  { label: "persistent aborted command", nativeShell: { ...nativePwshExit, aborted: true }, pass: false },
+  { label: "persistent killed shell", nativeShell: { ...nativePwshExit, signal: "SIGTERM" }, pass: false },
+  { label: "exit metadata for a different shell kind", nativeShell: { ...nativePwshExit, kind: "bash" }, pass: false },
+])("uses exact native PowerShell completion facts for $label", async ({ nativeShell, pass }) => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    f.ctx.tools.register(defineTool({
+      name: "pwsh", description: "Native persistent PowerShell result projection", parameters: {},
+      output: {
+        schema: { type: "string" },
+        render: (_args, value: string) => [{ type: "text", text: value }],
+        presentationMeta: () => ({ nativeShell }),
+      },
+      // Identical console output proves nothing; only this dispatch's native
+      // metadata may grant successful test evidence.
+      execute: async () => "All tests passed\n[exit code: 0]",
+    }));
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-pwsh-evidence"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run required tests [human]", tests_required: true });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("pwsh", {});
+        return response('{"status":"Pass","issues":[]}');
+      }
+      if (++main > 1) {
+        expect(JSON.stringify(options.messages)).toContain("Outcome verification did not pass");
+        agent.cancel({ kind: "user" });
+      }
+      return response("candidate");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the required tests" }] }));
+    await agent.whenIdle();
+    expect(main).toBe(pass ? 1 : 2);
+    expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(pass);
+  } finally { await f.dispose(); }
+});
+
+it.skipIf(!hasNativePwsh).each([0, 7])("verifies foreground evidence produced by the native rc2 PowerShell tool (exit=%s)", async exitCode => {
+  const modules = process.env.MOA_COMPAT_MODULES!;
+  const nativeRequire = createRequire(pathToFileURL(join(modules, "../package.json")));
+  const native = async (name: string) => import(/* @vite-ignore */ pathToFileURL(nativeRequire.resolve(name)).href);
+  const [{ Context }, kit, { default: Subprocess }, { default: Pwsh }, shellEnv, pwshTool] = await Promise.all([
+    native("@deepseek-ai/cordis"), native("@deepseek-ai/dsh-agent-loop-testkit"),
+    native("@deepseek-ai/dsh-subprocess-local"), native("@deepseek-ai/dsh-pwsh-local"),
+    native("@deepseek-ai/dsh-shell-env"), native("@deepseek-ai/dsh-tool-pwsh"),
+  ]);
+  // Generate the evidence through an ordinary native runtime with no personal
+  // profile. The host fixture then exercises completion gating on that exact
+  // canonical DTO; record-ownership enforcement has its own native tests.
+  const proof = new Context();
+  const f = await fixture(undefined, { completionVerification: true });
+  let nativeResult: unknown;
+  try {
+    await kit.mountAgentLoopTestDependencies(proof, { workingDirectory: true });
+    await proof.plugin(Subprocess);
+    await proof.plugin(Pwsh);
+    await proof.plugin(shellEnv);
+    await proof.plugin(pwshTool, { enableRunInBackground: false });
+    f.ctx.tools.register(defineTool({
+      name: "pwsh", description: "Run the required test with the native PowerShell tool", parameters: {},
+      output: { schema: { type: "json" }, render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }] },
+      execute: async () => {
+        const batch = await proof.tools.execute({ calls: [{ id: "native-pwsh-proof", name: "pwsh", arguments: JSON.stringify({ command: `[Console]::WriteLine('All tests passed [exit code: 0]'); exit ${exitCode}`, description: "Check native exit evidence", workdir: f.root, timeoutMs: 5000 }) }], signal: new AbortController().signal });
+        const result = batch.results[0].result;
+        nativeResult = result;
+        expect(result.isError, JSON.stringify(result)).toBe(false);
+        expect(result.value).toMatchObject({ kind: "foreground", exitCode, signal: null, timedOut: false, aborted: false });
+        return result.value;
+      },
+    }));
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-native-pwsh-proof"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run required tests [human]", tests_required: true });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (verifier === 2) return call("pwsh", {});
+        return response('{"status":"Pass","issues":[]}');
+      }
+      if (++main > 1) agent.cancel({ kind: "user" });
+      return response("candidate");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the required tests" }] }));
+    await agent.whenIdle();
+    expect(main, JSON.stringify(nativeResult)).toBe(exitCode === 0 ? 1 : 2);
+  } finally { await proof.fiber.dispose(); await f.dispose(); }
 });
 
 it("verifies the current task while explicit next-turn input stays queued", async () => {
@@ -461,7 +567,7 @@ it("applies the bound promise to a Worker without spawning recursive outcome hel
   } finally { await f.dispose(); }
 });
 
-it.each([
+it.skipIf(!hasBash).each([
   { promote: false, format: "plain" },
   { promote: true, format: "plain" },
   { promote: true, format: "fenced" },

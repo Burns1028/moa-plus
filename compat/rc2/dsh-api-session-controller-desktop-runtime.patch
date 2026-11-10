@@ -1,0 +1,15 @@
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -2346,11 +2346,7 @@ window.__ModuleLoader__.load({
+ 						content,
+ 						clientTimeZone
+ 					}, signal);
+-				} else if (content.some((part) => part.type === "file")) result = {
+-					ok: false,
+-					error: new RemoteError("subagent/attachment-invalid", "subagent continuation does not accept files", { reason: "SUBAGENT_FILE_UNSUPPORTED" })
+-				};
+-				else {
++				} else {
+ 					const routedContent = content;
+ 					const routed = await this.remote.subagents.prompt({
+ 						requestId: requestId ?? randomUUID(),

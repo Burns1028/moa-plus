@@ -1,0 +1,84 @@
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -4703,6 +4703,7 @@ window.__ModuleLoader__.load({
+ 			input;
+ 			/** The per-session composer-block registry. */
+ 			blocks;
++			submission;
+ 			/** Live upload state per draft that uploads when added: every file draft and every uploaded image draft. */
+ 			fileUploads = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)({});
+ 			draftAttachments = /* @__PURE__ */ new Map();
+@@ -4722,6 +4723,7 @@ window.__ModuleLoader__.load({
+ 				super(ctx, "conversation");
+ 				this.input = config.input;
+ 				this.blocks = config.blocks;
++				this.submission = config.submission;
+ 				this.maxConcurrentFileUploads = config.maxConcurrentFileUploads;
+ 				ctx.effect(() => async () => {
+ 					const operations = [...this.fileUploadOperations.values()];
+@@ -16371,6 +16373,31 @@ window.__ModuleLoader__.load({
+ 		var ComposerSubmissionPolicy = class {
+ 			/** Reactive preference source for the composer bar and the Settings row. */
+ 			busyEnter = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(DEFAULT_BUSY_ENTER_BEHAVIOR);
++			overrides = new Map();
++			overrideRevision = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(0);
++			register(sessionId, behavior) {
++				const token = Symbol();
++				const entries = this.overrides.get(sessionId) ?? new Map();
++				entries.set(token, behavior);
++				this.overrides.set(sessionId, entries);
++				this.overrideRevision.set(this.overrideRevision.getSnapshot() + 1);
++				return () => {
++					if (!entries.delete(token)) return;
++					if (entries.size === 0) this.overrides.delete(sessionId);
++					this.overrideRevision.set(this.overrideRevision.getSnapshot() + 1);
++				};
++			}
++			forSession(sessionId) {
++				if (sessionId === void 0) return this.busyEnter;
++				return {
++					getSnapshot: () => [...(this.overrides.get(sessionId)?.values() ?? [])].at(-1) ?? this.busyEnter.getSnapshot(),
++					subscribe: (listener) => {
++						const offPreference = this.busyEnter.subscribe(listener);
++						const offOverride = this.overrideRevision.subscribe(listener);
++						return () => { offPreference(); offOverride(); };
++					}
++				};
++			}
+ 			unsubscribe;
+ 			host;
+ 			/**
+@@ -21881,7 +21908,6 @@ window.__ModuleLoader__.load({
+ 			const intakeFiles = (0, react.useCallback)((files, directories) => {
+ 				if (uploadDenied || locked || machineBusy || subagent !== null && !continuable || addFiles === void 0 || files.length === 0) return;
+ 				const rejected = (() => {
+-					if (continuable && files.some((file) => directories?.has(file) || !isImageMediaType(file.type))) return t("image.unsupportedType");
+ 					if (imageLimits !== void 0) {
+ 						const mediaTypes = imageLimits.mediaTypes;
+ 						const images = files.filter((file) => mediaTypes.includes(file.type));
+@@ -22095,7 +22121,7 @@ window.__ModuleLoader__.load({
+ 											ref: fileInputRef,
+ 											type: "file",
+ 											multiple: true,
+-											disabled: !canAcceptDrop || subagent !== null,
++											disabled: !canAcceptDrop || subagent !== null && !continuable,
+ 											hidden: true,
+ 											onChange: onPickFiles
+ 										}),
+@@ -23094,7 +23120,7 @@ window.__ModuleLoader__.load({
+ 						},
+ 						hooks: {
+ 							stopShortcut,
+-							busyEnter: submissionPolicy.busyEnter,
++							busyEnter: submissionPolicy.forSession(sessionId),
+ 							fileUploads: conversation.fileUploads,
+ 							notices: shell.notices,
+ 							lexicon: shell.lexicon,
+@@ -23122,6 +23148,7 @@ window.__ModuleLoader__.load({
+ 			ctx.plugin(ConversationController, {
+ 				input: inputHub,
+ 				blocks: composerBlocks,
++				submission: submissionPolicy,
+ 				maxConcurrentFileUploads
+ 			});
+ 			ctx.plugin(todoDockEntry);

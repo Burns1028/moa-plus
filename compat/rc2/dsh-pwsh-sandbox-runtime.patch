@@ -1,0 +1,28 @@
+diff --git a/lib/index.js b/lib/index.js
+index 3f94db7..3fb3f4b 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,4 +1,4 @@
+-import { SandboxUnavailableError } from "@deepseek-ai/dsh-sandbox";
++import { ReadOnlyPathUnsupportedError, SandboxUnavailableError } from "@deepseek-ai/dsh-sandbox";
+ import { PwshLocalExecutor } from "@deepseek-ai/dsh-pwsh-local";
+ import { accessSync, constants, statSync } from "node:fs";
+ //#region lib/types/helpers.js
+@@ -122,6 +122,7 @@ var SandboxPwshExecutor = class SandboxPwshExecutor extends PwshLocalExecutor {
+ 		"sandboxPolicy"
+ 	];
+ 	mode;
++	get supportsReadOnlyPaths() { return this.ctx.sandbox.supportsReadOnlyPaths === true ? true : void 0; }
+ 	/**
+ 	* Per-process confinement facts retained until settlement. Providers may
+ 	* vary enforcement and diagnostic dialect between overlapping calls, so a
+@@ -151,7 +152,8 @@ var SandboxPwshExecutor = class SandboxPwshExecutor extends PwshLocalExecutor {
+ 	async execute(spec) {
+ 		const policy = spec.sandboxPolicy;
+ 		const { mode } = policy;
+-		if (mode === "danger-full-access") return SandboxPwshExecutor.decorateResult(await super.execute(spec), (result) => ({
++		if (policy.readOnlyPaths?.length && !this.supportsReadOnlyPaths) throw new ReadOnlyPathUnsupportedError("the selected process sandbox cannot enforce session readonly paths; use the matching native sandbox provider");
++		if (mode === "danger-full-access" && !policy.readOnlyPaths?.length) return SandboxPwshExecutor.decorateResult(await super.execute(spec), (result) => ({
+ 			...result,
+ 			sandbox: {
+ 				mode,

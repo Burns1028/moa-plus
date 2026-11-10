@@ -7,6 +7,8 @@ import {
   copyFile,
   rm,
   realpath,
+  cp,
+  readdir,
 } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -47,12 +49,12 @@ async function originalRuntime() {
       expect(hash(await readFile(target))).toBe(file.after);
     }
     if (entry.files.some((file: any) => file.file.endsWith(".js"))) execFileSync("git", [
-      "apply",
+      "-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply",
       "--reverse",
       "--unsafe-paths",
       `--directory=${packageRoot}`,
-      join(root, "compat/rc3", entry.runtimePatch),
-    ]);
+      "-",
+    ], { input: (await readFile(join(root, "compat/rc3", entry.runtimePatch), "utf8")).replaceAll("\r\n", "\n") });
   }
   return { directory, modules, variants };
 }
@@ -89,6 +91,42 @@ it("preflights, backs up and patches native runtimes at paths with spaces, with 
           hash(await readFile(join(backup, entry.package, file.file))),
         ).toBe(file.before);
       }
+  } finally {
+    await rm(f.directory, { recursive: true, force: true });
+  }
+});
+it("applies checked-out CRLF patches without changing the audited runtime bytes", async () => {
+  const f = await originalRuntime();
+  try {
+    const checkout = join(f.directory, "Windows checkout");
+    await mkdir(join(checkout, "scripts"), { recursive: true });
+    await copyFile(script, join(checkout, "scripts/apply-native-compat.mjs"));
+    await cp(join(root, "compat/rc3"), join(checkout, "compat/rc3"), { recursive: true });
+    for (const file of await readdir(join(checkout, "compat/rc3"))) {
+      if (!file.endsWith(".patch")) continue;
+      const target = join(checkout, "compat/rc3", file);
+      await writeFile(target, (await readFile(target, "utf8")).replace(/\r?\n/g, "\r\n"));
+    }
+    execFileSync(process.execPath, [join(checkout, "scripts/apply-native-compat.mjs"), "--modules", f.modules, "--runtime-only", "--backup", join(f.directory, "backup")]);
+    for (const entry of f.variants)
+      for (const file of entry.files.filter((file: any) => file.file.endsWith(".js")))
+        expect(hash(await readFile(join(f.modules, entry.package, file.file)))).toBe(file.after);
+  } finally {
+    await rm(f.directory, { recursive: true, force: true });
+  }
+});
+it("reports unsupported runtime versions before changing any native package", async () => {
+  const f = await originalRuntime();
+  try {
+    await writeFile(join(f.modules, "@deepseek-ai/dsh-agent/package.json"), JSON.stringify({ version: "0.9.0" }));
+    let failure: any;
+    try {
+      execFileSync(process.execPath, [script, "--modules", f.modules, "--runtime-only", "--backup", join(f.directory, "backup")], { stdio: "pipe" });
+    } catch (error) { failure = error; }
+    expect(failure).toBeDefined();
+    expect(String(failure.stderr)).toContain("Unsupported DSH runtime 0.9.0");
+    const first = f.variants[0], file = first.files[0];
+    expect(hash(await readFile(join(f.modules, first.package, file.file)))).toBe(file.before);
   } finally {
     await rm(f.directory, { recursive: true, force: true });
   }
