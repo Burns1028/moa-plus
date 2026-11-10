@@ -1,4 +1,4 @@
-![MoA+ — Intelligence, multiplied. 面向 DeepSeek Harness 的持久化 Agent、直接协作与共享上下文。](docs/media/moa-plus-banner.png)
+![MoA+ — Intelligence, multiplied. Coordinator 连接四个 Worker，通过直接通信与共享上下文协作。](docs/media/moa-plus-banner.png)
 
 # MoA+
 
