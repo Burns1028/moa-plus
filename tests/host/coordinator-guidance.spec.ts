@@ -113,7 +113,7 @@ it("explains role execution capabilities and explicit reply syntax in native too
   }
 });
 
-it("assembles adaptive scheduling guidance with the native wait contract", async () => {
+it("assembles adaptive scheduling guidance with native wait and history contracts", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
@@ -139,6 +139,12 @@ it("assembles adaptive scheduling guidance with the native wait contract", async
       properties: {
         wait: { enum: ["all", "selected"] },
         timeout_ms: { type: "integer" },
+        history_offset: {
+          description: expect.stringContaining("Must be supplied together with history_limit"),
+        },
+        history_limit: {
+          description: expect.stringContaining("Must be supplied together with history_offset"),
+        },
       },
     });
     expect(policy).toContain('wait="all"');

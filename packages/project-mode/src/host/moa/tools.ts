@@ -47,11 +47,13 @@ export function createQueryAgentTool(agents: MoAAgents) {
       },
       history_offset: {
         type: "integer",
-        description: "Newest-relative message offset",
+        description:
+          "Newest-relative message offset. Must be supplied together with history_limit.",
       },
       history_limit: {
         type: "integer",
-        description: "Number of human and AI messages",
+        description:
+          "Number of human and AI messages. Must be supplied together with history_offset.",
       },
     },
     output,
