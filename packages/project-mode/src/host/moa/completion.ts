@@ -40,8 +40,8 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
   const helpers = new Map<Agent, Helpers>();
   const mounted = new Map<Agent, () => void>();
   const running = new Map<Agent, Promise<Helpers>>();
-  const generations = new Map<Agent, string>();
-  const writes = new Map<Agent, Promise<void>>();
+  let generations = new WeakMap<Agent, string>();
+  const writes = new WeakMap<Agent, Promise<void>>();
   const retired = new Set<Promise<void>>();
   const recordFor = (id: SessionId) => host.record(id) ?? host.owner(id);
   const criteriaKey = (id: SessionId) => `${key}:${id}`;
@@ -372,7 +372,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const pair = helpers.get(agent); helpers.delete(agent); if (pair) await close(pair);
   });
   host.ctx.effect(() => async () => {
-    generations.clear();
+    generations = new WeakMap();
     for (const off of mounted.values()) off();
     mounted.clear();
     await Promise.all([...helpers.values()].map(close).concat([...retired]));

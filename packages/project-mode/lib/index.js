@@ -1180,8 +1180,8 @@ function bindCompletion(host) {
 	const helpers = /* @__PURE__ */ new Map();
 	const mounted = /* @__PURE__ */ new Map();
 	const running = /* @__PURE__ */ new Map();
-	const generations = /* @__PURE__ */ new Map();
-	const writes = /* @__PURE__ */ new Map();
+	let generations = /* @__PURE__ */ new WeakMap();
+	const writes = /* @__PURE__ */ new WeakMap();
 	const retired = /* @__PURE__ */ new Set();
 	const recordFor = (id) => host.record(id) ?? host.owner(id);
 	const criteriaKey = (id) => `${key}:${id}`;
@@ -1676,7 +1676,7 @@ function bindCompletion(host) {
 		if (pair) await close(pair);
 	});
 	host.ctx.effect(() => async () => {
-		generations.clear();
+		generations = /* @__PURE__ */ new WeakMap();
 		for (const off of mounted.values()) off();
 		mounted.clear();
 		await Promise.all([...helpers.values()].map(close).concat([...retired]));

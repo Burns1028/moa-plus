@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Avoid retaining disposed Agent contexts through completion generation and rubric-write bookkeeping; keep native write ordering and unload invalidation.
 - Add Adaptive Coordinator guidance for retained Worker reuse, useful-history forks, clean-context tasks, ready parallel branches, and native interruptible waits, while preserving direct handling of simple work.
 - Bundle five optional orchestration prompts: fan-out, panel-team, blackboard-team, critique-loop, and auto-orchestration. Enabled MoA Coordinators can expand them through native `@` candidate selection by click, Enter, or Tab; native Send, file references, uploads, queue, and steer retain their behavior. These are prompt texts over the existing tools and roles.
 - Let continuable Workers upload ordinary files through the native composer, streamed storage, receiving-Session receipts, and child admission. Retain native permissions, cancellation, and exact-request retry behavior.

@@ -142,6 +142,8 @@ The Builder uses the selected model's lowest supported reasoning effort for stru
 
 The Verifier submits its decision through a private `submit_verdict` tool and concludes its native turn. The existing frozen-candidate object holds that attempt's structured decision; it is replaced for the next attempt and released on exit or cancellation. Legacy plain/fenced JSON remains a fallback. Submission itself is excluded from inspection evidence, and the rubric-read, artifact inspection and required successful Bash checks still apply. Coordinator facts explain this automatic workflow using the same `completionVerification` setting that installs the gate; Workers do not receive the Coordinator-only guarantee.
 
+Generation and rubric-write sequencing are weakly keyed by the native Agent object, so these side tables do not retain disposed conversations. Unload replaces the generation table to invalidate earlier callbacks; live-Agent write ordering is unchanged.
+
 Both helpers run before the parent turn can close normally. A passing verdict permits native closure; the Host owns the actual inbox, resource-exit and turn-end checks. The rubric therefore evaluates task deliverables without requiring its own finished review or a later parent `turn/end` to exist already. Original human inputs retain chronological scope: later clarifications supersede conflicting earlier instructions, while commands about future work apply from their arrival unless explicitly retroactive. Explicit artifact, build and test requirements remain independently verified.
 
 ## Memory and UI boundaries

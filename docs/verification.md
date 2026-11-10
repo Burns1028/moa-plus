@@ -38,6 +38,10 @@ Real Ego-browser inspection confirmed live sidebar spinners, compact single-stat
 
 The fresh run reported 10,407,017 total tokens, including 10,021,888 cache-read tokens; all 126 streams supplied usage. Totals include the Coordinator, execution Worker and automatic helpers and are not a dollar-cost estimate. This repair establishes the tested execution and closure path; it does not establish that enabling MoA+ always improves results or latency. All owned evaluation hosts exited, temporary grading custody was restored with matching file/permission/symlink inventory, and private artifacts remain outside Git. PR #13 is still a draft pending the Blackboard lifecycle decision; no release or personal DSH replacement is included.
 
+### Completion bookkeeping cleanup — 2026-11-11
+
+A Stop That Shit review found two Agent-keyed side tables retaining disposed Agent objects until plugin unload. Generation identity and rubric-write ordering now use WeakMaps; unload replaces the generation table to preserve invalidation. Existing completion tests passed before and after this ownership-only change; the full **401 tests / 65 files**, both typechecks, build and **20 launcher checks with zero skips** passed afterwards. Client code, prompts, tool contracts and the native compatibility manifest are unchanged. The real-model/UI results above remain attributed to `50711b6`; this cleanup did not start another model or UI run.
+
 ## Current checkout: Worker attachments — 2026-11-10
 
 The current checkout implements the six-chapter MoA architecture and the [reviewed Worker attachment contract](native-worker-attachments-contract.md). Its matching compatibility manifest covers **21 native packages / 49 file paths**. The published **v0.2.0** release remains associated with its historical **19 packages / 43 paths** runtime and validation below; these revisions must not be mixed.
