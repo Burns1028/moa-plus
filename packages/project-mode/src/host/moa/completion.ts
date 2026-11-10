@@ -18,6 +18,8 @@ declare module "@deepseek-ai/dsh-llm" {
 
 const criteriaSchema = z.object({ criteria: z.string().min(1), promise: z.string().min(1) });
 const rubricSchema = z.object({ rubric: z.string().min(1), tests_required: z.boolean() });
+const verdictSchema = z.object({ status: z.enum(["Pass", "Partial", "Block"]), issues: z.array(z.string()) });
+type Verdict = z.infer<typeof verdictSchema>;
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
 const sourceVersionSchema = z.object({ path: z.string(), requirement: z.number().int().positive().nullable(), content: z.string().nullable() });
@@ -31,7 +33,7 @@ function lastText(agent: Agent, from = 0): string {
   const event = agent.session.snapshotEvents().slice(from).filter((e) => e.type === "assistant/message").at(-1);
   return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
-interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal): () => void }
+interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal): { readVerdict(): Verdict | undefined; dispose(): void } }
 
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
 export function bindCompletion(host: HostAccess): (agent: Agent) => void {
@@ -103,11 +105,14 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     generations.set(parent, generation);
     let rubric: string | undefined;
     let submitted: z.infer<typeof rubricSchema> | undefined;
-    let candidate: { answer: string; signal: AbortSignal } | undefined;
+    let candidate: { answer: string; signal: AbortSignal; verdict?: Verdict } | undefined;
     const freezeCandidate = (answer: string, signal: AbortSignal) => {
-      const snapshot = { answer, signal };
+      const snapshot: NonNullable<typeof candidate> = { answer, signal };
       candidate = snapshot;
-      return () => { if (candidate === snapshot) candidate = undefined; };
+      return {
+        readVerdict: () => snapshot.verdict,
+        dispose: () => { if (candidate === snapshot) candidate = undefined; },
+      };
     };
     const read = async (signal: AbortSignal) => {
       const fs = filesystem(parent);
@@ -169,6 +174,23 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
             candidate.signal.throwIfAborted();
             return candidate.answer;
           } }));
+          ctx.tools.register(defineTool({
+            name: "submit_verdict",
+            description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables. This ends the review; submission alone is not inspection or required test evidence.",
+            parameters: {
+              status: { type: "string", required: true, enum: ["Pass", "Partial", "Block"] },
+              issues: { type: "array", required: true, items: { type: "string" }, description: "Concrete remaining gaps; empty when no issues remain" },
+            },
+            output,
+            async execute(args, exec) {
+              if (!candidate) throw new Error("No active candidate review");
+              exec.signal.throwIfAborted();
+              candidate.signal.throwIfAborted();
+              candidate.verdict = verdictSchema.parse(args);
+              exec.concludeTurn();
+              return "Verdict submitted.";
+            },
+          }));
         }
         // Standard installs its own per-Agent delegation variant after setup.
         ctx.tools.suppress({ deny: hiddenDelegation });
@@ -261,7 +283,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const control = AbortSignal.any([signal, host.closing.signal, wake.signal]);
     let active: Helpers | undefined;
     let stopEvidence: (() => void) | undefined;
-    let clearCandidate: (() => void) | undefined;
+    let candidateReview: ReturnType<Helpers["freezeCandidate"]> | undefined;
     try {
       listener();
       let pending = running.get(agent);
@@ -288,10 +310,11 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         const call = pair.verifier.agent.session.snapshotEvents().filter(event => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
         if (call) successfulBash.add(call.seq);
       });
-      clearCandidate = pair.freezeCandidate(answer, control);
+      candidateReview = pair.freezeCandidate(answer, control);
       pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       await pair.read(control);
+      control.throwIfAborted();
       const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
       const calls = events.filter((e) => e.type === "tool/call");
       const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
@@ -299,18 +322,22 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const passedBash = successfulCalls.some(call => successfulBash.has(call.seq)) || events.some(event => event.type === "job/settled" && event.data.kind === "bash" && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.type === "tool/call" && call.data.name.toLowerCase() === "bash" && call.data.callId === event.data.toolCall?.rootCallId));
       let verdict: { status?: string; issues?: unknown };
       try {
-        const body = lastText(pair.verifier.agent, offset).trim();
-        try { verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch {
-          const fenced = body.split("```");
-          if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
-          verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+        const submittedVerdict = candidateReview.readVerdict();
+        if (submittedVerdict) verdict = submittedVerdict;
+        else {
+          const body = lastText(pair.verifier.agent, offset).trim();
+          try { verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch {
+            const fenced = body.split("```");
+            if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
+            verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+          }
+          if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
         }
-        if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
       } catch {
-        agent.steer(msg("Outcome verification did not pass. Verifier must return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
+        agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
         return;
       }
-      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || (testsRequired && !passedBash)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || (testsRequired && !passedBash)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
     } catch (error) {
       signal.throwIfAborted();
       if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -318,7 +345,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
       }
     } finally {
-      clearCandidate?.();
+      candidateReview?.dispose();
       stopEvidence?.();
       host.listeners.delete(listener);
       if (control.aborted && active?.verifier.agent.status === "running") active.verifier.agent.cancel({ kind: "parent" });

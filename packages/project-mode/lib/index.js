@@ -1093,7 +1093,7 @@ function outcomeVerifierPrompt(rubricPath) {
 
 This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
 
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require Bash merely to inspect it. Inspect file artifacts with available native tools and personally run relevant Bash/build/tests where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Rubric file: ${rubricPath}`;
+Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require Bash merely to inspect it. Inspect file artifacts with available native tools and personally run relevant Bash/build/tests where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1123,6 +1123,14 @@ const criteriaSchema = z.object({
 const rubricSchema = z.object({
 	rubric: z.string().min(1),
 	tests_required: z.boolean()
+});
+const verdictSchema = z.object({
+	status: z.enum([
+		"Pass",
+		"Partial",
+		"Block"
+	]),
+	issues: z.array(z.string())
 });
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
@@ -1263,8 +1271,11 @@ function bindCompletion(host) {
 				signal
 			};
 			candidate = snapshot;
-			return () => {
-				if (candidate === snapshot) candidate = void 0;
+			return {
+				readVerdict: () => snapshot.verdict,
+				dispose: () => {
+					if (candidate === snapshot) candidate = void 0;
+				}
 			};
 		};
 		const read = async (signal) => {
@@ -1366,6 +1377,36 @@ function bindCompletion(host) {
 							if (!candidate) throw new Error("No active candidate review");
 							candidate.signal.throwIfAborted();
 							return candidate.answer;
+						}
+					}));
+					ctx.tools.register(defineTool({
+						name: "submit_verdict",
+						description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables. This ends the review; submission alone is not inspection or required test evidence.",
+						parameters: {
+							status: {
+								type: "string",
+								required: true,
+								enum: [
+									"Pass",
+									"Partial",
+									"Block"
+								]
+							},
+							issues: {
+								type: "array",
+								required: true,
+								items: { type: "string" },
+								description: "Concrete remaining gaps; empty when no issues remain"
+							}
+						},
+						output: output$1,
+						async execute(args, exec) {
+							if (!candidate) throw new Error("No active candidate review");
+							exec.signal.throwIfAborted();
+							candidate.signal.throwIfAborted();
+							candidate.verdict = verdictSchema.parse(args);
+							exec.concludeTurn();
+							return "Verdict submitted.";
 						}
 					}));
 				}
@@ -1528,7 +1569,7 @@ function bindCompletion(host) {
 		]);
 		let active;
 		let stopEvidence;
-		let clearCandidate;
+		let candidateReview;
 		try {
 			listener();
 			let pending = running.get(agent);
@@ -1559,10 +1600,11 @@ function bindCompletion(host) {
 				const call = pair.verifier.agent.session.snapshotEvents().filter((event) => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
 				if (call) successfulBash.add(call.seq);
 			});
-			clearCandidate = pair.freezeCandidate(answer, control);
+			candidateReview = pair.freezeCandidate(answer, control);
 			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
 			await pair.read(control);
+			control.throwIfAborted();
 			const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
 			const calls = events.filter((e) => e.type === "tool/call");
 			const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
@@ -1570,20 +1612,24 @@ function bindCompletion(host) {
 			const passedBash = successfulCalls.some((call) => successfulBash.has(call.seq)) || events.some((event) => event.type === "job/settled" && event.data.kind === "bash" && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some((call) => call.type === "tool/call" && call.data.name.toLowerCase() === "bash" && call.data.callId === event.data.toolCall?.rootCallId));
 			let verdict;
 			try {
-				const body = lastText(pair.verifier.agent, offset).trim();
-				try {
-					verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-				} catch {
-					const fenced = body.split("```");
-					if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
-					verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+				const submittedVerdict = candidateReview.readVerdict();
+				if (submittedVerdict) verdict = submittedVerdict;
+				else {
+					const body = lastText(pair.verifier.agent, offset).trim();
+					try {
+						verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+					} catch {
+						const fenced = body.split("```");
+						if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
+						verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+					}
+					if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
 				}
-				if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
 			} catch {
-				agent.steer(msg("Outcome verification did not pass. Verifier must return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
+				agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
 				return;
 			}
-			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || testsRequired && !passedBash) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedBash) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
 		} catch (error) {
 			signal.throwIfAborted();
 			if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -1594,7 +1640,7 @@ function bindCompletion(host) {
 				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
 			}
 		} finally {
-			clearCandidate?.();
+			candidateReview?.dispose();
 			stopEvidence?.();
 			host.listeners.delete(listener);
 			if (control.aborted && active?.verifier.agent.status === "running") active.verifier.agent.cancel({ kind: "parent" });
@@ -3152,11 +3198,11 @@ function createQueryAgentTool(agents) {
 			},
 			history_offset: {
 				type: "integer",
-				description: "Newest-relative message offset"
+				description: "Newest-relative message offset. Must be supplied together with history_limit."
 			},
 			history_limit: {
 				type: "integer",
-				description: "Number of human and AI messages"
+				description: "Number of human and AI messages. Must be supplied together with history_offset."
 			}
 		},
 		output,
@@ -5323,10 +5369,13 @@ let ProjectMode = (() => {
 		}
 		roleText(agent) {
 			const own = this.record(agent.id);
-			if (own?.project.mode === "enabled") return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({
-				...own.project.paths,
-				contextIndex: contextIndexPath(own.project.paths)
-			})}`;
+			if (own?.project.mode === "enabled") {
+				const completion = this.config.completionVerification ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery." : "Automatic outcome verification is not enabled in this runtime.";
+				return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({
+					...own.project.paths,
+					contextIndex: contextIndexPath(own.project.paths)
+				})}\n${completion}`;
+			}
 			const parent = this.owner(agent.id);
 			return parent ? parent.operations[`moa:agent:${agent.id}`] ? workerPrompt : `${workerPrompt}\nPaths: ${JSON.stringify({
 				...parent.project.paths,
