@@ -20,6 +20,8 @@ import { nativeLoader } from "./native-loader.ts";
 import { submissionFixture } from "./submission-fixture.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { en } from "../../packages/project-mode/src/client/locales.ts";
+import type { WorkerMessageAttachment } from "../../packages/project-mode/src/shared/index.ts";
+import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 
 const dispose: (() => unknown)[] = [];
 afterEach(async () => {
@@ -28,7 +30,10 @@ afterEach(async () => {
   localStorage.clear();
   delete (window as any).__ModuleLoader__;
 });
-async function bench(inputText?: string) {
+async function bench(
+  inputText?: string,
+  attachments?: WorkerMessageAttachment[],
+) {
   const load = nativeLoader(),
     root = new Context();
   dispose.push(() => root.fiber.dispose());
@@ -109,6 +114,7 @@ async function bench(inputText?: string) {
                       inputText ??
                       `## Input ${workerId}\n\n- **Keep** this input as written.`,
                     actor: "user",
+                    ...(attachments ? { attachments } : {}),
                   },
                 ],
                 outputs: [
@@ -165,6 +171,48 @@ const t = (key: keyof typeof en, args?: Record<string, any>) =>
   String(en[key] ?? key).replace(/\{(\w+)\}/g, (_, key) =>
     String(args?.[key] ?? key),
   );
+
+it("shows attachment-only timeline input and opens its existing native file resource", async () => {
+  const b = await bench("", [
+    {
+      type: "image",
+      attachment: {
+        attachmentId: AttachmentId("e".repeat(64)),
+        name: "diagram.png",
+        mediaType: "image/png",
+        bytes: 31,
+        width: 2,
+        height: 3,
+      },
+      path: "/attachments/diagram.png",
+    },
+  ]);
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((e: any) => e.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  const openResource = vi.fn();
+  const signal = new AbortController().signal;
+  const ui = render(
+    <Component
+      {...entry.inject?.()}
+      sessionId={sid("parent")}
+      t={t}
+      useTabInfo={() => ({
+        tab: { visible: true, signal, actions: { openResource } },
+      })}
+    />,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "diagram.png" }));
+  expect(openResource).toHaveBeenCalledWith(
+    expect.stringContaining("diagram.png"),
+  );
+  expect(
+    [...ui.container.querySelectorAll("summary")].some(
+      (summary) => summary.textContent === "",
+    ),
+  ).toBe(false);
+});
 
 it.each([
   {

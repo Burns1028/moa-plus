@@ -4361,6 +4361,32 @@ var TurnCoordination = class {
 		}));
 	}
 };
+// src/host/message-content.ts
+/** Project visible dialogue without rewriting text or copying attachment content. */
+function messageContent(ctx, content, separator = "") {
+	const attachments = [];
+	for (const block of content) {
+		if (block.type !== "file" && block.type !== "image") continue;
+		const store = ctx.get("attachments");
+		const hostPath = block.type === "file" ? store?.fileHostPath(block.attachment) : store?.imageHostPath(block.attachment);
+		const path = hostPath && ctx.get("fs")?.processPathFromHostPath(hostPath);
+		const reference = block.type === "file" ? {
+			type: "file",
+			attachment: block.attachment
+		} : {
+			type: "image",
+			attachment: block.attachment
+		};
+		attachments.push({
+			...reference,
+			...path ? { path } : {}
+		});
+	}
+	return {
+		text: content.filter((block) => block.type === "text").map((block) => block.text).join(separator),
+		...attachments.length ? { attachments } : {}
+	};
+}
 // src/host/history.ts
 /** A relative window over committed dialogue, indexed from its newest message. */
 async function readHistory(host, parentId, workerId, offset, limit, signal) {
@@ -4378,14 +4404,14 @@ async function readHistory(host, parentId, workerId, offset, limit, signal) {
 			if (event.seq < observed.inheritedEventCount) continue;
 			const message = event.type === "assistant/message" ? event.data.message : event.type === "user/message" && (event.data.source.kind === "user" || event.data.source.kind === "project-mode-assignment" || event.data.source.kind === "moa-message") ? event.data : void 0;
 			if (!message) continue;
-			const text = message.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-			if (message.role === "assistant" && !text) continue;
+			const content = messageContent(host.ctx, message.content);
+			if (message.role === "assistant" && !content.text && !content.attachments?.length) continue;
 			messages.push({
 				id: message.id,
 				seq: event.seq,
 				turn,
 				role: message.role === "assistant" ? "assistant" : "user",
-				text
+				...content
 			});
 		}
 		return {
@@ -4440,16 +4466,16 @@ async function readWorkerTimeline(host, parentId, workerId, limit, signal) {
 				id: event.data.id,
 				seq: event.seq,
 				time: event.time,
-				text: event.data.content.filter((b) => b.type === "text").map((b) => b.text).join(""),
+				...messageContent(host.ctx, event.data.content),
 				actor: event.data.source.kind === "moa-message" ? event.data.source.senderId === record.project.coordinatorSessionId ? "coordinator" : "agent" : assignments.has(event.data.id) || event.data.source.kind === "project-mode-assignment" ? "coordinator" : "user"
 			});
 			if (event.type === "assistant/message" && event.data.turn === current.turn) {
-				const text = event.data.message.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-				current.outputs = text ? [{
+				const content = messageContent(host.ctx, event.data.message.content);
+				current.outputs = content.text || content.attachments?.length ? [{
 					id: event.data.message.id,
 					seq: event.seq,
 					time: event.time,
-					text
+					...content
 				}] : [];
 			}
 			if (event.type === "deliverables/presented" && event.data.turn === current.turn) for (const file of event.data.files) current.artifacts.push({
@@ -4653,18 +4679,18 @@ async function readWorkerActivity(host, workerId, signal, previewChars = host.co
 		signal?.throwIfAborted();
 		const coordinatorInputs = new Set(host.owner(workerId)?.assignments.filter((a) => a.workerId === workerId).flatMap((a) => a.messageId ? [a.messageId] : []));
 		const agent = host.ctx.agents.get(workerId);
-		if (agent) return summarize(agent.session.snapshotEvents(), agent.session.inheritedEventCount, agent.inbox.nextStep, agent.inbox.nextTurn, coordinatorInputs, previewChars);
+		if (agent) return summarize(host, agent.session.snapshotEvents(), agent.session.inheritedEventCount, agent.inbox.nextStep, agent.inbox.nextTurn, coordinatorInputs, previewChars);
 		const observed = _usingCtx$1.u(await observeForTurn(host.ctx, workerId, signal));
 		const inbox = observed.projections?.values.inbox;
 		if (!inbox) throw new Error("project-mode/worker-inbox-unavailable");
-		return summarize(observed.events, observed.inheritedEventCount, inbox["next-step"].map((value) => messageSchema.parse(value)), inbox["next-turn"].map((value) => messageSchema.parse(value)), coordinatorInputs, previewChars);
+		return summarize(host, observed.events, observed.inheritedEventCount, inbox["next-step"].map((value) => messageSchema.parse(value)), inbox["next-turn"].map((value) => messageSchema.parse(value)), coordinatorInputs, previewChars);
 	} catch (_) {
 		_usingCtx$1.e = _;
 	} finally {
 		_usingCtx$1.d();
 	}
 }
-function summarize(events, inherited, nextStep, nextTurn, coordinatorInputs, previewChars) {
+function summarize(host, events, inherited, nextStep, nextTurn, coordinatorInputs, previewChars) {
 	const admissions = /* @__PURE__ */ new Map();
 	const committed = [];
 	const actor = (message) => {
@@ -4675,11 +4701,12 @@ function summarize(events, inherited, nextStep, nextTurn, coordinatorInputs, pre
 	const input = (message, state, position) => {
 		const by = actor(message);
 		if (!by) return;
-		const text = message.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+		const { text, attachments } = messageContent(host.ctx, message.content, "\n");
 		return {
 			messageId: message.id,
 			actor: by,
 			text: text.slice(0, previewChars),
+			...attachments ? { attachments } : {},
 			truncated: text.length > previewChars,
 			state,
 			...position

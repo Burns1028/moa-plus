@@ -1,6 +1,7 @@
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import type { WorkerHistoryPage } from "../shared/index.ts";
 import type { HostAccess } from "./host-access.ts";
+import { messageContent } from "./message-content.ts";
 
 /** A relative window over committed dialogue, indexed from its newest message. */
 export async function readHistory(
@@ -34,18 +35,20 @@ export async function readHistory(
           ? event.data
           : undefined;
     if (!message) continue;
-    const text = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+    const content = messageContent(host.ctx, message.content);
     // Reasoning-only/tool-only assistant steps are not visible AI replies.
-    if (message.role === "assistant" && !text) continue;
+    if (
+      message.role === "assistant" &&
+      !content.text &&
+      !content.attachments?.length
+    )
+      continue;
     messages.push({
       id: message.id,
       seq: event.seq,
       turn,
       role: message.role === "assistant" ? "assistant" : "user",
-      text,
+      ...content,
     });
   }
   return {

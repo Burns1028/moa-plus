@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes the MoA+ v0.2.0 runtime. The v0.1.23 tag and its media document the earlier Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes the current checkout, including the unreleased Worker attachment extension. The published v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
@@ -149,6 +149,8 @@ Incoming `moa-message`, `project-mode-result`, and `project-mode-assignment` rec
 A message-driven handoff closes a native turn without completing its work. Its historical capsule seats persist as continued outcomes, stay in their original segment, and show Worker progress until their original assignments really end. The outbox then freezes their actual result. Recovery follows the same rule, so reconnecting cannot lose a capsule or move it to a passive later reply.
 
 Worker addresses carry the actual native direct parent. For a visible nested Worker, the UI subscribes to `followWorkerParent`; its Host callback borrows that Worker and the true parent chain through the reviewed native residency seam. Native capacity, permissions and teardown still own those handles. Releasing the view does not stop ongoing work; ordinary top-level parent references remain unchanged.
+
+The same subscription now holds visible direct Workers as well, preserving the exact receiving Session for native file uploads. Existing streamed storage and staged receipts remain native-owned; child prompt admission validates lineage and request identity before resolving a receipt, under the native child admission lock. Accepted native inbox insertion/history facts deduplicate retries, including the claim-before-commit interval. Query/activity/timeline projections retain durable file/image references and readable native paths without copying content or changing permissions. See the [reviewed attachment contract](native-worker-attachments-contract.md).
 
 The Workers tab is read-only. It shows original input, final AI output, and artifacts with two-line expandable Markdown previews. It does not summarize via a model. Workers/notes defaults use native closable tab behavior. Native sidebar rows retain their alignment and controls.
 

@@ -128,6 +128,10 @@ Results contain `children`, optionally `history`, and a wait `reason` of `done`,
 
 Each history page contains `workerId`, current `status`, `offset`, `limit`, `total`, `messages`, and `observedThroughSeq`. Message entries include relative `index`, native `id`, `seq`, `turn`, `role` (`user` or `assistant`), and full visible `text`. The view includes committed human input, managed assignments, MoA messages, and intermediate/final visible AI replies. It excludes inherited Fork history, system/runtime instructions, reasoning, internal notices, and tool calls/results. Incoming messages can shift later relative indices. Pending inputs remain available in activity views until committed.
 
+Messages with files or images also include `attachments`: entries contain `type`, the original native `attachment` reference (ID, name, byte count and image metadata), and a native readable `path` when available. Text stays verbatim, including an empty string for an attachment-only message; attachment-only AI replies remain visible. No file contents, image bytes or base64 are copied into a query. Recent human-input activity and the Workers timeline retain the same references. Reading a returned path uses the calling Agent's ordinary native tool permissions.
+
+In a matching runtime, a user can open a retained Worker, select/paste/drop files in its native composer, and send them with text or alone. File uploads are staged for that exact receiving Session; sibling or parent receipts cannot be reused. The visible Worker uses the existing native residency borrow while the view is open. Native steer/queue and images retain their behavior. These additions require this checkout's [attachment compatibility contract](native-worker-attachments-contract.md); the published v0.2.0 runtime retains the earlier child-file restriction.
+
 Reads do not wake Workers or create capsule participation. Deleted members and failed-creation placeholders are omitted. An existing Worker whose execution failed remains visible.
 
 ## KillAgent

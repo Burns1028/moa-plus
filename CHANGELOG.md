@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Let continuable Workers upload ordinary files through the native composer, streamed storage, receiving-Session receipts, and child admission. Retain native permissions, cancellation, and exact-request retry behavior.
+- Preserve file/image references and readable paths in Coordinator queries, recent human inputs, and Worker timeline previews, including attachment-only messages.
 - Replace the draft MoA+ checkbox with a compact cover-style wordmark button. The off state is gray; the on state is electric lime in the dark theme and a darker green in the light theme. Started conversations retain a fixed mode identity.
 
 ## 0.2.0 — 2026-11-10

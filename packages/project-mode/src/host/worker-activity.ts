@@ -5,6 +5,7 @@ import type { HostAccess } from "./host-access.ts";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { observeForTurn } from "./native.ts";
 import { messageSchema } from "./state.ts";
+import { messageContent } from "./message-content.ts";
 
 /** Read native committed messages and the native Inbox; no shadow task queue. */
 export async function readWorkerActivity(
@@ -23,6 +24,7 @@ export async function readWorkerActivity(
   const agent = host.ctx.agents.get(workerId);
   if (agent)
     return summarize(
+      host,
       agent.session.snapshotEvents(),
       agent.session.inheritedEventCount,
       agent.inbox.nextStep,
@@ -34,6 +36,7 @@ export async function readWorkerActivity(
   const inbox = observed.projections?.values.inbox;
   if (!inbox) throw new Error("project-mode/worker-inbox-unavailable");
   return summarize(
+    host,
     observed.events,
     observed.inheritedEventCount,
     inbox["next-step"].map((value) => messageSchema.parse(value)),
@@ -44,6 +47,7 @@ export async function readWorkerActivity(
 }
 
 function summarize(
+  host: HostAccess,
   events: readonly SessionEvent[],
   inherited: number,
   nextStep: readonly UserMessage[],
@@ -74,14 +78,16 @@ function summarize(
   ): WorkerInputView | undefined => {
     const by = actor(message);
     if (!by) return;
-    const text = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
+    const { text, attachments } = messageContent(
+      host.ctx,
+      message.content,
+      "\n",
+    );
     return {
       messageId: message.id,
       actor: by,
       text: text.slice(0, previewChars),
+      ...(attachments ? { attachments } : {}),
       truncated: text.length > previewChars,
       state,
       ...position,

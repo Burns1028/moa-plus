@@ -1,8 +1,29 @@
 # Verification
 
-## MoA+ v0.2.0
+## Current checkout: Worker attachments — 2026-11-10
 
-The current checkout implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. The matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
+The current checkout implements the six-chapter MoA architecture and the [reviewed Worker attachment contract](native-worker-attachments-contract.md). Its matching compatibility manifest covers **21 native packages / 49 file paths**. The published **v0.2.0** release remains associated with its historical **19 packages / 43 paths** runtime and validation below; these revisions must not be mixed.
+
+Worker uploads use native attachment storage and exact-Session authorization. Native admission receipts and recovery deduplication retain input identity. Coordinator activity/history and the existing Workers timeline preserve durable file/image references and available read paths without rewriting the original text or embedding attachment contents.
+
+The final combined regression run passed **372 tests across 62 files**. The production build, both typechecks and all **20 launcher checks with zero skips** passed. These are automated results, separate from the real-model acceptance below.
+
+Real Ego-browser acceptance used an isolated native DSH 0.2.1-rc.3 runtime with DeepSeek-V4.1-Flash / High:
+
+- A file-only TXT input was uploaded through the Worker conversation. The Worker used the native read tool and returned the exact code stored in that file.
+- Its complete final AI message returned to the Coordinator. The Coordinator queried the Worker and read the referenced upload through native tools.
+- After an actual server restart, a history window with offset **0** and limit **4** retained the attachment ID, filename and read path; native file reading still succeeded.
+- A cold reopened Worker accepted another TXT upload and read its contents successfully.
+
+Additional browser smoke checks admitted a valid 2×2 PNG through the native Worker clipboard intake; the actual model replied `IMAGE_RECEIVED`. This establishes image intake and continuation, not vision quality. Clicking an uploaded filename in the existing work axis opened the native right-panel file preview with the exact uploaded content. A fresh ordinary root conversation with MoA+ off also accepted a file upload, and the model's native read returned the same file checksum.
+
+All four Worker turns and all four Coordinator turns ended normally. Each Worker turn produced one canonical result whose full AI content matched the committed final message, including across the restart. Completion verification retried a verdict-format/answer-marker failure before natural closure; no verdict was overridden.
+
+These observations cover TXT and image intake, native preview, result return, Coordinator inspection, ordinary-mode file input and restart/cold continuation. Private transcripts, screenshots and local test logs are not packaged.
+
+## Published MoA+ v0.2.0
+
+The released v0.2.0 runtime implements the six-chapter MoA architecture: native Agent primitives, shared knowledge, Request/ReplyTo, background execution, joined cancellation, and independent completion gates. Its matching compatibility manifest covers **19 native packages / 43 file paths**. SendMessage is a direct native tool beside run_code in PTC, absent from program SDKs and nested dispatch. See the [architecture](architecture.md) and [reviewed native contracts](compatibility.md).
 
 ### Release validation: 2026-11-10
 

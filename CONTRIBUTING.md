@@ -4,7 +4,7 @@ Start with [MOA responsibilities](docs/moa-architecture.md), the [code architect
 
 ## Local setup
 
-Use Node 24.9+, npm and Git. This plugin targets DSH 0.2.1-rc.3 with the explicit native compatibility manifest in this checkout. The v0.2.0 runtime extends 19 native packages across 43 file paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
+Use Node 24.9+, npm and Git. This plugin targets DSH 0.2.1-rc.3 with the explicit native compatibility manifest in this checkout: 21 native packages across 49 file paths. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
 
 ```sh
 npm ci

@@ -13,7 +13,10 @@ import type {
 import type { TypertClientRemote } from "@deepseek-ai/dsh-typert-protocol";
 import { fileAddressFor } from "@deepseek-ai/dsh-util-workspace-path";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
-import type { WorkerTimelinePage } from "../shared/index.ts";
+import type {
+  WorkerTimelineMessage,
+  WorkerTimelinePage,
+} from "../shared/index.ts";
 import type { SharedProps } from "./components.tsx";
 import { projectForSession } from "./tree.ts";
 import { useSelected } from "./hooks.ts";
@@ -56,6 +59,44 @@ export function MessagePreview({
         )}
       </summary>
     </details>
+  );
+}
+function MessageBody({
+  message,
+  labels,
+  open,
+}: {
+  message: WorkerTimelineMessage;
+  labels: React.ComponentProps<typeof MarkdownText>["labels"];
+  open(path: string): void;
+}) {
+  return (
+    <>
+      {message.text && <MessagePreview text={message.text} labels={labels} />}
+      {!!message.attachments?.length && (
+        <ul className="pm-axis-files">
+          {message.attachments.map(({ type, attachment, path }, index) => {
+            const name = attachment.name ?? attachment.attachmentId;
+            const label = (
+              <>
+                <FileTypeIcon path={name} size={16} /> <span>{name}</span>
+              </>
+            );
+            return (
+              <li key={`${type}:${attachment.attachmentId}:${index}`}>
+                {path ? (
+                  <button type="button" title={path} onClick={() => open(path)}>
+                    {label}
+                  </button>
+                ) : (
+                  <span title={attachment.attachmentId}>{label}</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }
 export function WorkersPanel({
@@ -254,7 +295,15 @@ export function WorkersPanel({
                         ? "fromAgent"
                         : "fromUser",
                   )}
-                  <MessagePreview text={message.text} labels={labels} />
+                  <MessageBody
+                    message={message}
+                    labels={labels}
+                    open={(path) =>
+                      tab.actions.openResource(
+                        fileAddressFor(worker!.workerId, page.cwd, path),
+                      )
+                    }
+                  />
                 </div>
               ))}
             </section>
@@ -263,7 +312,15 @@ export function WorkersPanel({
               {turn.outputs.map((message) => (
                 <div className="pm-axis-message" key={message.id}>
                   <Timestamp time={message.time} />
-                  <MessagePreview text={message.text} labels={labels} />
+                  <MessageBody
+                    message={message}
+                    labels={labels}
+                    open={(path) =>
+                      tab.actions.openResource(
+                        fileAddressFor(worker!.workerId, page.cwd, path),
+                      )
+                    }
+                  />
                 </div>
               ))}
               {!turn.outputs.length && (
