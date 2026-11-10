@@ -1,4 +1,4 @@
-![MoA+ — Intelligence, multiplied. Persistent Agents, direct collaboration, and shared context for DeepSeek Harness.](docs/media/moa-plus-banner.png)
+![MoA+ — Intelligence, multiplied. A Coordinator connects four Workers through direct communication and shared context in DeepSeek Harness.](docs/media/moa-plus-banner.png)
 
 # MoA+
 

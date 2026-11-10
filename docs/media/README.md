@@ -1,4 +1,10 @@
-# Product captures
+# Project imagery and product captures
+
+## MoA+ cover
+
+`moa-plus-banner.png` is AI-generated brand artwork for the project. Its 16:9 composition places the MoA+ identity on the left and connected Coordinator, Worker and shared-context illustrations on the right. Both READMEs use this same image; the walkthrough videos below remain native product recordings.
+
+## Historical captures (v0.1.22)
 
 These assets show Project Mode v0.1.22 running with the compatible DeepSeek Harness 0.2.1-rc.3 runtime, captured on 2026-11-02. The captures use the installed Desktop Host and its native Web UI in a local browser. No runtime code was changed for capture, and no product UI was mocked or generated.
 
