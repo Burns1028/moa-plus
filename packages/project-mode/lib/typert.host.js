@@ -42,6 +42,30 @@ const dsh_plugin_project_mode_projectMode_catalog_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -51,6 +75,30 @@ const dsh_plugin_project_mode_projectMode_catalog_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -60,6 +108,30 @@ const dsh_plugin_project_mode_projectMode_catalog_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -161,6 +233,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -170,6 +266,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -179,6 +299,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -204,6 +348,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -213,6 +381,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -222,6 +414,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -253,6 +469,30 @@ const dsh_plugin_project_mode_projectMode_control_result$schema = () => (dsh_plu
   'turn': z.number(),
   'role': z.union([z.literal("user"), z.literal("assistant")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
 })),
   'observedThroughSeq': z.number(),
 })]))
@@ -299,6 +539,30 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -308,6 +572,30 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -317,6 +605,30 @@ const dsh_plugin_project_mode_projectMode_follow_result$schema = () => (dsh_plug
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -398,6 +710,30 @@ const dsh_plugin_project_mode_projectMode_history_result$schema = () => (dsh_plu
   'turn': z.number(),
   'role': z.union([z.literal("user"), z.literal("assistant")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
 })),
   'observedThroughSeq': z.number(),
 }))
@@ -490,6 +826,30 @@ const dsh_plugin_project_mode_projectMode_snapshot_result$schema = () => (dsh_pl
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -499,6 +859,30 @@ const dsh_plugin_project_mode_projectMode_snapshot_result$schema = () => (dsh_pl
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -508,6 +892,30 @@ const dsh_plugin_project_mode_projectMode_snapshot_result$schema = () => (dsh_pl
   'messageId': z.string(),
   'actor': z.union([z.literal("user"), z.literal("coordinator"), z.literal("other")]),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'truncated': z.boolean(),
   'state': z.union([z.literal("committed"), z.literal("pending-steer"), z.literal("pending-queue")]),
   'seq': z.number().describe('Native admission/edit position, or committed message position.'),
@@ -581,6 +989,30 @@ const dsh_plugin_project_mode_projectMode_timeline_result$schema = () => (dsh_pl
   'seq': z.number(),
   'time': z.number(),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'actor': z.union([z.undefined(), z.literal("user"), z.literal("coordinator"), z.literal("agent")]).optional(),
 })),
   'outputs': z.array(z.object({
@@ -588,6 +1020,30 @@ const dsh_plugin_project_mode_projectMode_timeline_result$schema = () => (dsh_pl
   'seq': z.number(),
   'time': z.number(),
   'text': z.string(),
+  'attachments': z.union([z.undefined(), z.array(z.union([z.object({
+  'type': z.literal("file"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque content-addressed storage identifier; never a filesystem path or bearer URL.'),
+  'name': z.string().describe('Sanitized display filename, also the stored object\'s leaf name.'),
+  'bytes': z.number().describe('Exact byte length.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+}), z.object({
+  'type': z.literal("image"),
+  'attachment': z.object({
+  'attachmentId': z.string().describe('Opaque storage identifier; never a filesystem path or bearer URL.'),
+  'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).describe('Media type verified from the stored bytes.'),
+  'bytes': z.number().describe('Exact encoded byte length.'),
+  'width': z.number().describe('Intrinsic encoded width in pixels.'),
+  'height': z.number().describe('Intrinsic encoded height in pixels.'),
+  'name': z.union([z.undefined(), z.string()]).optional().describe('Optional display name stripped of local path information.'),
+  'originalDimensions': z.union([z.undefined(), z.object({
+  'width': z.number(),
+  'height': z.number(),
+})]).optional().describe('Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.'),
+}),
+  'path': z.union([z.undefined(), z.string()]).optional().describe('Native execution-world read path, when the attachment is locally accessible.'),
+})]))]).optional(),
   'actor': z.union([z.undefined(), z.literal("user"), z.literal("coordinator"), z.literal("agent")]).optional(),
 })),
   'artifacts': z.array(z.object({
@@ -677,7 +1133,7 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode#projectMode/catalog:result',
         create: dsh_plugin_project_mode_projectMode_catalog_result$schema,
-        jsonSchema: {"type":"array","items":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},
+        jsonSchema: {"type":"array","items":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},
       },
       sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":849,"column":9},
     },
@@ -770,7 +1226,7 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#ProjectFrame',
         create: dsh_plugin_project_mode_projectMode_follow_result$schema,
-        jsonSchema: {"type":"object","properties":{"type":{"type":"string","const":"baseline"},"value":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},"required":["type","value"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"type":{"type":"string","const":"baseline"},"value":{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}},"required":["type","value"],"additionalProperties":true},
       },
       sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":812,"column":10},
     },
@@ -895,7 +1351,7 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#WorkerHistoryPage',
         create: dsh_plugin_project_mode_projectMode_history_result$schema,
-        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"offset":{"type":"number"},"limit":{"type":"number"},"total":{"type":"number"},"messages":{"type":"array","items":{"type":"object","properties":{"index":{"type":"number","description":"Zero-based position from newest in this observed dialogue."},"id":{"type":"string"},"seq":{"type":"number"},"turn":{"type":"number"},"role":{"type":"string","enum":["user","assistant"]},"text":{"type":"string"}},"required":["index","id","seq","turn","role","text"],"additionalProperties":true}},"observedThroughSeq":{"type":"number"}},"required":["workerId","status","offset","limit","total","messages","observedThroughSeq"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"offset":{"type":"number"},"limit":{"type":"number"},"total":{"type":"number"},"messages":{"type":"array","items":{"type":"object","properties":{"index":{"type":"number","description":"Zero-based position from newest in this observed dialogue."},"id":{"type":"string"},"seq":{"type":"number"},"turn":{"type":"number"},"role":{"type":"string","enum":["user","assistant"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}}},"required":["index","id","seq","turn","role","text"],"additionalProperties":true}},"observedThroughSeq":{"type":"number"}},"required":["workerId","status","offset","limit","total","messages","observedThroughSeq"],"additionalProperties":true},
       },
       sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":877,"column":9},
     },
@@ -1030,7 +1486,7 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode#projectMode/snapshot:result',
         create: dsh_plugin_project_mode_projectMode_snapshot_result$schema,
-        jsonSchema: {"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}]},
+        jsonSchema: {"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"project":{"type":"object","properties":{"version":{"type":"number","const":1},"id":{"type":"string"},"coordinatorSessionId":{"type":"string"},"workspaceId":{"type":"string"},"workspacePath":{"type":"string"},"paths":{"type":"object","properties":{"root":{"type":"string"},"context":{"type":"string"},"notes":{"type":"string"},"archived":{"type":"string"},"index":{"type":"string","description":"New index; older records are resolved without rewriting their documents."}},"required":["root","context","notes","archived"],"additionalProperties":true},"mode":{"type":"string","enum":["enabled","disabled"]},"modeLocked":{"type":"boolean","enum":[false,true],"description":"Project identity becomes permanent when this Session starts a turn."},"revision":{"type":"number"},"createdAt":{"type":"number"},"updatedAt":{"type":"number"}},"required":["version","id","coordinatorSessionId","workspacePath","paths","mode","revision","createdAt","updatedAt"],"additionalProperties":true},"workers":{"type":"array","items":{"type":"object","properties":{"workerId":{"type":"string"},"parentSessionId":{"type":"string","description":"Actual native direct parent; older direct-child snapshots omit this field."},"name":{"type":"string"},"lifecycle":{"type":"string","enum":["provisioning","active","deleting","deleted","provision-failed"]},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"availability":{"type":"string","enum":["live","cold","unavailable"]},"queueLength":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"pendingSteerCount":{"oneOf":[{"type":"null","const":null},{"type":"number"}]},"phase":{"type":"string","enum":["idle","starting","working","waiting-user","stopping","failed","stopped","disconnected"]},"progressText":{"type":"string"},"updatedAt":{"type":"number"},"activity":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"observedThroughSeq":{"type":"number"},"latestInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Latest committed task/dialogue input, not a guessed task summary."},"lastUserInput":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true,"description":"Most recent committed or still-pending human input; excludes withdrawn input."},"pendingUserInputs":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","other"]},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"truncated":{"type":"boolean"},"state":{"type":"string","enum":["committed","pending-steer","pending-queue"]},"seq":{"type":"number","description":"Native admission/edit position, or committed message position."},"time":{"type":"number"}},"required":["messageId","actor","text","truncated","state","seq","time"],"additionalProperties":true}},"pendingUserInputCount":{"type":"number"}},"required":["observedThroughSeq","pendingUserInputs","pendingUserInputCount"],"additionalProperties":true}],"description":"Present on list/get; null means native activity could not be observed."}},"required":["workerId","name","lifecycle","status","availability","queueLength","pendingSteerCount","phase","updatedAt"],"additionalProperties":true}},"turnMemberships":{"type":"array","items":{"type":"object","properties":{"projectId":{"type":"string"},"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number","description":"Native human user/message (or turn/start fallback) seq; never a business turn."},"participationSeq":{"type":"number","description":"Native coordinator evidence at the first accepted assignment/result."},"participationKind":{"type":"string","enum":["spawn","send","result"]},"completionIds":{"type":"array","items":{"type":"string"}},"workerId":{"type":"string"},"firstOperationId":{"type":"string"},"firstCallId":{"type":"string"},"order":{"type":"number"}},"required":["projectId","coordinatorSessionId","coordinatorTurn","workerId","firstOperationId","firstCallId","order"],"additionalProperties":true}},"closedTurnOutcomes":{"type":"array","items":{"type":"object","properties":{"coordinatorSessionId":{"type":"string"},"coordinatorTurn":{"type":"number"},"segmentStartSeq":{"type":"number"},"workerId":{"type":"string"},"status":{"type":"string","enum":["deleted","failed","stopped","completed","continued"]},"completionIds":{"type":"array","items":{"type":"string"}},"lastResultMessageId":{"type":"string"},"lastResultSeq":{"type":"number"},"summary":{"type":"string"}},"required":["coordinatorSessionId","coordinatorTurn","workerId","status","completionIds"],"additionalProperties":true}},"coordinatorTurn":{"oneOf":[{"type":"null","const":null},{"type":"object","properties":{"sessionId":{"type":"string"},"turn":{"type":"number"},"phase":{"type":"string","enum":["working","failed","waiting-workers","reviewing-results","closing","closed","interrupted"]},"workerIds":{"type":"array","items":{"type":"string"}},"unresolvedOperationIds":{"type":"array","items":{"type":"string"}},"pendingAssignmentIds":{"type":"array","items":{"type":"string"}},"runningWorkerIds":{"type":"array","items":{"type":"string"}},"queuedWorkerIds":{"type":"array","items":{"type":"string"}},"undeliveredCompletionIds":{"type":"array","items":{"type":"string"}},"unconsumedCompletionIds":{"type":"array","items":{"type":"string"}},"pendingSteerCount":{"type":"number"},"revision":{"type":"number"}},"required":["sessionId","turn","phase","workerIds","unresolvedOperationIds","pendingAssignmentIds","runningWorkerIds","queuedWorkerIds","undeliveredCompletionIds","unconsumedCompletionIds","pendingSteerCount","revision"],"additionalProperties":true}]},"streamEpoch":{"type":"string"},"revision":{"type":"number"}},"required":["project","workers","turnMemberships","closedTurnOutcomes","coordinatorTurn","streamEpoch","revision"],"additionalProperties":true}]},
       },
       sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":787,"column":9},
     },
@@ -1093,7 +1549,7 @@ const $remote = createTypertRemoteInfo({
         mode: 'strict',
         typeSymbol: 'dsh-plugin-project-mode/shared#WorkerTimelinePage',
         create: dsh_plugin_project_mode_projectMode_timeline_result$schema,
-        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"cwd":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"total":{"type":"number"},"hasMore":{"type":"boolean"},"observedThroughSeq":{"type":"number"},"turns":{"type":"array","items":{"type":"object","properties":{"turn":{"type":"number"},"startedAt":{"type":"number"},"finishedAt":{"type":"number"},"outcome":{"oneOf":[{"type":"null","const":null},{"type":"string"}]},"inputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","agent"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"outputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"actor":{"type":"string","enum":["user","coordinator","agent"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"artifacts":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"description":{"type":"string"},"kind":{"type":"string","enum":["presented","changed"]},"seq":{"type":"number"},"time":{"type":"number"}},"required":["path","kind","seq","time"],"additionalProperties":true}}},"required":["turn","startedAt","outcome","inputs","outputs","artifacts"],"additionalProperties":true}}},"required":["workerId","status","total","hasMore","observedThroughSeq","turns"],"additionalProperties":true},
+        jsonSchema: {"type":"object","properties":{"workerId":{"type":"string"},"cwd":{"type":"string"},"status":{"oneOf":[{"type":"null","const":null},{"type":"string","enum":["busy","idle"]}]},"total":{"type":"number"},"hasMore":{"type":"boolean"},"observedThroughSeq":{"type":"number"},"turns":{"type":"array","items":{"type":"object","properties":{"turn":{"type":"number"},"startedAt":{"type":"number"},"finishedAt":{"type":"number"},"outcome":{"oneOf":[{"type":"null","const":null},{"type":"string"}]},"inputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"actor":{"type":"string","enum":["user","coordinator","agent"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"outputs":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"text":{"type":"string"},"attachments":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"file"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque content-addressed storage identifier; never a filesystem path or bearer URL."},"name":{"type":"string","description":"Sanitized display filename, also the stored object's leaf name."},"bytes":{"type":"number","description":"Exact byte length."}},"required":["attachmentId","name","bytes"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true},"path":{"type":"string","description":"Native execution-world read path, when the attachment is locally accessible."}},"required":["type","attachment"],"additionalProperties":true}]}},"actor":{"type":"string","enum":["user","coordinator","agent"]}},"required":["id","seq","time","text"],"additionalProperties":true}},"artifacts":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"description":{"type":"string"},"kind":{"type":"string","enum":["presented","changed"]},"seq":{"type":"number"},"time":{"type":"number"}},"required":["path","kind","seq","time"],"additionalProperties":true}}},"required":["turn","startedAt","outcome","inputs","outputs","artifacts"],"additionalProperties":true}}},"required":["workerId","status","total","hasMore","observedThroughSeq","turns"],"additionalProperties":true},
       },
       sourceLocation: {"file":"packages/project-mode/src/host/index.ts","line":900,"column":10},
     },
@@ -1654,7 +2110,7 @@ export const TYPERT = {
           },
           {
             "name": "WorkerDialogueMessage",
-            "declaration": "export interface WorkerDialogueMessage {\n    index: number;\n    id: string;\n    seq: number;\n    turn: number;\n    role: \"user\" | \"assistant\";\n    text: string;\n}"
+            "declaration": "export interface WorkerDialogueMessage {\n    index: number;\n    id: string;\n    seq: number;\n    turn: number;\n    role: \"user\" | \"assistant\";\n    text: string;\n    attachments?: WorkerMessageAttachment[];\n}"
           },
           {
             "name": "WorkerHistoryPage",
@@ -1662,7 +2118,11 @@ export const TYPERT = {
           },
           {
             "name": "WorkerInputView",
-            "declaration": "export interface WorkerInputView {\n    messageId: string;\n    actor: \"user\" | \"coordinator\" | \"other\";\n    text: string;\n    truncated: boolean;\n    state: \"committed\" | \"pending-steer\" | \"pending-queue\";\n    seq: number;\n    time: number;\n}"
+            "declaration": "export interface WorkerInputView {\n    messageId: string;\n    actor: \"user\" | \"coordinator\" | \"other\";\n    text: string;\n    attachments?: WorkerMessageAttachment[];\n    truncated: boolean;\n    state: \"committed\" | \"pending-steer\" | \"pending-queue\";\n    seq: number;\n    time: number;\n}"
+          },
+          {
+            "name": "WorkerMessageAttachment",
+            "declaration": "export type WorkerMessageAttachment = ({ type: \"file\"; attachment: FileAttachmentRef; } | { type: \"image\"; attachment: ImageAttachmentRef; }) & { path?: string; };"
           },
           {
             "name": "WorkerParentReady",
@@ -1670,7 +2130,7 @@ export const TYPERT = {
           },
           {
             "name": "WorkerTimelineMessage",
-            "declaration": "export interface WorkerTimelineMessage {\n    id: string;\n    seq: number;\n    time: number;\n    text: string;\n    actor?: \"user\" | \"coordinator\" | \"agent\";\n}"
+            "declaration": "export interface WorkerTimelineMessage {\n    id: string;\n    seq: number;\n    time: number;\n    text: string;\n    attachments?: WorkerMessageAttachment[];\n    actor?: \"user\" | \"coordinator\" | \"agent\";\n}"
           },
           {
             "name": "WorkerTimelinePage",

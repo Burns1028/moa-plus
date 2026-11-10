@@ -48,7 +48,24 @@
  			unsubscribe;
  			host;
  			/**
-@@ -20207,7 +20234,7 @@
+@@ -19038,7 +19065,6 @@
+ 			const intakeFiles = (0, react.useCallback)((files, directories) => {
+ 				if (locked || machineBusy || subagent !== null && !continuable || addFiles === void 0 || files.length === 0) return;
+ 				const rejected = (() => {
+-					if (continuable && files.some((file) => directories?.has(file) || !isImageMediaType(file.type))) return t("image.unsupportedType");
+ 					if (imageLimits !== void 0) {
+ 						const mediaTypes = imageLimits.mediaTypes;
+ 						const images = files.filter((file) => mediaTypes.includes(file.type));
+@@ -19244,7 +19270,7 @@
+ 											ref: fileInputRef,
+ 											type: "file",
+ 											multiple: true,
+-											disabled: subagent !== null,
++											disabled: subagent !== null && !continuable,
+ 											hidden: true,
+ 											onChange: onPickFiles
+ 										}),
+@@ -20207,7 +20233,7 @@
  						},
  						hooks: {
  							stopShortcut,
@@ -57,7 +74,7 @@
  							fileUploads: conversation.fileUploads,
  							notices: shell.notices,
  							lexicon: shell.lexicon,
-@@ -20235,6 +20262,7 @@
+@@ -20235,6 +20261,7 @@
  			ctx.plugin(ConversationController, {
  				input: inputHub,
  				blocks: composerBlocks,
@@ -65,17 +82,6 @@
  				maxConcurrentFileUploads
  			});
  			ctx.plugin(todoDockEntry);
---- a/lib/types/client/index.d.ts
-+++ b/lib/types/client/index.d.ts
-@@ -25,7 +25,7 @@
- export type { ConversationGroupRegistry } from './conversation/group-registry.ts';
- export type { ConversationGroupContext, ConversationGroupData, ConversationGroupDataMap, ConversationGroupDefinition, ConversationGroupedView, ConversationGroupInput, GroupKey, GroupNodePosition, GroupReference, GroupSnapshot, GroupUpdate, NodeChange, NodeKey, NodeReference, RenderEntry, } from './contract/groups.ts';
- export { ConversationController, UnsupportedImageMediaTypeError } from './service.ts';
--export type { IConversation } from './service.ts';
-+export type { IConversation, ComposerSubmissionOverrides } from './service.ts';
- export type { ConversationContextReader, ConversationLocation, ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataSource, ConversationLocationDataStore, ConversationMatch, ConversationMatchHandler, ConversationMatchResult, ConversationNodeContext, ConversationNodeDefinition, ConversationNodeDefinitionInput, ConversationPreviousContext, ConversationPublication, ConversationStartMatch, ConversationStepDataMap, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewBuilder, ConversationViewDefinition, ConversationViewNode, ConversationViewSnapshotMap, ConversationViewSnapshotStore, StepLocation, TurnLocation, } from './contract/conversation.ts';
- export { EMPTY_CONVERSATION_SNAPSHOT, conversationPhase } from './contract/snapshot.ts';
- export type { ConversationPhase, ConversationSnapshot, } from './contract/snapshot.ts';
 --- a/lib/types/client/service.d.ts
 +++ b/lib/types/client/service.d.ts
 @@ -23,7 +23,14 @@
@@ -109,6 +115,17 @@
          maxConcurrentFileUploads: number;
      });
      /**
+--- a/lib/types/client/index.d.ts
++++ b/lib/types/client/index.d.ts
+@@ -25,7 +25,7 @@
+ export type { ConversationGroupRegistry } from './conversation/group-registry.ts';
+ export type { ConversationGroupContext, ConversationGroupData, ConversationGroupDataMap, ConversationGroupDefinition, ConversationGroupedView, ConversationGroupInput, GroupKey, GroupNodePosition, GroupReference, GroupSnapshot, GroupUpdate, NodeChange, NodeKey, NodeReference, RenderEntry, } from './contract/groups.ts';
+ export { ConversationController, UnsupportedImageMediaTypeError } from './service.ts';
+-export type { IConversation } from './service.ts';
++export type { IConversation, ComposerSubmissionOverrides } from './service.ts';
+ export type { ConversationContextReader, ConversationLocation, ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataSource, ConversationLocationDataStore, ConversationMatch, ConversationMatchHandler, ConversationMatchResult, ConversationNodeContext, ConversationNodeDefinition, ConversationNodeDefinitionInput, ConversationPreviousContext, ConversationPublication, ConversationStartMatch, ConversationStepDataMap, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewBuilder, ConversationViewDefinition, ConversationViewNode, ConversationViewSnapshotMap, ConversationViewSnapshotStore, StepLocation, TurnLocation, } from './contract/conversation.ts';
+ export { EMPTY_CONVERSATION_SNAPSHOT, conversationPhase } from './contract/snapshot.ts';
+ export type { ConversationPhase, ConversationSnapshot, } from './contract/snapshot.ts';
 --- a/lib/types/client/input/submission-policy.d.ts
 +++ b/lib/types/client/input/submission-policy.d.ts
 @@ -3,7 +3,8 @@

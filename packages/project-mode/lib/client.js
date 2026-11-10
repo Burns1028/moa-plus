@@ -259,6 +259,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -276,6 +305,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -293,6 +351,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -455,6 +542,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -472,6 +588,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -489,6 +634,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -550,6 +724,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -567,6 +770,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -584,6 +816,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -629,7 +890,36 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"turn": zod.z.number(),
 					"role": zod.z.union([zod.z.literal("user"), zod.z.literal("assistant")]),
-					"text": zod.z.string()
+					"text": zod.z.string(),
+					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+						"type": zod.z.literal("file"),
+						"attachment": zod.z.object({
+							"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+							"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+							"bytes": zod.z.number().describe("Exact byte length.")
+						}),
+						"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+					}), zod.z.object({
+						"type": zod.z.literal("image"),
+						"attachment": zod.z.object({
+							"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+							"mediaType": zod.z.union([
+								zod.z.literal("image/png"),
+								zod.z.literal("image/jpeg"),
+								zod.z.literal("image/webp"),
+								zod.z.literal("image/gif")
+							]).describe("Media type verified from the stored bytes."),
+							"bytes": zod.z.number().describe("Exact encoded byte length."),
+							"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+							"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+							"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+							"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+								"width": zod.z.number(),
+								"height": zod.z.number()
+							})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+						}),
+						"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+					})]))]).optional()
 				})),
 				"observedThroughSeq": zod.z.number()
 			})
@@ -711,6 +1001,35 @@ window.__ModuleLoader__.load({
 									zod.z.literal("other")
 								]),
 								"text": zod.z.string(),
+								"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+									"type": zod.z.literal("file"),
+									"attachment": zod.z.object({
+										"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+										"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+										"bytes": zod.z.number().describe("Exact byte length.")
+									}),
+									"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+								}), zod.z.object({
+									"type": zod.z.literal("image"),
+									"attachment": zod.z.object({
+										"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+										"mediaType": zod.z.union([
+											zod.z.literal("image/png"),
+											zod.z.literal("image/jpeg"),
+											zod.z.literal("image/webp"),
+											zod.z.literal("image/gif")
+										]).describe("Media type verified from the stored bytes."),
+										"bytes": zod.z.number().describe("Exact encoded byte length."),
+										"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+										"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+										"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+										"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+											"width": zod.z.number(),
+											"height": zod.z.number()
+										})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+									}),
+									"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+								})]))]).optional(),
 								"truncated": zod.z.boolean(),
 								"state": zod.z.union([
 									zod.z.literal("committed"),
@@ -728,6 +1047,35 @@ window.__ModuleLoader__.load({
 									zod.z.literal("other")
 								]),
 								"text": zod.z.string(),
+								"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+									"type": zod.z.literal("file"),
+									"attachment": zod.z.object({
+										"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+										"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+										"bytes": zod.z.number().describe("Exact byte length.")
+									}),
+									"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+								}), zod.z.object({
+									"type": zod.z.literal("image"),
+									"attachment": zod.z.object({
+										"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+										"mediaType": zod.z.union([
+											zod.z.literal("image/png"),
+											zod.z.literal("image/jpeg"),
+											zod.z.literal("image/webp"),
+											zod.z.literal("image/gif")
+										]).describe("Media type verified from the stored bytes."),
+										"bytes": zod.z.number().describe("Exact encoded byte length."),
+										"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+										"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+										"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+										"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+											"width": zod.z.number(),
+											"height": zod.z.number()
+										})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+									}),
+									"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+								})]))]).optional(),
 								"truncated": zod.z.boolean(),
 								"state": zod.z.union([
 									zod.z.literal("committed"),
@@ -745,6 +1093,35 @@ window.__ModuleLoader__.load({
 									zod.z.literal("other")
 								]),
 								"text": zod.z.string(),
+								"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+									"type": zod.z.literal("file"),
+									"attachment": zod.z.object({
+										"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+										"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+										"bytes": zod.z.number().describe("Exact byte length.")
+									}),
+									"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+								}), zod.z.object({
+									"type": zod.z.literal("image"),
+									"attachment": zod.z.object({
+										"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+										"mediaType": zod.z.union([
+											zod.z.literal("image/png"),
+											zod.z.literal("image/jpeg"),
+											zod.z.literal("image/webp"),
+											zod.z.literal("image/gif")
+										]).describe("Media type verified from the stored bytes."),
+										"bytes": zod.z.number().describe("Exact encoded byte length."),
+										"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+										"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+										"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+										"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+											"width": zod.z.number(),
+											"height": zod.z.number()
+										})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+									}),
+									"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+								})]))]).optional(),
 								"truncated": zod.z.boolean(),
 								"state": zod.z.union([
 									zod.z.literal("committed"),
@@ -853,7 +1230,36 @@ window.__ModuleLoader__.load({
 				"seq": zod.z.number(),
 				"turn": zod.z.number(),
 				"role": zod.z.union([zod.z.literal("user"), zod.z.literal("assistant")]),
-				"text": zod.z.string()
+				"text": zod.z.string(),
+				"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+					"type": zod.z.literal("file"),
+					"attachment": zod.z.object({
+						"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+						"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+						"bytes": zod.z.number().describe("Exact byte length.")
+					}),
+					"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+				}), zod.z.object({
+					"type": zod.z.literal("image"),
+					"attachment": zod.z.object({
+						"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+						"mediaType": zod.z.union([
+							zod.z.literal("image/png"),
+							zod.z.literal("image/jpeg"),
+							zod.z.literal("image/webp"),
+							zod.z.literal("image/gif")
+						]).describe("Media type verified from the stored bytes."),
+						"bytes": zod.z.number().describe("Exact encoded byte length."),
+						"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+						"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+						"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+						"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+							"width": zod.z.number(),
+							"height": zod.z.number()
+						})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+					}),
+					"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+				})]))]).optional()
 			})),
 			"observedThroughSeq": zod.z.number()
 		});
@@ -1012,6 +1418,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -1029,6 +1464,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -1046,6 +1510,35 @@ window.__ModuleLoader__.load({
 								zod.z.literal("other")
 							]),
 							"text": zod.z.string(),
+							"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+								"type": zod.z.literal("file"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+									"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+									"bytes": zod.z.number().describe("Exact byte length.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							}), zod.z.object({
+								"type": zod.z.literal("image"),
+								"attachment": zod.z.object({
+									"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+									"mediaType": zod.z.union([
+										zod.z.literal("image/png"),
+										zod.z.literal("image/jpeg"),
+										zod.z.literal("image/webp"),
+										zod.z.literal("image/gif")
+									]).describe("Media type verified from the stored bytes."),
+									"bytes": zod.z.number().describe("Exact encoded byte length."),
+									"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+									"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+									"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+									"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+										"width": zod.z.number(),
+										"height": zod.z.number()
+									})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+								}),
+								"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+							})]))]).optional(),
 							"truncated": zod.z.boolean(),
 							"state": zod.z.union([
 								zod.z.literal("committed"),
@@ -1147,6 +1640,35 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"time": zod.z.number(),
 					"text": zod.z.string(),
+					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+						"type": zod.z.literal("file"),
+						"attachment": zod.z.object({
+							"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+							"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+							"bytes": zod.z.number().describe("Exact byte length.")
+						}),
+						"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+					}), zod.z.object({
+						"type": zod.z.literal("image"),
+						"attachment": zod.z.object({
+							"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+							"mediaType": zod.z.union([
+								zod.z.literal("image/png"),
+								zod.z.literal("image/jpeg"),
+								zod.z.literal("image/webp"),
+								zod.z.literal("image/gif")
+							]).describe("Media type verified from the stored bytes."),
+							"bytes": zod.z.number().describe("Exact encoded byte length."),
+							"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+							"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+							"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+							"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+								"width": zod.z.number(),
+								"height": zod.z.number()
+							})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+						}),
+						"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+					})]))]).optional(),
 					"actor": zod.z.union([
 						zod.z.undefined(),
 						zod.z.literal("user"),
@@ -1159,6 +1681,35 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"time": zod.z.number(),
 					"text": zod.z.string(),
+					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
+						"type": zod.z.literal("file"),
+						"attachment": zod.z.object({
+							"attachmentId": zod.z.string().describe("Opaque content-addressed storage identifier; never a filesystem path or bearer URL."),
+							"name": zod.z.string().describe("Sanitized display filename, also the stored object's leaf name."),
+							"bytes": zod.z.number().describe("Exact byte length.")
+						}),
+						"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+					}), zod.z.object({
+						"type": zod.z.literal("image"),
+						"attachment": zod.z.object({
+							"attachmentId": zod.z.string().describe("Opaque storage identifier; never a filesystem path or bearer URL."),
+							"mediaType": zod.z.union([
+								zod.z.literal("image/png"),
+								zod.z.literal("image/jpeg"),
+								zod.z.literal("image/webp"),
+								zod.z.literal("image/gif")
+							]).describe("Media type verified from the stored bytes."),
+							"bytes": zod.z.number().describe("Exact encoded byte length."),
+							"width": zod.z.number().describe("Intrinsic encoded width in pixels."),
+							"height": zod.z.number().describe("Intrinsic encoded height in pixels."),
+							"name": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Optional display name stripped of local path information."),
+							"originalDimensions": zod.z.union([zod.z.undefined(), zod.z.object({
+								"width": zod.z.number(),
+								"height": zod.z.number()
+							})]).optional().describe("Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image.")
+						}),
+						"path": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("Native execution-world read path, when the attachment is locally accessible.")
+					})]))]).optional(),
 					"actor": zod.z.union([
 						zod.z.undefined(),
 						zod.z.literal("user"),
@@ -1399,6 +1950,114 @@ window.__ModuleLoader__.load({
 																		]
 																	},
 																	"text": { "type": "string" },
+																	"attachments": {
+																		"type": "array",
+																		"items": { "oneOf": [{
+																			"type": "object",
+																			"properties": {
+																				"type": {
+																					"type": "string",
+																					"const": "file"
+																				},
+																				"attachment": {
+																					"type": "object",
+																					"properties": {
+																						"attachmentId": {
+																							"type": "string",
+																							"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																						},
+																						"name": {
+																							"type": "string",
+																							"description": "Sanitized display filename, also the stored object's leaf name."
+																						},
+																						"bytes": {
+																							"type": "number",
+																							"description": "Exact byte length."
+																						}
+																					},
+																					"required": [
+																						"attachmentId",
+																						"name",
+																						"bytes"
+																					],
+																					"additionalProperties": true
+																				},
+																				"path": {
+																					"type": "string",
+																					"description": "Native execution-world read path, when the attachment is locally accessible."
+																				}
+																			},
+																			"required": ["type", "attachment"],
+																			"additionalProperties": true
+																		}, {
+																			"type": "object",
+																			"properties": {
+																				"type": {
+																					"type": "string",
+																					"const": "image"
+																				},
+																				"attachment": {
+																					"type": "object",
+																					"properties": {
+																						"attachmentId": {
+																							"type": "string",
+																							"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																						},
+																						"mediaType": {
+																							"type": "string",
+																							"enum": [
+																								"image/png",
+																								"image/jpeg",
+																								"image/webp",
+																								"image/gif"
+																							],
+																							"description": "Media type verified from the stored bytes."
+																						},
+																						"bytes": {
+																							"type": "number",
+																							"description": "Exact encoded byte length."
+																						},
+																						"width": {
+																							"type": "number",
+																							"description": "Intrinsic encoded width in pixels."
+																						},
+																						"height": {
+																							"type": "number",
+																							"description": "Intrinsic encoded height in pixels."
+																						},
+																						"name": {
+																							"type": "string",
+																							"description": "Optional display name stripped of local path information."
+																						},
+																						"originalDimensions": {
+																							"type": "object",
+																							"properties": {
+																								"width": { "type": "number" },
+																								"height": { "type": "number" }
+																							},
+																							"required": ["width", "height"],
+																							"additionalProperties": true,
+																							"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																						}
+																					},
+																					"required": [
+																						"attachmentId",
+																						"mediaType",
+																						"bytes",
+																						"width",
+																						"height"
+																					],
+																					"additionalProperties": true
+																				},
+																				"path": {
+																					"type": "string",
+																					"description": "Native execution-world read path, when the attachment is locally accessible."
+																				}
+																			},
+																			"required": ["type", "attachment"],
+																			"additionalProperties": true
+																		}] }
+																	},
 																	"truncated": { "type": "boolean" },
 																	"state": {
 																		"type": "string",
@@ -1439,6 +2098,114 @@ window.__ModuleLoader__.load({
 																		]
 																	},
 																	"text": { "type": "string" },
+																	"attachments": {
+																		"type": "array",
+																		"items": { "oneOf": [{
+																			"type": "object",
+																			"properties": {
+																				"type": {
+																					"type": "string",
+																					"const": "file"
+																				},
+																				"attachment": {
+																					"type": "object",
+																					"properties": {
+																						"attachmentId": {
+																							"type": "string",
+																							"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																						},
+																						"name": {
+																							"type": "string",
+																							"description": "Sanitized display filename, also the stored object's leaf name."
+																						},
+																						"bytes": {
+																							"type": "number",
+																							"description": "Exact byte length."
+																						}
+																					},
+																					"required": [
+																						"attachmentId",
+																						"name",
+																						"bytes"
+																					],
+																					"additionalProperties": true
+																				},
+																				"path": {
+																					"type": "string",
+																					"description": "Native execution-world read path, when the attachment is locally accessible."
+																				}
+																			},
+																			"required": ["type", "attachment"],
+																			"additionalProperties": true
+																		}, {
+																			"type": "object",
+																			"properties": {
+																				"type": {
+																					"type": "string",
+																					"const": "image"
+																				},
+																				"attachment": {
+																					"type": "object",
+																					"properties": {
+																						"attachmentId": {
+																							"type": "string",
+																							"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																						},
+																						"mediaType": {
+																							"type": "string",
+																							"enum": [
+																								"image/png",
+																								"image/jpeg",
+																								"image/webp",
+																								"image/gif"
+																							],
+																							"description": "Media type verified from the stored bytes."
+																						},
+																						"bytes": {
+																							"type": "number",
+																							"description": "Exact encoded byte length."
+																						},
+																						"width": {
+																							"type": "number",
+																							"description": "Intrinsic encoded width in pixels."
+																						},
+																						"height": {
+																							"type": "number",
+																							"description": "Intrinsic encoded height in pixels."
+																						},
+																						"name": {
+																							"type": "string",
+																							"description": "Optional display name stripped of local path information."
+																						},
+																						"originalDimensions": {
+																							"type": "object",
+																							"properties": {
+																								"width": { "type": "number" },
+																								"height": { "type": "number" }
+																							},
+																							"required": ["width", "height"],
+																							"additionalProperties": true,
+																							"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																						}
+																					},
+																					"required": [
+																						"attachmentId",
+																						"mediaType",
+																						"bytes",
+																						"width",
+																						"height"
+																					],
+																					"additionalProperties": true
+																				},
+																				"path": {
+																					"type": "string",
+																					"description": "Native execution-world read path, when the attachment is locally accessible."
+																				}
+																			},
+																			"required": ["type", "attachment"],
+																			"additionalProperties": true
+																		}] }
+																	},
 																	"truncated": { "type": "boolean" },
 																	"state": {
 																		"type": "string",
@@ -1481,6 +2248,114 @@ window.__ModuleLoader__.load({
 																			]
 																		},
 																		"text": { "type": "string" },
+																		"attachments": {
+																			"type": "array",
+																			"items": { "oneOf": [{
+																				"type": "object",
+																				"properties": {
+																					"type": {
+																						"type": "string",
+																						"const": "file"
+																					},
+																					"attachment": {
+																						"type": "object",
+																						"properties": {
+																							"attachmentId": {
+																								"type": "string",
+																								"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																							},
+																							"name": {
+																								"type": "string",
+																								"description": "Sanitized display filename, also the stored object's leaf name."
+																							},
+																							"bytes": {
+																								"type": "number",
+																								"description": "Exact byte length."
+																							}
+																						},
+																						"required": [
+																							"attachmentId",
+																							"name",
+																							"bytes"
+																						],
+																						"additionalProperties": true
+																					},
+																					"path": {
+																						"type": "string",
+																						"description": "Native execution-world read path, when the attachment is locally accessible."
+																					}
+																				},
+																				"required": ["type", "attachment"],
+																				"additionalProperties": true
+																			}, {
+																				"type": "object",
+																				"properties": {
+																					"type": {
+																						"type": "string",
+																						"const": "image"
+																					},
+																					"attachment": {
+																						"type": "object",
+																						"properties": {
+																							"attachmentId": {
+																								"type": "string",
+																								"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																							},
+																							"mediaType": {
+																								"type": "string",
+																								"enum": [
+																									"image/png",
+																									"image/jpeg",
+																									"image/webp",
+																									"image/gif"
+																								],
+																								"description": "Media type verified from the stored bytes."
+																							},
+																							"bytes": {
+																								"type": "number",
+																								"description": "Exact encoded byte length."
+																							},
+																							"width": {
+																								"type": "number",
+																								"description": "Intrinsic encoded width in pixels."
+																							},
+																							"height": {
+																								"type": "number",
+																								"description": "Intrinsic encoded height in pixels."
+																							},
+																							"name": {
+																								"type": "string",
+																								"description": "Optional display name stripped of local path information."
+																							},
+																							"originalDimensions": {
+																								"type": "object",
+																								"properties": {
+																									"width": { "type": "number" },
+																									"height": { "type": "number" }
+																								},
+																								"required": ["width", "height"],
+																								"additionalProperties": true,
+																								"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																							}
+																						},
+																						"required": [
+																							"attachmentId",
+																							"mediaType",
+																							"bytes",
+																							"width",
+																							"height"
+																						],
+																						"additionalProperties": true
+																					},
+																					"path": {
+																						"type": "string",
+																						"description": "Native execution-world read path, when the attachment is locally accessible."
+																					}
+																				},
+																				"required": ["type", "attachment"],
+																				"additionalProperties": true
+																			}] }
+																		},
 																		"truncated": { "type": "boolean" },
 																		"state": {
 																			"type": "string",
@@ -2155,6 +3030,114 @@ window.__ModuleLoader__.load({
 																			]
 																		},
 																		"text": { "type": "string" },
+																		"attachments": {
+																			"type": "array",
+																			"items": { "oneOf": [{
+																				"type": "object",
+																				"properties": {
+																					"type": {
+																						"type": "string",
+																						"const": "file"
+																					},
+																					"attachment": {
+																						"type": "object",
+																						"properties": {
+																							"attachmentId": {
+																								"type": "string",
+																								"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																							},
+																							"name": {
+																								"type": "string",
+																								"description": "Sanitized display filename, also the stored object's leaf name."
+																							},
+																							"bytes": {
+																								"type": "number",
+																								"description": "Exact byte length."
+																							}
+																						},
+																						"required": [
+																							"attachmentId",
+																							"name",
+																							"bytes"
+																						],
+																						"additionalProperties": true
+																					},
+																					"path": {
+																						"type": "string",
+																						"description": "Native execution-world read path, when the attachment is locally accessible."
+																					}
+																				},
+																				"required": ["type", "attachment"],
+																				"additionalProperties": true
+																			}, {
+																				"type": "object",
+																				"properties": {
+																					"type": {
+																						"type": "string",
+																						"const": "image"
+																					},
+																					"attachment": {
+																						"type": "object",
+																						"properties": {
+																							"attachmentId": {
+																								"type": "string",
+																								"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																							},
+																							"mediaType": {
+																								"type": "string",
+																								"enum": [
+																									"image/png",
+																									"image/jpeg",
+																									"image/webp",
+																									"image/gif"
+																								],
+																								"description": "Media type verified from the stored bytes."
+																							},
+																							"bytes": {
+																								"type": "number",
+																								"description": "Exact encoded byte length."
+																							},
+																							"width": {
+																								"type": "number",
+																								"description": "Intrinsic encoded width in pixels."
+																							},
+																							"height": {
+																								"type": "number",
+																								"description": "Intrinsic encoded height in pixels."
+																							},
+																							"name": {
+																								"type": "string",
+																								"description": "Optional display name stripped of local path information."
+																							},
+																							"originalDimensions": {
+																								"type": "object",
+																								"properties": {
+																									"width": { "type": "number" },
+																									"height": { "type": "number" }
+																								},
+																								"required": ["width", "height"],
+																								"additionalProperties": true,
+																								"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																							}
+																						},
+																						"required": [
+																							"attachmentId",
+																							"mediaType",
+																							"bytes",
+																							"width",
+																							"height"
+																						],
+																						"additionalProperties": true
+																					},
+																					"path": {
+																						"type": "string",
+																						"description": "Native execution-world read path, when the attachment is locally accessible."
+																					}
+																				},
+																				"required": ["type", "attachment"],
+																				"additionalProperties": true
+																			}] }
+																		},
 																		"truncated": { "type": "boolean" },
 																		"state": {
 																			"type": "string",
@@ -2195,6 +3178,114 @@ window.__ModuleLoader__.load({
 																			]
 																		},
 																		"text": { "type": "string" },
+																		"attachments": {
+																			"type": "array",
+																			"items": { "oneOf": [{
+																				"type": "object",
+																				"properties": {
+																					"type": {
+																						"type": "string",
+																						"const": "file"
+																					},
+																					"attachment": {
+																						"type": "object",
+																						"properties": {
+																							"attachmentId": {
+																								"type": "string",
+																								"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																							},
+																							"name": {
+																								"type": "string",
+																								"description": "Sanitized display filename, also the stored object's leaf name."
+																							},
+																							"bytes": {
+																								"type": "number",
+																								"description": "Exact byte length."
+																							}
+																						},
+																						"required": [
+																							"attachmentId",
+																							"name",
+																							"bytes"
+																						],
+																						"additionalProperties": true
+																					},
+																					"path": {
+																						"type": "string",
+																						"description": "Native execution-world read path, when the attachment is locally accessible."
+																					}
+																				},
+																				"required": ["type", "attachment"],
+																				"additionalProperties": true
+																			}, {
+																				"type": "object",
+																				"properties": {
+																					"type": {
+																						"type": "string",
+																						"const": "image"
+																					},
+																					"attachment": {
+																						"type": "object",
+																						"properties": {
+																							"attachmentId": {
+																								"type": "string",
+																								"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																							},
+																							"mediaType": {
+																								"type": "string",
+																								"enum": [
+																									"image/png",
+																									"image/jpeg",
+																									"image/webp",
+																									"image/gif"
+																								],
+																								"description": "Media type verified from the stored bytes."
+																							},
+																							"bytes": {
+																								"type": "number",
+																								"description": "Exact encoded byte length."
+																							},
+																							"width": {
+																								"type": "number",
+																								"description": "Intrinsic encoded width in pixels."
+																							},
+																							"height": {
+																								"type": "number",
+																								"description": "Intrinsic encoded height in pixels."
+																							},
+																							"name": {
+																								"type": "string",
+																								"description": "Optional display name stripped of local path information."
+																							},
+																							"originalDimensions": {
+																								"type": "object",
+																								"properties": {
+																									"width": { "type": "number" },
+																									"height": { "type": "number" }
+																								},
+																								"required": ["width", "height"],
+																								"additionalProperties": true,
+																								"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																							}
+																						},
+																						"required": [
+																							"attachmentId",
+																							"mediaType",
+																							"bytes",
+																							"width",
+																							"height"
+																						],
+																						"additionalProperties": true
+																					},
+																					"path": {
+																						"type": "string",
+																						"description": "Native execution-world read path, when the attachment is locally accessible."
+																					}
+																				},
+																				"required": ["type", "attachment"],
+																				"additionalProperties": true
+																			}] }
+																		},
 																		"truncated": { "type": "boolean" },
 																		"state": {
 																			"type": "string",
@@ -2237,6 +3328,114 @@ window.__ModuleLoader__.load({
 																				]
 																			},
 																			"text": { "type": "string" },
+																			"attachments": {
+																				"type": "array",
+																				"items": { "oneOf": [{
+																					"type": "object",
+																					"properties": {
+																						"type": {
+																							"type": "string",
+																							"const": "file"
+																						},
+																						"attachment": {
+																							"type": "object",
+																							"properties": {
+																								"attachmentId": {
+																									"type": "string",
+																									"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																								},
+																								"name": {
+																									"type": "string",
+																									"description": "Sanitized display filename, also the stored object's leaf name."
+																								},
+																								"bytes": {
+																									"type": "number",
+																									"description": "Exact byte length."
+																								}
+																							},
+																							"required": [
+																								"attachmentId",
+																								"name",
+																								"bytes"
+																							],
+																							"additionalProperties": true
+																						},
+																						"path": {
+																							"type": "string",
+																							"description": "Native execution-world read path, when the attachment is locally accessible."
+																						}
+																					},
+																					"required": ["type", "attachment"],
+																					"additionalProperties": true
+																				}, {
+																					"type": "object",
+																					"properties": {
+																						"type": {
+																							"type": "string",
+																							"const": "image"
+																						},
+																						"attachment": {
+																							"type": "object",
+																							"properties": {
+																								"attachmentId": {
+																									"type": "string",
+																									"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																								},
+																								"mediaType": {
+																									"type": "string",
+																									"enum": [
+																										"image/png",
+																										"image/jpeg",
+																										"image/webp",
+																										"image/gif"
+																									],
+																									"description": "Media type verified from the stored bytes."
+																								},
+																								"bytes": {
+																									"type": "number",
+																									"description": "Exact encoded byte length."
+																								},
+																								"width": {
+																									"type": "number",
+																									"description": "Intrinsic encoded width in pixels."
+																								},
+																								"height": {
+																									"type": "number",
+																									"description": "Intrinsic encoded height in pixels."
+																								},
+																								"name": {
+																									"type": "string",
+																									"description": "Optional display name stripped of local path information."
+																								},
+																								"originalDimensions": {
+																									"type": "object",
+																									"properties": {
+																										"width": { "type": "number" },
+																										"height": { "type": "number" }
+																									},
+																									"required": ["width", "height"],
+																									"additionalProperties": true,
+																									"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																								}
+																							},
+																							"required": [
+																								"attachmentId",
+																								"mediaType",
+																								"bytes",
+																								"width",
+																								"height"
+																							],
+																							"additionalProperties": true
+																						},
+																						"path": {
+																							"type": "string",
+																							"description": "Native execution-world read path, when the attachment is locally accessible."
+																						}
+																					},
+																					"required": ["type", "attachment"],
+																					"additionalProperties": true
+																				}] }
+																			},
 																			"truncated": { "type": "boolean" },
 																			"state": {
 																				"type": "string",
@@ -2624,7 +3823,115 @@ window.__ModuleLoader__.load({
 												"type": "string",
 												"enum": ["user", "assistant"]
 											},
-											"text": { "type": "string" }
+											"text": { "type": "string" },
+											"attachments": {
+												"type": "array",
+												"items": { "oneOf": [{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "file"
+														},
+														"attachment": {
+															"type": "object",
+															"properties": {
+																"attachmentId": {
+																	"type": "string",
+																	"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																},
+																"name": {
+																	"type": "string",
+																	"description": "Sanitized display filename, also the stored object's leaf name."
+																},
+																"bytes": {
+																	"type": "number",
+																	"description": "Exact byte length."
+																}
+															},
+															"required": [
+																"attachmentId",
+																"name",
+																"bytes"
+															],
+															"additionalProperties": true
+														},
+														"path": {
+															"type": "string",
+															"description": "Native execution-world read path, when the attachment is locally accessible."
+														}
+													},
+													"required": ["type", "attachment"],
+													"additionalProperties": true
+												}, {
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "image"
+														},
+														"attachment": {
+															"type": "object",
+															"properties": {
+																"attachmentId": {
+																	"type": "string",
+																	"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																},
+																"mediaType": {
+																	"type": "string",
+																	"enum": [
+																		"image/png",
+																		"image/jpeg",
+																		"image/webp",
+																		"image/gif"
+																	],
+																	"description": "Media type verified from the stored bytes."
+																},
+																"bytes": {
+																	"type": "number",
+																	"description": "Exact encoded byte length."
+																},
+																"width": {
+																	"type": "number",
+																	"description": "Intrinsic encoded width in pixels."
+																},
+																"height": {
+																	"type": "number",
+																	"description": "Intrinsic encoded height in pixels."
+																},
+																"name": {
+																	"type": "string",
+																	"description": "Optional display name stripped of local path information."
+																},
+																"originalDimensions": {
+																	"type": "object",
+																	"properties": {
+																		"width": { "type": "number" },
+																		"height": { "type": "number" }
+																	},
+																	"required": ["width", "height"],
+																	"additionalProperties": true,
+																	"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																}
+															},
+															"required": [
+																"attachmentId",
+																"mediaType",
+																"bytes",
+																"width",
+																"height"
+															],
+															"additionalProperties": true
+														},
+														"path": {
+															"type": "string",
+															"description": "Native execution-world read path, when the attachment is locally accessible."
+														}
+													},
+													"required": ["type", "attachment"],
+													"additionalProperties": true
+												}] }
+											}
 										},
 										"required": [
 											"index",
@@ -3057,6 +4364,114 @@ window.__ModuleLoader__.load({
 																	]
 																},
 																"text": { "type": "string" },
+																"attachments": {
+																	"type": "array",
+																	"items": { "oneOf": [{
+																		"type": "object",
+																		"properties": {
+																			"type": {
+																				"type": "string",
+																				"const": "file"
+																			},
+																			"attachment": {
+																				"type": "object",
+																				"properties": {
+																					"attachmentId": {
+																						"type": "string",
+																						"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																					},
+																					"name": {
+																						"type": "string",
+																						"description": "Sanitized display filename, also the stored object's leaf name."
+																					},
+																					"bytes": {
+																						"type": "number",
+																						"description": "Exact byte length."
+																					}
+																				},
+																				"required": [
+																					"attachmentId",
+																					"name",
+																					"bytes"
+																				],
+																				"additionalProperties": true
+																			},
+																			"path": {
+																				"type": "string",
+																				"description": "Native execution-world read path, when the attachment is locally accessible."
+																			}
+																		},
+																		"required": ["type", "attachment"],
+																		"additionalProperties": true
+																	}, {
+																		"type": "object",
+																		"properties": {
+																			"type": {
+																				"type": "string",
+																				"const": "image"
+																			},
+																			"attachment": {
+																				"type": "object",
+																				"properties": {
+																					"attachmentId": {
+																						"type": "string",
+																						"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																					},
+																					"mediaType": {
+																						"type": "string",
+																						"enum": [
+																							"image/png",
+																							"image/jpeg",
+																							"image/webp",
+																							"image/gif"
+																						],
+																						"description": "Media type verified from the stored bytes."
+																					},
+																					"bytes": {
+																						"type": "number",
+																						"description": "Exact encoded byte length."
+																					},
+																					"width": {
+																						"type": "number",
+																						"description": "Intrinsic encoded width in pixels."
+																					},
+																					"height": {
+																						"type": "number",
+																						"description": "Intrinsic encoded height in pixels."
+																					},
+																					"name": {
+																						"type": "string",
+																						"description": "Optional display name stripped of local path information."
+																					},
+																					"originalDimensions": {
+																						"type": "object",
+																						"properties": {
+																							"width": { "type": "number" },
+																							"height": { "type": "number" }
+																						},
+																						"required": ["width", "height"],
+																						"additionalProperties": true,
+																						"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																					}
+																				},
+																				"required": [
+																					"attachmentId",
+																					"mediaType",
+																					"bytes",
+																					"width",
+																					"height"
+																				],
+																				"additionalProperties": true
+																			},
+																			"path": {
+																				"type": "string",
+																				"description": "Native execution-world read path, when the attachment is locally accessible."
+																			}
+																		},
+																		"required": ["type", "attachment"],
+																		"additionalProperties": true
+																	}] }
+																},
 																"truncated": { "type": "boolean" },
 																"state": {
 																	"type": "string",
@@ -3097,6 +4512,114 @@ window.__ModuleLoader__.load({
 																	]
 																},
 																"text": { "type": "string" },
+																"attachments": {
+																	"type": "array",
+																	"items": { "oneOf": [{
+																		"type": "object",
+																		"properties": {
+																			"type": {
+																				"type": "string",
+																				"const": "file"
+																			},
+																			"attachment": {
+																				"type": "object",
+																				"properties": {
+																					"attachmentId": {
+																						"type": "string",
+																						"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																					},
+																					"name": {
+																						"type": "string",
+																						"description": "Sanitized display filename, also the stored object's leaf name."
+																					},
+																					"bytes": {
+																						"type": "number",
+																						"description": "Exact byte length."
+																					}
+																				},
+																				"required": [
+																					"attachmentId",
+																					"name",
+																					"bytes"
+																				],
+																				"additionalProperties": true
+																			},
+																			"path": {
+																				"type": "string",
+																				"description": "Native execution-world read path, when the attachment is locally accessible."
+																			}
+																		},
+																		"required": ["type", "attachment"],
+																		"additionalProperties": true
+																	}, {
+																		"type": "object",
+																		"properties": {
+																			"type": {
+																				"type": "string",
+																				"const": "image"
+																			},
+																			"attachment": {
+																				"type": "object",
+																				"properties": {
+																					"attachmentId": {
+																						"type": "string",
+																						"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																					},
+																					"mediaType": {
+																						"type": "string",
+																						"enum": [
+																							"image/png",
+																							"image/jpeg",
+																							"image/webp",
+																							"image/gif"
+																						],
+																						"description": "Media type verified from the stored bytes."
+																					},
+																					"bytes": {
+																						"type": "number",
+																						"description": "Exact encoded byte length."
+																					},
+																					"width": {
+																						"type": "number",
+																						"description": "Intrinsic encoded width in pixels."
+																					},
+																					"height": {
+																						"type": "number",
+																						"description": "Intrinsic encoded height in pixels."
+																					},
+																					"name": {
+																						"type": "string",
+																						"description": "Optional display name stripped of local path information."
+																					},
+																					"originalDimensions": {
+																						"type": "object",
+																						"properties": {
+																							"width": { "type": "number" },
+																							"height": { "type": "number" }
+																						},
+																						"required": ["width", "height"],
+																						"additionalProperties": true,
+																						"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																					}
+																				},
+																				"required": [
+																					"attachmentId",
+																					"mediaType",
+																					"bytes",
+																					"width",
+																					"height"
+																				],
+																				"additionalProperties": true
+																			},
+																			"path": {
+																				"type": "string",
+																				"description": "Native execution-world read path, when the attachment is locally accessible."
+																			}
+																		},
+																		"required": ["type", "attachment"],
+																		"additionalProperties": true
+																	}] }
+																},
 																"truncated": { "type": "boolean" },
 																"state": {
 																	"type": "string",
@@ -3139,6 +4662,114 @@ window.__ModuleLoader__.load({
 																		]
 																	},
 																	"text": { "type": "string" },
+																	"attachments": {
+																		"type": "array",
+																		"items": { "oneOf": [{
+																			"type": "object",
+																			"properties": {
+																				"type": {
+																					"type": "string",
+																					"const": "file"
+																				},
+																				"attachment": {
+																					"type": "object",
+																					"properties": {
+																						"attachmentId": {
+																							"type": "string",
+																							"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																						},
+																						"name": {
+																							"type": "string",
+																							"description": "Sanitized display filename, also the stored object's leaf name."
+																						},
+																						"bytes": {
+																							"type": "number",
+																							"description": "Exact byte length."
+																						}
+																					},
+																					"required": [
+																						"attachmentId",
+																						"name",
+																						"bytes"
+																					],
+																					"additionalProperties": true
+																				},
+																				"path": {
+																					"type": "string",
+																					"description": "Native execution-world read path, when the attachment is locally accessible."
+																				}
+																			},
+																			"required": ["type", "attachment"],
+																			"additionalProperties": true
+																		}, {
+																			"type": "object",
+																			"properties": {
+																				"type": {
+																					"type": "string",
+																					"const": "image"
+																				},
+																				"attachment": {
+																					"type": "object",
+																					"properties": {
+																						"attachmentId": {
+																							"type": "string",
+																							"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																						},
+																						"mediaType": {
+																							"type": "string",
+																							"enum": [
+																								"image/png",
+																								"image/jpeg",
+																								"image/webp",
+																								"image/gif"
+																							],
+																							"description": "Media type verified from the stored bytes."
+																						},
+																						"bytes": {
+																							"type": "number",
+																							"description": "Exact encoded byte length."
+																						},
+																						"width": {
+																							"type": "number",
+																							"description": "Intrinsic encoded width in pixels."
+																						},
+																						"height": {
+																							"type": "number",
+																							"description": "Intrinsic encoded height in pixels."
+																						},
+																						"name": {
+																							"type": "string",
+																							"description": "Optional display name stripped of local path information."
+																						},
+																						"originalDimensions": {
+																							"type": "object",
+																							"properties": {
+																								"width": { "type": "number" },
+																								"height": { "type": "number" }
+																							},
+																							"required": ["width", "height"],
+																							"additionalProperties": true,
+																							"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																						}
+																					},
+																					"required": [
+																						"attachmentId",
+																						"mediaType",
+																						"bytes",
+																						"width",
+																						"height"
+																					],
+																					"additionalProperties": true
+																				},
+																				"path": {
+																					"type": "string",
+																					"description": "Native execution-world read path, when the attachment is locally accessible."
+																				}
+																			},
+																			"required": ["type", "attachment"],
+																			"additionalProperties": true
+																		}] }
+																	},
 																	"truncated": { "type": "boolean" },
 																	"state": {
 																		"type": "string",
@@ -3457,6 +5088,114 @@ window.__ModuleLoader__.load({
 														"seq": { "type": "number" },
 														"time": { "type": "number" },
 														"text": { "type": "string" },
+														"attachments": {
+															"type": "array",
+															"items": { "oneOf": [{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "file"
+																	},
+																	"attachment": {
+																		"type": "object",
+																		"properties": {
+																			"attachmentId": {
+																				"type": "string",
+																				"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																			},
+																			"name": {
+																				"type": "string",
+																				"description": "Sanitized display filename, also the stored object's leaf name."
+																			},
+																			"bytes": {
+																				"type": "number",
+																				"description": "Exact byte length."
+																			}
+																		},
+																		"required": [
+																			"attachmentId",
+																			"name",
+																			"bytes"
+																		],
+																		"additionalProperties": true
+																	},
+																	"path": {
+																		"type": "string",
+																		"description": "Native execution-world read path, when the attachment is locally accessible."
+																	}
+																},
+																"required": ["type", "attachment"],
+																"additionalProperties": true
+															}, {
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "image"
+																	},
+																	"attachment": {
+																		"type": "object",
+																		"properties": {
+																			"attachmentId": {
+																				"type": "string",
+																				"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																			},
+																			"mediaType": {
+																				"type": "string",
+																				"enum": [
+																					"image/png",
+																					"image/jpeg",
+																					"image/webp",
+																					"image/gif"
+																				],
+																				"description": "Media type verified from the stored bytes."
+																			},
+																			"bytes": {
+																				"type": "number",
+																				"description": "Exact encoded byte length."
+																			},
+																			"width": {
+																				"type": "number",
+																				"description": "Intrinsic encoded width in pixels."
+																			},
+																			"height": {
+																				"type": "number",
+																				"description": "Intrinsic encoded height in pixels."
+																			},
+																			"name": {
+																				"type": "string",
+																				"description": "Optional display name stripped of local path information."
+																			},
+																			"originalDimensions": {
+																				"type": "object",
+																				"properties": {
+																					"width": { "type": "number" },
+																					"height": { "type": "number" }
+																				},
+																				"required": ["width", "height"],
+																				"additionalProperties": true,
+																				"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																			}
+																		},
+																		"required": [
+																			"attachmentId",
+																			"mediaType",
+																			"bytes",
+																			"width",
+																			"height"
+																		],
+																		"additionalProperties": true
+																	},
+																	"path": {
+																		"type": "string",
+																		"description": "Native execution-world read path, when the attachment is locally accessible."
+																	}
+																},
+																"required": ["type", "attachment"],
+																"additionalProperties": true
+															}] }
+														},
 														"actor": {
 															"type": "string",
 															"enum": [
@@ -3484,6 +5223,114 @@ window.__ModuleLoader__.load({
 														"seq": { "type": "number" },
 														"time": { "type": "number" },
 														"text": { "type": "string" },
+														"attachments": {
+															"type": "array",
+															"items": { "oneOf": [{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "file"
+																	},
+																	"attachment": {
+																		"type": "object",
+																		"properties": {
+																			"attachmentId": {
+																				"type": "string",
+																				"description": "Opaque content-addressed storage identifier; never a filesystem path or bearer URL."
+																			},
+																			"name": {
+																				"type": "string",
+																				"description": "Sanitized display filename, also the stored object's leaf name."
+																			},
+																			"bytes": {
+																				"type": "number",
+																				"description": "Exact byte length."
+																			}
+																		},
+																		"required": [
+																			"attachmentId",
+																			"name",
+																			"bytes"
+																		],
+																		"additionalProperties": true
+																	},
+																	"path": {
+																		"type": "string",
+																		"description": "Native execution-world read path, when the attachment is locally accessible."
+																	}
+																},
+																"required": ["type", "attachment"],
+																"additionalProperties": true
+															}, {
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "image"
+																	},
+																	"attachment": {
+																		"type": "object",
+																		"properties": {
+																			"attachmentId": {
+																				"type": "string",
+																				"description": "Opaque storage identifier; never a filesystem path or bearer URL."
+																			},
+																			"mediaType": {
+																				"type": "string",
+																				"enum": [
+																					"image/png",
+																					"image/jpeg",
+																					"image/webp",
+																					"image/gif"
+																				],
+																				"description": "Media type verified from the stored bytes."
+																			},
+																			"bytes": {
+																				"type": "number",
+																				"description": "Exact encoded byte length."
+																			},
+																			"width": {
+																				"type": "number",
+																				"description": "Intrinsic encoded width in pixels."
+																			},
+																			"height": {
+																				"type": "number",
+																				"description": "Intrinsic encoded height in pixels."
+																			},
+																			"name": {
+																				"type": "string",
+																				"description": "Optional display name stripped of local path information."
+																			},
+																			"originalDimensions": {
+																				"type": "object",
+																				"properties": {
+																					"width": { "type": "number" },
+																					"height": { "type": "number" }
+																				},
+																				"required": ["width", "height"],
+																				"additionalProperties": true,
+																				"description": "Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."
+																			}
+																		},
+																		"required": [
+																			"attachmentId",
+																			"mediaType",
+																			"bytes",
+																			"width",
+																			"height"
+																		],
+																		"additionalProperties": true
+																	},
+																	"path": {
+																		"type": "string",
+																		"description": "Native execution-world read path, when the attachment is locally accessible."
+																	}
+																},
+																"required": ["type", "attachment"],
+																"additionalProperties": true
+															}] }
+														},
 														"actor": {
 															"type": "string",
 															"enum": [
@@ -3888,24 +5735,24 @@ window.__ModuleLoader__.load({
 			};
 		}
 		// src/client/worker-parent.ts
-		/** Native child input needs its parent Agent; opening the parent restores it without a prompt. */
+		/** Visible Worker input retains its exact native Session and real parent chain. */
 		function bindWorkerParents(client, sessions) {
 			const held = /* @__PURE__ */ new Map();
-			const nested = /* @__PURE__ */ new Map();
-			const releaseNested = (slot) => {
+			const resident = /* @__PURE__ */ new Map();
+			const releaseResident = (slot) => {
 				slot.abort.abort();
 				slot.stream?.dispose();
 			};
 			const reconcile = () => {
 				const { byId } = sessions.list.getSnapshot();
 				const needed = /* @__PURE__ */ new Set();
-				const neededNested = /* @__PURE__ */ new Set();
+				const neededWorkers = /* @__PURE__ */ new Set();
 				for (const project of client.store.projects()) {
 					if (project.project.mode !== "enabled") continue;
 					for (const worker of project.workers) {
 						if (worker.lifecycle !== "active" || !Object.entries(byId[worker.workerId]?.retainedBy ?? {}).some(([source, count]) => (source === "mainView" || source === "sidebarChat") && count > 0)) continue;
 						needed.add(project.project.coordinatorSessionId);
-						if (worker.parentSessionId && worker.parentSessionId !== project.project.coordinatorSessionId) neededNested.add(worker.workerId);
+						neededWorkers.add(worker.workerId);
 					}
 				}
 				for (const [id, lease] of held) {
@@ -3927,24 +5774,24 @@ window.__ModuleLoader__.load({
 						console.error("Project Mode: parent acquisition failed", error);
 					}
 				}
-				for (const [id, slot] of nested) {
-					if (neededNested.has(id) && slot.version === client.connectionVersion) continue;
-					nested.delete(id);
-					releaseNested(slot);
+				for (const [id, slot] of resident) {
+					if (neededWorkers.has(id) && slot.version === client.connectionVersion) continue;
+					resident.delete(id);
+					releaseResident(slot);
 				}
-				for (const id of neededNested) {
-					if (nested.has(id)) continue;
+				for (const id of neededWorkers) {
+					if (resident.has(id)) continue;
 					const slot = {
 						abort: new AbortController(),
 						version: client.connectionVersion
 					};
-					nested.set(id, slot);
+					resident.set(id, slot);
 					(async () => {
 						try {
 							slot.stream = client.followWorkerParent(id, slot.abort.signal);
 							for await (const _ready of slot.stream) if (slot.abort.signal.aborted) return;
 						} catch (error) {
-							if (!slot.abort.signal.aborted) console.error("MoA+: nested parent opening failed", error);
+							if (!slot.abort.signal.aborted) console.error("MoA+: Worker residency failed", error);
 						}
 					})();
 				}
@@ -3959,8 +5806,8 @@ window.__ModuleLoader__.load({
 				for (const off of unsubscribe) off();
 				for (const lease of held.values()) lease.reference?.release();
 				held.clear();
-				for (const slot of nested.values()) releaseNested(slot);
-				nested.clear();
+				for (const slot of resident.values()) releaseResident(slot);
+				resident.clear();
 			};
 		}
 		// ../../node_modules/@deepseek-ai/dsh-util-workspace-path/lib/index.js
@@ -4313,6 +6160,34 @@ window.__ModuleLoader__.load({
 				}) : preview })
 			});
 		}
+		function MessageBody({ message, labels, open }) {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [message.text && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
+				text: message.text,
+				labels
+			}), !!message.attachments?.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
+				className: "pm-axis-files",
+				children: message.attachments.map(({ type, attachment, path }, index) => {
+					const name = attachment.name ?? attachment.attachmentId;
+					const label = /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FileTypeIcon, {
+							path: name,
+							size: 16
+						}),
+						" ",
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: name })
+					] });
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("li", { children: path ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						title: path,
+						onClick: () => open(path),
+						children: label
+					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						title: attachment.attachmentId,
+						children: label
+					}) }, `${type}:${attachment.attachmentId}:${index}`);
+				})
+			})] });
+		}
 		function WorkersPanel({ client, open, timeline, sessionId, useTabInfo, t }) {
 			const project = useSelected(client.store.subscribe, () => projectForSession(client, sessionId));
 			const generation = useSelected(client.subscribeModes, () => client.connectionVersion);
@@ -4469,9 +6344,10 @@ window.__ModuleLoader__.load({
 												" ·",
 												" ",
 												t(message.actor === "coordinator" ? "fromCoordinator" : message.actor === "agent" ? "fromAgent" : "fromUser"),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
-													text: message.text,
-													labels
+												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
+													message,
+													labels,
+													open: (path) => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, path))
 												})
 											]
 										}, message.id))]
@@ -4482,9 +6358,10 @@ window.__ModuleLoader__.load({
 											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineOutputs") }),
 											turn.outputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 												className: "pm-axis-message",
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
-													text: message.text,
-													labels
+												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
+													message,
+													labels,
+													open: (path) => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, path))
 												})]
 											}, message.id)),
 											!turn.outputs.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {

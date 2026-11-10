@@ -5,5 +5,5 @@ declare module "@deepseek-ai/dsh-api-session-controller/client" {
         projectModeParent: unknown;
     }
 }
-/** Native child input needs its parent Agent; opening the parent restores it without a prompt. */
+/** Visible Worker input retains its exact native Session and real parent chain. */
 export declare function bindWorkerParents(client: ProjectClient, sessions: ISessions): () => void;

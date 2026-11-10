@@ -8,6 +8,7 @@ import * as reactDomClient from "react-dom/client";
 import * as store from "@deepseek-ai/dsh-client-store";
 import * as slots from "@deepseek-ai/dsh-client-ui-slots";
 import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
+import * as gateway from "@deepseek-ai/dsh-api-gateway/client";
 import * as virtual from "@tanstack/react-virtual";
 import * as zod from "zod";
 const resolve = createRequire(import.meta.url).resolve;
@@ -22,16 +23,21 @@ export function nativeLoader() {
       "@deepseek-ai/dsh-client-store": store,
       "@deepseek-ai/dsh-client-ui-slots": slots,
       "@deepseek-ai/dsh-client-ui-primitives": primitives,
+      "@deepseek-ai/dsh-api-gateway/client": gateway,
       "@tanstack/react-virtual": virtual,
       zod,
     }),
   );
-  return function capture<T>(id: string): T {
+  return function capture<T>(
+    id: string,
+    transform?: (source: string) => string,
+  ): T {
     let registration: any;
     (window as any).__ModuleLoader__ = {
       load: (r: unknown) => (registration = r),
     };
-    new Function(readFileSync(resolve(id + "/client"), "utf8"))();
+    const source = readFileSync(resolve(id + "/client"), "utf8");
+    new Function(transform ? transform(source) : source)();
     if (registration.id !== id) throw new Error("Wrong factory");
     const req: any = (s: string) => {
       if (!baseline.has(s)) throw new Error("Missing actual baseline " + s);

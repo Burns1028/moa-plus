@@ -264,7 +264,9 @@ function prerequisites(paths) {
 
 function nativeEntries() {
   return json(join(repository, "compat/rc3/manifest.json")).filter(
-    (entry) => entry.variant !== "desktop",
+    (entry, index, entries) =>
+      entry.variant !== "desktop" &&
+      entries.findIndex((other) => other.package === entry.package) === index,
   );
 }
 
@@ -447,10 +449,23 @@ function verifyRetry(paths, source) {
         `Refusing to overwrite changed owned profile ${name}; use a fresh --dir.`,
       );
   }
+  const variants = json(join(repository, "compat/rc3/manifest.json")).filter(
+    (entry) => entry.variant !== "desktop",
+  );
   for (const entry of nativeEntries())
     for (const file of entry.files) {
       const path = noSymlinks(join(paths.backup, entry.package, file.file));
-      if (stat(path) && hash(path) !== file.before)
+      if (
+        stat(path) &&
+        !variants
+          .filter((candidate) => candidate.package === entry.package)
+          .some((candidate) =>
+            candidate.files.some(
+              (preimage) =>
+                preimage.file === file.file && preimage.before === hash(path),
+            ),
+          )
+      )
         throw new Error(
           "Original native backup integrity changed; refusing to overwrite it.",
         );

@@ -79,14 +79,21 @@ function readyFixture(t, { stock = false } = {}) {
     copyFileSync(join(root, "runtime/rc3", name), join(profile, name));
   const manifest = JSON.parse(
     readFileSync(join(root, "compat/rc3/manifest.json"), "utf8"),
-  ).filter((entry, index, entries) => entry.variant !== "desktop" && entries.findIndex(other => other.package === entry.package) === index);
+  ).filter(
+    (entry, index, entries) =>
+      entry.variant !== "desktop" &&
+      entries.findIndex((other) => other.package === entry.package) === index,
+  );
   const source = stock
     ? join(root, "runtime/rc3/node_modules")
     : join(root, "node_modules");
   for (const entry of manifest) {
     const packageRoot = join(modules, entry.package);
     mkdirSync(packageRoot, { recursive: true });
-    copyFileSync(join(source, entry.package, "package.json"), join(packageRoot, "package.json"));
+    copyFileSync(
+      join(source, entry.package, "package.json"),
+      join(packageRoot, "package.json"),
+    );
     for (const file of entry.files) {
       const target = join(modules, entry.package, file.file);
       mkdirSync(dirname(target), { recursive: true });
@@ -555,6 +562,82 @@ test("retry never overwrites a file through an existing artifact symlink", (t) =
   );
   assert.notEqual(result.status, 0);
   assert.equal(readFileSync(outside, "utf8"), "unrelated data");
+});
+
+test("setup retry validates one original backup per package despite upgrade preimages", (t) => {
+  for (const variant of ["npm", "moa-0.2.0"]) {
+    const { directory } = readyFixture(t);
+    writeFileSync(
+      join(directory, markerName),
+      JSON.stringify(marker(directory, "failed")),
+    );
+    const entry = JSON.parse(
+      readFileSync(join(root, "compat/rc3/manifest.json"), "utf8"),
+    ).find(
+      (entry) =>
+        entry.package === "@deepseek-ai/dsh-client-ui-conversation" &&
+        entry.variant === variant,
+    );
+    const stock = join(directory, "stock");
+    mkdirSync(join(stock, "lib"), { recursive: true });
+    copyFileSync(
+      join(root, "node_modules", entry.package, "lib/client.js"),
+      join(stock, "lib/client.js"),
+    );
+    const reverse = spawnSync(
+      "git",
+      [
+        "apply",
+        "--reverse",
+        "--unsafe-paths",
+        `--directory=${stock}`,
+        join(root, "compat/rc3", entry.runtimePatch),
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.equal(reverse.status, 0, reverse.stderr);
+    const backup = join(
+      directory,
+      "native-backup",
+      entry.package,
+      "lib/client.js",
+    );
+    mkdirSync(dirname(backup), { recursive: true });
+    copyFileSync(join(stock, "lib/client.js"), backup);
+    const bin = join(directory, "bin");
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, "npm"),
+      `#!${process.execPath}\nif(process.argv[2]==='--version')console.log('11.0.0');else process.exit(37);\n`,
+    );
+    chmodSync(join(bin, "npm"), 0o755);
+    const result = spawnSync(
+      process.execPath,
+      [script, "setup", "--dir", directory],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /npm.*37/);
+    assert.equal(
+      digest(backup),
+      entry.files.find((file) => file.file === "lib/client.js").before,
+    );
+    writeFileSync(backup, "not an audited native preimage");
+    const rejected = spawnSync(
+      process.execPath,
+      [script, "setup", "--dir", directory],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      },
+    );
+    assert.match(rejected.stderr, /backup integrity changed/);
+  }
 });
 
 test(

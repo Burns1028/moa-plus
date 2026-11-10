@@ -6,6 +6,7 @@ import type {
 } from "../shared/index.ts";
 import type { HostAccess } from "./host-access.ts";
 import { abortableChange } from "./native.ts";
+import { messageContent } from "./message-content.ts";
 
 export async function readWorkerTimeline(
   host: HostAccess,
@@ -57,10 +58,7 @@ export async function readWorkerTimeline(
         id: event.data.id,
         seq: event.seq,
         time: event.time,
-        text: event.data.content
-          .filter((b) => b.type === "text")
-          .map((b) => b.text)
-          .join(""),
+        ...messageContent(host.ctx, event.data.content),
         actor:
           event.data.source.kind === "moa-message"
             ? event.data.source.senderId === record.project.coordinatorSessionId
@@ -76,20 +74,18 @@ export async function readWorkerTimeline(
       event.type === "assistant/message" &&
       event.data.turn === current.turn
     ) {
-      const text = event.data.message.content
-        .filter((b) => b.type === "text")
-        .map((b) => b.text)
-        .join("");
-      current.outputs = text
-        ? [
-            {
-              id: event.data.message.id,
-              seq: event.seq,
-              time: event.time,
-              text,
-            },
-          ]
-        : [];
+      const content = messageContent(host.ctx, event.data.message.content);
+      current.outputs =
+        content.text || content.attachments?.length
+          ? [
+              {
+                id: event.data.message.id,
+                seq: event.seq,
+                time: event.time,
+                ...content,
+              },
+            ]
+          : [];
     }
     if (
       event.type === "deliverables/presented" &&

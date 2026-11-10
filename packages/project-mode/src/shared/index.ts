@@ -1,4 +1,8 @@
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
+import type {
+  FileAttachmentRef,
+  ImageAttachmentRef,
+} from "@deepseek-ai/dsh-attachment";
 
 export interface ProjectPaths {
   root: string;
@@ -76,10 +80,19 @@ export interface WorkerParentReady {
   workerId: SessionId;
   parentSessionId: SessionId;
 }
+/** Durable references only; content bytes remain owned by native attachment storage. */
+export type WorkerMessageAttachment = (
+  | { type: "file"; attachment: FileAttachmentRef }
+  | { type: "image"; attachment: ImageAttachmentRef }
+) & {
+  /** Native execution-world read path, when the attachment is locally accessible. */
+  path?: string;
+};
 export interface WorkerInputView {
   messageId: string;
   actor: "user" | "coordinator" | "other";
   text: string;
+  attachments?: WorkerMessageAttachment[];
   truncated: boolean;
   state: "committed" | "pending-steer" | "pending-queue";
   /** Native admission/edit position, or committed message position. */
@@ -180,6 +193,7 @@ export interface WorkerDialogueMessage {
   turn: number;
   role: "user" | "assistant";
   text: string;
+  attachments?: WorkerMessageAttachment[];
 }
 export interface WorkerHistoryPage {
   workerId: SessionId;
@@ -195,6 +209,7 @@ export interface WorkerTimelineMessage {
   seq: number;
   time: number;
   text: string;
+  attachments?: WorkerMessageAttachment[];
   actor?: "user" | "coordinator" | "agent";
 }
 export interface WorkerArtifact {
