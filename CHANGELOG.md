@@ -6,6 +6,7 @@
 
 ### Review corrections
 
+- Accept a Verifier's plain JSON verdict or one fenced JSON verdict with surrounding explanation. Malformed or ambiguous output reports a JSON-format problem; native inspection and required-test evidence remain mandatory.
 - Organize role, review, identity and interrupt-judge prompts under `host/prompts/`, centralize collaboration tool definitions, and move shared Context I/O to the memory module without changing prompt output or native execution contracts.
 - Match accepted messages by their native source identity during recovery; unrelated message text can no longer hide a prior admission and cause duplicate insertion.
 - Use the model's lowest supported reasoning effort for rubric extraction, without changing the Coordinator or evidence-gathering Verifier's selected effort.
