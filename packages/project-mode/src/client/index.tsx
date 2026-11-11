@@ -196,7 +196,7 @@ function applyProjectClient(ctx: Context) {
         const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
         return (
           <>
-            {p.node.data.incoming && <AgentMessage {...p} message={p.node.data.incoming} settled={settled} />}
+            {p.node.data.incoming && <AgentMessage {...p} message={p.node.data.incoming} settled={settled} opening={p.node.data.openingInput} />}
             {selected && <WorkerCapsuleList
               {...p}
               turn={p.node.data.turn}

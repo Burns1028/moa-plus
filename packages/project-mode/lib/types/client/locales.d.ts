@@ -4,12 +4,11 @@ export declare const en: {
     readonly selectWorker: "Select a worker to view its work.";
     readonly openConversation: "Open conversation ↗";
     readonly loadingTimeline: "Loading timeline…";
-    readonly timelineTurn: "Task {turn}";
-    readonly timelineInputs: "Task";
-    readonly timelineOutputs: "Result";
-    readonly timelineArtifacts: "Files";
-    readonly timelineMessages: "Messages · {count}";
-    readonly originalMessage: "Original message";
+    readonly timelineTurn: "Turn {turn}";
+    readonly timelineInputs: "Input";
+    readonly timelineOutputs: "Output";
+    readonly timelineArtifacts: "Artifacts";
+    readonly emptyInput: "No new input in this turn";
     readonly collapseText: "Collapse full text";
     readonly fromCoordinator: "Coordinator";
     readonly fromAgent: "Agent";

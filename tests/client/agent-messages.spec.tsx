@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, expect, it } from "vitest";
-import { render, cleanup, screen, fireEvent } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Context } from "@deepseek-ai/cordis";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type * as Renderer from "@deepseek-ai/dsh-client-ui-renderer/client";
@@ -197,6 +197,36 @@ it("shows a loaded MoA message even when its turn boundary is outside the histor
   b.draw(node, "child");
   expect(screen.getByText("From Coordinator")).toBeDefined();
   expect(screen.getByText("Continue the investigation.")).toBeDefined();
+});
+
+it.each([
+  { kind: "project-mode-assignment", reason: "completed" },
+  { kind: "moa-message", reason: "handoff" },
+])("keeps the opening $kind task expanded after $reason through the registered client slot", async ({ kind, reason }) => {
+  const b = await bench();
+  const source = kind === "moa-message"
+    ? { kind, form: "relay", senderId: "parent", rootId: "parent", operationId: "opening" }
+    : { kind, form: "relay", coordinatorSessionId: "parent", operationId: "opening" };
+  b.assembler.replaceWindow([
+    event("turn/start", 1, { turn: 1 }), event("step/start", 2, { turn: 1, step: 1 }),
+    input(3, source, `${kind === "moa-message" ? "From: parent\n" : ""}### Assigned task\n\n**Keep this request visible.**`),
+    event("assistant/message", 4, { turn: 1, step: 1, message: {
+      id: "answer", role: "assistant", source: { kind: "model", provider: "fixture", model: "fixture" },
+      content: [{ type: "text", text: "Task completed." }],
+    }, stream: [] }),
+    event("step/end", 5, { turn: 1, step: 1 }), event("turn/end", 6, { turn: 1, reason: { kind: reason } }),
+  ], false);
+  const node = [...b.read().nodes.values()].find(n => n.kind === "project-mode-workers-tail" && n.data.incoming) as Chat.ChatNode<"project-mode-workers-tail">;
+  const ui = b.draw(node, "child");
+  const card = ui.container.querySelector<HTMLDetailsElement>("[data-moa-message]")!;
+  expect(card.open).toBe(true);
+  expect(card.hasAttribute("data-settled")).toBe(false);
+  expect(ui.getByRole("heading", { name: "Assigned task" })).toBeDefined();
+  expect(ui.container.querySelector("strong")?.textContent).toBe("Keep this request visible.");
+  fireEvent.click(card.querySelector("summary")!);
+  ui.refresh();
+  expect(card.open).toBe(false);
+  await waitFor(() => expect(card.querySelector(".pm-agent-preview")?.textContent).toContain("Keep this request visible."));
 });
 
 it.each(["completed", "handoff", "aborted"])("settles a message after %s while retaining manual access and visible failed work", async reason => {

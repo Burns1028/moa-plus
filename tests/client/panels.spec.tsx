@@ -261,10 +261,10 @@ function timelineTurn(
   };
 }
 
-function taskCard(turn: number): HTMLDetailsElement {
+function timelineEntry(turn: number): HTMLElement {
   return screen
     .getByText(t("timelineTurn", { turn }))
-    .closest<HTMLDetailsElement>("details")!;
+    .closest<HTMLElement>("article")!;
 }
 
 it("shows attachment-only timeline input and opens its existing native file resource", async () => {
@@ -362,45 +362,39 @@ it.each([
   },
 );
 
-it("opens the latest task and keeps an older round compact until its complete result is requested", async () => {
+it("shows one input, output and artifact section per turn in chronological order", async () => {
   const b = await bench(undefined, undefined, [
     timelineTurn(2),
     timelineTurn(1),
   ]);
   const ui = drawTimeline(b);
   await screen.findByText("Findings 2 Exact result 2.");
-  const latest = taskCard(2),
-    older = taskCard(1);
-  expect(latest.open).toBe(true);
-  expect(older.open).toBe(false);
-  expect(within(older).queryByText("Assignment 1 Exact task 1.")).toBeNull();
-  expect(screen.queryByText("Findings 1 Exact result 1.")).toBeNull();
+  const entries = [...ui.container.querySelectorAll(".pm-axis-turn")];
   expect(
-    latest.querySelector<HTMLDetailsElement>(".pm-task-messages")?.open,
-  ).toBe(false);
-  expect(latest.querySelector(".pm-task-message-list")).toBeNull();
-
-  fireEvent.click(older.querySelector("summary")!);
-  const preview = await within(older).findByText("Findings 1 Exact result 1.");
-  const result = preview.closest<HTMLDetailsElement>("details")!;
-  expect(result.open).toBe(false);
-  fireEvent.click(preview);
+    entries.map((entry) => entry.querySelector("strong")?.textContent),
+  ).toEqual(["Turn 1", "Turn 2"]);
+  for (const entry of entries) {
+    expect(
+      [...entry.querySelectorAll("h4")].map((heading) => heading.textContent),
+    ).toEqual([en.timelineInputs, en.timelineOutputs, en.timelineArtifacts]);
+    expect(entry.tagName).toBe("ARTICLE");
+  }
+  const older = timelineEntry(1);
+  expect(within(older).getByText("Assignment 1 Exact task 1.")).toBeDefined();
+  fireEvent.click(within(older).getByText("Findings 1 Exact result 1."));
   expect(
     await within(older).findByRole("heading", { name: "Findings 1" }),
   ).toBeDefined();
-  expect(within(older).getByText("Exact result 1.")).toBeDefined();
-  expect(latest.open).toBe(true);
   fireEvent.click(within(older).getByRole("button", { name: "report-1.md" }));
   expect(ui.openResource).toHaveBeenCalledExactlyOnceWith(
     expect.stringContaining("/child/report-1.md"),
   );
-  expect(older.open).toBe(true);
+  expect(
+    ui.container.querySelector(".pm-task-card,.pm-task-messages"),
+  ).toBeNull();
 });
 
-it("hides later communication by default, restores the original message, and opens its native attachment", async () => {
-  const rawTask = "From: coordinator\n### Clean task\n\nActual responsibility.";
-  const rawFollowup =
-    "Request ID: original-request\nFrom: teammate\n\n### Exact followup\n\nRetain this entire original message.";
+it("keeps all input messages together and exposes their attachments without another disclosure layer", async () => {
   const turn = timelineTurn(2, {
     inputs: [
       {
@@ -408,7 +402,7 @@ it("hides later communication by default, restores the original message, and ope
         seq: 20,
         time: 1700000000000,
         actor: "coordinator",
-        text: rawTask,
+        text: "From: coordinator\n### Clean task\n\nActual responsibility.",
         displayText: "### Clean task\n\nActual responsibility.",
       },
       {
@@ -416,9 +410,8 @@ it("hides later communication by default, restores the original message, and ope
         seq: 21,
         time: 1700000000100,
         actor: "agent",
-        text: rawFollowup,
-        displayText:
-          "### Exact followup\n\nRetain this entire original message.",
+        text: "Request ID: original-request\nFrom: teammate\n### Exact followup\n\nRetain this entire message.",
+        displayText: "### Exact followup\n\nRetain this entire message.",
         attachments: [
           {
             type: "image",
@@ -438,73 +431,38 @@ it("hides later communication by default, restores the original message, and ope
   });
   const b = await bench(undefined, undefined, [turn]);
   const ui = drawTimeline(b);
-  await screen.findByText("Clean task Actual responsibility.");
-  const card = taskCard(2);
-  const messages = card.querySelector<HTMLDetailsElement>(".pm-task-messages")!;
-  expect(messages.open).toBe(false);
-  expect(
-    screen.queryByText("Exact followup Retain this entire original message."),
-  ).toBeNull();
-  expect(screen.queryByRole("button", { name: "followup.png" })).toBeNull();
+  const preview = await screen.findByText(
+    "Clean task Actual responsibility. Exact followup Retain this entire message.",
+  );
+  const entry = timelineEntry(2);
+  expect(entry.querySelectorAll(".pm-axis-section")).toHaveLength(3);
   expect(ui.container.textContent).not.toContain("From: coordinator");
   expect(ui.container.textContent).not.toContain(
     "Request ID: original-request",
   );
-
-  fireEvent.click(messages.querySelector("summary")!);
-  await within(messages).findByText(
-    "Exact followup Retain this entire original message.",
-  );
-  const originals =
-    messages.querySelectorAll<HTMLDetailsElement>(".pm-task-raw");
-  expect(originals).toHaveLength(2);
-  expect([...originals].every((item) => !item.open)).toBe(true);
-  fireEvent.click(originals[1].querySelector("summary")!);
-  expect(originals[1].open).toBe(true);
-  expect(
-    await within(originals[1]).findByRole("heading", {
-      name: "Exact followup",
-    }),
-  ).toBeDefined();
-  expect(originals[1].textContent).toContain("Request ID: original-request");
-  expect(originals[1].textContent).toContain("From: teammate");
-  expect(originals[1].textContent).toContain(
-    "Retain this entire original message.",
-  );
-  fireEvent.click(
-    within(messages).getByRole("button", { name: "followup.png" }),
-  );
+  fireEvent.click(within(entry).getByRole("button", { name: "followup.png" }));
   expect(ui.openResource).toHaveBeenCalledExactlyOnceWith(
     expect.stringContaining("followup.png"),
   );
-  expect(messages.open).toBe(true);
-  expect(card.open).toBe(true);
+  fireEvent.click(preview);
+  expect(
+    await within(entry).findByRole("heading", { name: "Clean task" }),
+  ).toBeDefined();
+  expect(
+    within(entry).getByRole("heading", { name: "Exact followup" }),
+  ).toBeDefined();
+  expect(within(entry).getByText("Retain this entire message.")).toBeDefined();
 });
 
-it("folds the previous default task for a new round while keeping manual choices through stream frames", async () => {
+it("preserves an expanded input or output while new chronological turns stream in", async () => {
   const second = timelineTurn(2),
-    first = timelineTurn(1),
-    third = timelineTurn(3);
+    first = timelineTurn(1);
   const b = await bench(undefined, undefined, [second, first]);
-  drawTimeline(b);
+  const ui = drawTimeline(b);
   await screen.findByText("Findings 2 Exact result 2.");
-  expect(taskCard(2).open).toBe(true);
-  act(() => b.emitTimeline([third, second, first]));
-  await screen.findByText("Findings 3 Exact result 3.");
-  await vi.waitFor(() => expect(taskCard(2).open).toBe(false));
-  expect(taskCard(3).open).toBe(true);
-  expect(taskCard(1).open).toBe(false);
-
-  const secondCard = taskCard(2),
-    thirdCard = taskCard(3);
-  fireEvent.click(secondCard.querySelector("summary")!);
-  const excerpt = await within(secondCard).findByText(
-    "Findings 2 Exact result 2.",
-  );
-  fireEvent.click(excerpt);
-  await within(secondCard).findByRole("heading", { name: "Findings 2" });
-  fireEvent.click(thirdCard.querySelector("summary")!);
-  expect(thirdCard.open).toBe(false);
+  const secondEntry = timelineEntry(2);
+  fireEvent.click(within(secondEntry).getByText("Findings 2 Exact result 2."));
+  await within(secondEntry).findByRole("heading", { name: "Findings 2" });
   const updated = {
     ...second,
     outputs: [
@@ -514,15 +472,27 @@ it("folds the previous default task for a new round while keeping manual choices
       },
     ],
   };
-  act(() => b.emitTimeline([timelineTurn(4), third, updated, first]));
+  act(() => b.emitTimeline([timelineTurn(3), updated, first]));
   await screen.findByRole("heading", { name: "Updated evidence" });
-  expect(taskCard(4).open).toBe(true);
-  expect(taskCard(3)).toBe(thirdCard);
-  expect(thirdCard.open).toBe(false);
-  expect(taskCard(2)).toBe(secondCard);
-  expect(secondCard.open).toBe(true);
-  expect(within(secondCard).getByText("Later streamed result.")).toBeDefined();
+  expect(timelineEntry(2)).toBe(secondEntry);
+  expect(within(secondEntry).getByText("Later streamed result.")).toBeDefined();
+  expect(
+    [...ui.container.querySelectorAll(".pm-axis-turn strong")].map(
+      (node) => node.textContent,
+    ),
+  ).toEqual(["Turn 1", "Turn 2", "Turn 3"]);
   expect(b.remote.timeline).toHaveBeenCalledTimes(1);
+});
+
+it("retains all three sections for a turn without new input, output or artifacts", async () => {
+  const b = await bench(undefined, undefined, [
+    timelineTurn(2, { inputs: [], outputs: [], artifacts: [] }),
+  ]);
+  drawTimeline(b);
+  expect(await screen.findByText(en.emptyInput)).toBeDefined();
+  expect(screen.getByText(en.emptyReply)).toBeDefined();
+  expect(screen.getByText(en.noArtifacts)).toBeDefined();
+  expect(timelineEntry(2).querySelectorAll("h4")).toHaveLength(3);
 });
 
 it("registers a native Workers tab and defaults once to Workers and the native notes preview without reopening closed tabs", async () => {

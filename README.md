@@ -20,7 +20,7 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-MoA+ **v0.2.5** supports the audited **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.6** supports the audited **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
 profile extends **22 native packages across 50 file paths**. Keep the plugin
 and its matching profile from the same release; a stock or differently prepared
@@ -31,12 +31,12 @@ Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares 
 
 The updated rc.2 Desktop Next profile supports protected Workers through native nonpersistent PowerShell, and Bash where installed, on Windows. It preserves existing records across Coordinator atomic updates and requires native Windows Job containment. Persistent terminals and unadapted process providers still refuse protected use. The rc.3 profile retains its macOS Seatbelt/Linux bubblewrap requirement; it does not include this Windows extension. See [backend requirements][compatibility] for the supported policy and filesystem scope.
 
-The commands below use the v0.2.5 checkout. Use `main` instead to follow development.
+The commands below use the v0.2.6 checkout. Use `main` instead to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.5 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.6 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -76,7 +76,7 @@ These are local prompt texts using the existing tools and role presets. Native s
 
 The Coordinator maintains `notes.md` and `archived.md`; the Host refreshes full notes before each Coordinator inference. Coordinator and Workers contribute reusable findings through `context/index.md`, then read relevant files as needed. Isolated Workers access the same shared knowledge, so later work can build on confirmed findings without copying every execution detail into the main conversation.
 
-A Rubric Builder derives acceptance criteria from the original requirements and specification. An Outcome Verifier checks actual deliverables with native tools and returns concrete gaps when results are incomplete or evidence is missing. See [roles and common flows][roles], the [code architecture][architecture], and the [Tool API][tools] for the full contracts.
+Automatic acceptance is off by default. Enable `completionVerification` when a task needs it: a Rubric Builder derives criteria from the original requirements, and an Outcome Verifier checks actual deliverables with native tools and returns concrete gaps. See [roles and common flows][roles], the [code architecture][architecture], and the [Tool API][tools] for the full contracts.
 
 ## See it in action
 
@@ -84,9 +84,9 @@ Select the compact **MoA+ wordmark** before the first message: gray is off and g
 
 MoA+ keeps collaboration in the native DSH interface. **Capsules are child conversations**: click one to open its Worker, or find the same Worker beneath the Coordinator in the sidebar. You can give the Worker instructions directly and use Back to return to the Coordinator. Capsules stay with the turn or message segment where the Worker participated.
 
-Agent communication appears in compact cards with a sender, message type and short preview; expand a card for the complete Markdown, with thinking kept in its own disclosure. Communication stays visible during execution and folds after completion, leaving the final answer prominent. New user input remains responsive while the team works.
+An opening Coordinator task remains visible as input in its Worker conversation. Later internal communication appears in compact cards during execution and folds after completion. Cards retain full Markdown and a separate thinking disclosure. New user input remains responsive while the team works.
 
-The closable Workers tab groups each turn into a task card, with the latest open and earlier cards folded by default. Task previews use two lines and final results use four; expand either to read the full original Markdown. File chips open attachments and artifacts. Communication records stay folded, with original messages available when needed. The read-only panel uses no model summaries; the notes.md tab keeps current work records nearby.
+The closable Workers tab shows a chronological timeline. Each turn contains just input, output, and artifacts. All inputs for that turn stay together; expand a text preview to read the complete Markdown. File links open native attachments and artifacts. The read-only panel uses no model summaries; the notes.md tab keeps current work records nearby.
 
 The demo starts with the wordmark's off/on states and theme adaptation, then opens the retained Note Bundle task to show capsules, Worker conversations, original Agent messages, the Workers timeline, notes, and results. In that real run, Exporter implemented title sorting, Docs wrote the guide, a human added instructions inside Docs, and the Coordinator checked the Worker history before verifying the result. The recording revisits that execution without starting a new model task. See the [task and actual checks](docs/demo-moa-plus.md) or [runtime verification][verification]. The earlier Project Mode recording remains in the [v0.1.23 demo archive](docs/demo-workflow.md).
 

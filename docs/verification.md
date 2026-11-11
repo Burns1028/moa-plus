@@ -1,5 +1,13 @@
 # Verification
 
+## MoA+ 0.2.6 visible inputs and opt-in acceptance — 2026-11-12
+
+The Worker opening task had been incorrectly grouped with internal process traffic. An explicit Coordinator task at native step one now remains visible in the input position, using the native control boundary; later updates and Worker reports still fold after completion. Native anchors, human interleaving and capsule ownership are retained. The Workers panel is simplified to chronological input/output/artifact sections, with all inputs together and no separate communication log or folded task cards.
+
+The production build and Host/Client typechecks passed. The final Host, Client, integration and native-contract suite passed **485 tests across 71 files**, with **21 tests and one file skipped**. Focused rendering checks passed **42/42**, including actual rc.2 and rc.3 conversation factories/seats and the complete AgentMessage component: opening tasks, step-nine updates, same-step updates after execution, completed process folding, full content and manual disclosure choices. Timeline/nested-address checks passed **17/17**. Launcher checks passed **17**, with three explicit Windows/fixture skips.
+
+Automatic completion verification now defaults to off. A native AgentLoop regression remounts the production plugin with empty configuration, rather than inheriting the test fixture's override. Its `123` input creates only the Coordinator, makes one scripted model request and one step, and naturally completes without Builder/Verifier Agents, criteria tools, completion notices or rubrics. Explicit opt-in verification retains its existing regression coverage. This is native integration evidence with a scripted adapter, not a claim about every model's choices. No native compatibility patch or background execution strategy changes in this revision.
+
 ## MoA+ 0.2.5 Worker task cards — 2026-11-11
 
 The read-only Workers panel now presents task/result previews and native file chips, with communication details folded. The latest card opens by default, previous default cards fold when new work arrives, and manually chosen disclosures survive stream frames. Full Markdown stays outside the summary control. Transport and initial identity prefixes are omitted only after exact source/birth-message verification; original text and attachments remain available.

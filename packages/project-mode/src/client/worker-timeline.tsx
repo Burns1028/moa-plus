@@ -70,7 +70,7 @@ function MessageBody({
   open,
   collapseLabel,
 }: {
-  message: WorkerTimelineMessage;
+  message: Pick<WorkerTimelineMessage, "text" | "displayText" | "attachments">;
   labels: React.ComponentProps<typeof MarkdownText>["labels"];
   open(path: string): void;
   collapseLabel: string;
@@ -111,26 +111,17 @@ function MessageBody({
   );
 }
 
-function TaskCard({
+function TimelineTurn({
   turn,
-  latest,
   t,
   labels,
   open,
 }: {
   turn: WorkerTimelineTurn;
-  latest: boolean;
   t: WorkersPanelProps["t"];
   labels: React.ComponentProps<typeof MarkdownText>["labels"];
   open(path: string): void;
 }) {
-  const [expanded, setExpanded] = React.useState(latest);
-  const [showMessages, setShowMessages] = React.useState(false);
-  const manuallyToggled = React.useRef(false);
-  React.useEffect(() => {
-    if (!latest && !manuallyToggled.current) setExpanded(false);
-  }, [latest]);
-  const task = turn.inputs[0];
   const outcome =
     turn.outcome === null
       ? "working"
@@ -141,121 +132,73 @@ function TaskCard({
           : turn.outcome === "aborted"
             ? "stopped"
             : "failed";
-  const body = (message: WorkerTimelineMessage) => (
+  const body = (messages: WorkerTimelineMessage[]) => (
     <MessageBody
-      message={message}
+      message={{
+        text: messages
+          .map((message) => message.displayText ?? message.text)
+          .filter(Boolean)
+          .join("\n\n"),
+        attachments: messages.flatMap((message) => message.attachments ?? []),
+      }}
       labels={labels}
       collapseLabel={t("collapseText")}
       open={open}
     />
   );
   return (
-    <details
-      className="pm-task-card"
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
-    >
-      <summary
-        className="pm-task-toggle"
-        onClick={() => {
-          manuallyToggled.current = true;
-        }}
-      >
-        <span className="pm-task-meta">
-          <strong>{t("timelineTurn", { turn: turn.turn })}</strong>
-          <span className="pm-task-outcome" data-outcome={outcome}>
-            {t(outcome)}
-          </span>
-        </span>
+    <article className="pm-axis-turn">
+      <div className="pm-axis-turn-head">
+        <strong>{t("timelineTurn", { turn: turn.turn })}</strong>
         <Timestamp time={turn.startedAt} />
-      </summary>
-      {expanded && (
-        <div className="pm-task-body">
-          {task && (
-            <section className="pm-task-section">
-              <h4>{t("timelineInputs")}</h4>
-              {body(task)}
-            </section>
-          )}
-          <section className="pm-task-section pm-task-result">
-            <h4>{t("timelineOutputs")}</h4>
-            {turn.outputs.map((message) => (
-              <div key={message.id}>{body(message)}</div>
+        <span className="pm-axis-outcome" data-outcome={outcome}>
+          {t(outcome)}
+        </span>
+      </div>
+      <section className="pm-axis-section">
+        <h4>{t("timelineInputs")}</h4>
+        {turn.inputs.length ? (
+          body(turn.inputs)
+        ) : (
+          <p className="pm-axis-empty">{t("emptyInput")}</p>
+        )}
+      </section>
+      <section className="pm-axis-section pm-axis-output">
+        <h4>{t("timelineOutputs")}</h4>
+        {turn.outputs.length ? (
+          body(turn.outputs)
+        ) : (
+          <p className="pm-axis-empty">
+            {t(turn.outcome === null ? "awaitingReply" : "emptyReply")}
+          </p>
+        )}
+      </section>
+      <section className="pm-axis-section">
+        <h4>{t("timelineArtifacts")}</h4>
+        {turn.artifacts.length ? (
+          <ul className="pm-axis-files">
+            {turn.artifacts.map((file) => (
+              <li key={file.path}>
+                <button
+                  type="button"
+                  title={
+                    file.description
+                      ? `${file.path}\n${file.description}`
+                      : file.path
+                  }
+                  onClick={() => open(file.path)}
+                >
+                  <FileTypeIcon path={file.path} size={16} />
+                  <span>{file.path.split(/[\\/]/).at(-1)}</span>
+                </button>
+              </li>
             ))}
-            {!turn.outputs.length && (
-              <p className="pm-axis-empty">
-                {t(turn.outcome === null ? "awaitingReply" : "emptyReply")}
-              </p>
-            )}
-          </section>
-          {!!turn.artifacts.length && (
-            <section className="pm-task-section">
-              <h4>{t("timelineArtifacts")}</h4>
-              <ul className="pm-axis-files pm-task-artifacts">
-                {turn.artifacts.map((file) => (
-                  <li key={file.path}>
-                    <button
-                      type="button"
-                      title={
-                        file.description
-                          ? `${file.path}\n${file.description}`
-                          : file.path
-                      }
-                      onClick={() => open(file.path)}
-                    >
-                      <FileTypeIcon path={file.path} size={16} />
-                      <span>{file.path.split(/[\\/]/).at(-1)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {!!turn.inputs.length && (
-            <details
-              className="pm-task-messages"
-              onToggle={(event) => setShowMessages(event.currentTarget.open)}
-            >
-              <summary>
-                {t("timelineMessages", { count: turn.inputs.length })}
-              </summary>
-              {showMessages && (
-                <div className="pm-task-message-list">
-                  {turn.inputs.map((message) => (
-                    <div className="pm-task-message" key={message.id}>
-                      <div className="pm-task-message-meta">
-                        <span>
-                          {t(
-                            message.actor === "coordinator"
-                              ? "fromCoordinator"
-                              : message.actor === "agent"
-                                ? "fromAgent"
-                                : "fromUser",
-                          )}
-                        </span>
-                        <Timestamp time={message.time} />
-                      </div>
-                      {body(message)}
-                      {message.displayText !== undefined &&
-                        message.displayText !== message.text && (
-                          <details className="pm-task-raw">
-                            <summary>{t("originalMessage")}</summary>
-                            <MarkdownText
-                              text={message.text}
-                              labels={labels}
-                              variant="compact"
-                            />
-                          </details>
-                        )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </details>
-          )}
-        </div>
-      )}
-    </details>
+          </ul>
+        ) : (
+          <p className="pm-axis-empty">{t("noArtifacts")}</p>
+        )}
+      </section>
+    </article>
   );
 }
 export function WorkersPanel({
@@ -420,11 +363,10 @@ export function WorkersPanel({
             </button>
           </div>
         )}
-        {page?.turns.map((turn, index) => (
-          <TaskCard
+        {page?.turns.toReversed().map((turn) => (
+          <TimelineTurn
             key={`${worker!.workerId}:${turn.turn}`}
             turn={turn}
-            latest={index === 0}
             t={t}
             labels={labels}
             open={(path) =>

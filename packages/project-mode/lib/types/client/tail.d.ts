@@ -13,6 +13,7 @@ declare module "@deepseek-ai/dsh-client-ui-chat/client" {
             step: number;
             segmentStartSeq: number;
             incoming?: IncomingAgentMessage;
+            openingInput?: boolean;
         };
     }
 }

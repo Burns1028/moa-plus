@@ -63,18 +63,26 @@ export function AgentMessage({
   client,
   t,
   settled = false,
+  opening = false,
 }: Pick<SharedProps, "client" | "t"> & {
   message: IncomingAgentMessage;
   settled?: boolean;
+  opening?: boolean;
 }) {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(opening);
   const disclosure = React.useRef<HTMLDetailsElement>(null);
   const previewId = React.useId();
   React.useEffect(() => {
-    if (!settled) return;
+    if (!opening) return;
+    if (disclosure.current) disclosure.current.open = true;
+    setExpanded(true);
+  }, [opening]);
+  React.useEffect(() => {
+    if (!settled || opening) return;
     if (disclosure.current) disclosure.current.open = false;
     setExpanded(false);
-  }, [settled]);
+  }, [settled, opening]);
+  const compact = settled && !opening;
   const source = message.source as unknown as Record<string, unknown>;
   const id = [
     source.senderSessionId,
@@ -133,14 +141,16 @@ export function AgentMessage({
         ref={disclosure}
         className="pm-agent-message"
         data-moa-message
-        data-settled={settled || undefined}
+        data-settled={compact || undefined}
+        data-opening-input={opening || undefined}
+        open={expanded}
         onToggle={(event) => setExpanded(event.currentTarget.open)}
       >
         <summary
           aria-label={t(expanded ? "collapse" : "expand", {
             name: `${sender} · ${t(kind)}`,
           })}
-          aria-describedby={expanded || settled ? undefined : previewId}
+          aria-describedby={expanded || compact ? undefined : previewId}
         >
           <span className="pm-agent-heading">
             <WorkerIcon workerId={id ?? name} />
@@ -154,7 +164,7 @@ export function AgentMessage({
               <path d="m6 4 4 4-4 4" />
             </svg>
           </span>
-          {!expanded && !settled && (
+          {!expanded && !compact && (
             <span className="pm-agent-preview" id={previewId}>
               {preview ||
                 (content.length ? t("messageContent") : t("emptyReply"))}

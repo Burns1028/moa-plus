@@ -28,6 +28,7 @@ declare module "@deepseek-ai/dsh-client-ui-chat/client" {
       step: number;
       segmentStartSeq: number;
       incoming?: IncomingAgentMessage;
+      openingInput?: boolean;
     };
   }
 }
@@ -123,6 +124,22 @@ export const workerTailDefinition: ConversationNodeDefinition<{
     // Turn owner without assigning them to an earlier or later Step.
     const turn = location?.kind === "step" || location?.kind === "turn"
       ? location.turn : undefined;
+    const source = context.state.incoming?.source as unknown as
+      | Record<string, unknown>
+      | undefined;
+    const process = turn?.data.get("turn-process");
+    // A Coordinator's initial task is the Worker's question, not execution
+    // traffic. Use the same control boundary as native opening-input layout:
+    // processStartSeq can move back to turn/start when an answer is finalized.
+    const openingInput = Boolean(
+      source &&
+      (source.kind === "project-mode-assignment" ||
+        (source.kind === "moa-message" && typeof source.senderId === "string" &&
+          source.senderId !== "" && source.senderId === source.rootId)) &&
+      location?.kind === "step" && location.step.step === 1 && turn?.start &&
+      (!process || process.controlAnchorSeq === turn.start.seq ||
+        context.state.seq + 0.2 < process.controlAnchorSeq),
+    );
     const node: ChatNode<"project-mode-workers-tail"> = {
       key: context.key,
       id: context.id,
@@ -133,14 +150,15 @@ export const workerTailDefinition: ConversationNodeDefinition<{
         ? { kind: "turn", turn }
         : context.start?.location ?? { kind: "unresolved" },
       visibility: "visible",
-      // Agent traffic belongs to the native process disclosure. Marking it as
-      // human input keeps the entire completed turn permanently expanded.
-      groupTree: context.state.incoming ? "process" : "turn",
+      // Only the opening task belongs to input. Later correspondence remains
+      // process; interleaved input would keep the completed turn expanded.
+      groupTree: context.state.incoming ? openingInput ? "input" : "process" : "turn",
       data: {
         turn: turn?.turn ?? 0,
         step: location?.kind === "step" ? location.step.step : 0,
         segmentStartSeq: context.state.segmentStartSeq,
         ...(context.state.incoming ? { incoming: context.state.incoming } : {}),
+        ...(openingInput ? { openingInput: true } : {}),
       },
     };
     return node;
