@@ -29,6 +29,7 @@ jobs:
           tests/client/worker-parent.spec.ts
           tests/host/coordinator-guidance.spec.ts
           tests/host/moa-completion.spec.ts
+          tests/host/completion-helper-failure.spec.ts
           tests/host/orchestration-prompts.spec.ts
           tests/client/orchestration-input.spec.ts
           tests/native-contract/orchestration-input.spec.tsx --maxWorkers=1

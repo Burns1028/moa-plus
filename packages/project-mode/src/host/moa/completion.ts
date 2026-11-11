@@ -1,4 +1,4 @@
-import type { Agent, AgentHandle } from "@deepseek-ai/dsh-agent";
+import type { Agent, AgentHandle, ModelSelection } from "@deepseek-ai/dsh-agent";
 import { createUserMessage, type ContentBlock, type UserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { defineTool } from "@deepseek-ai/dsh-tools";
@@ -33,7 +33,23 @@ function lastText(agent: Agent, from = 0): string {
   const event = agent.session.snapshotEvents().slice(from).filter((e) => e.type === "assistant/message").at(-1);
   return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
+class CompletionHelperFailure extends Error {}
+function checkHelperFailure(agent: Agent, role: string, from = 0): void {
+  const end = agent.session.snapshotEvents().slice(from).findLast(event => event.type === "turn/end");
+  if (end?.type === "turn/end" && end.data.reason.kind === "error")
+    throw new CompletionHelperFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
+}
 interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal): { readVerdict(): Verdict | undefined; dispose(): void } }
+
+/** New native loops record selection before preparing a step; legacy loops use request hooks. */
+function hasNativeModelSelection(agent: Agent): agent is Agent & { model: {
+  current(): ModelSelection | undefined;
+  select(selection: ModelSelection): void;
+} } {
+  const model: unknown = Reflect.get(agent, "model");
+  return typeof model === "object" && model !== null &&
+    typeof Reflect.get(model, "current") === "function" && typeof Reflect.get(model, "select") === "function";
+}
 
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
 export function bindCompletion(host: HostAccess): (agent: Agent) => void {
@@ -132,25 +148,40 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       await write;
     };
     const hiddenDelegation = [...new Set([...host.config.coordinatorHiddenTools, "subagent", "subagent_fork", "workflow", "send_message", "control_workers", "Task", "Fork", "SendMessage", "QueryAgent", "KillAgent"])];
+    const inherited = parent.session.requestHeader()?.config ?? parent.options;
+    const selected = hasNativeModelSelection(parent) ? parent.model.current() : undefined;
+    // A pending native selection can be newer than the last request header.
+    // Omitting its effort restores the adapter default, clearing the old one.
+    const { reasoningEffort: _inheritedEffort, ...controls } = inherited;
+    const agentOptions = selected === undefined ? inherited : { ...controls, ...selected };
     const make = async (role: "builder" | "verifier") => host.ctx.agents.create({
       sessionId: SessionId(`moa-${role}-${randomUUID()}`), parentAgent: parent,
       meta: { cwd: root, parentSession: parent.id, origin: "subagent" },
-      agentOptions: parent.session.requestHeader()?.config ?? parent.options,
+      agentOptions,
       signal,
-      async setup(ctx) {
+      async setup(ctx, agent) {
         ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
         // Helpers use direct tool calls, including when the parent uses PTC.
         await presentNativeTools(ctx);
         if (role === "builder") {
-          // Rubric extraction has no execution or research to perform. Select
-          // the model's least reasoning effort after native model selection;
-          // the parent and evidence-gathering Verifier keep their own effort.
-          ctx.on("agent/request", async ({ signal }, next) => {
-            const config = await next();
-            const model = await ctx.llm.resolveModelInfo(config.provider, config.model, signal);
-            const effort = model.reasoning?.efforts[0]?.id;
-            return effort === undefined ? config : { ...config, reasoningEffort: effort };
-          }, { prepend: true });
+          // Select the Builder's lightest supported effort before the native
+          // loop fixes prompt/tool preparation to that model selection.
+          if (hasNativeModelSelection(agent)) {
+            const current = agent.model.current();
+            if (current) {
+              const model = await ctx.llm.resolveModelInfo(current.provider, current.model, signal);
+              const effort = model.reasoning?.efforts[0]?.id;
+              if (effort !== undefined) agent.model.select({ ...current, reasoningEffort: effort });
+            }
+          } else {
+            // Legacy native selection is resolved in the request waterfall.
+            ctx.on("agent/request", async ({ signal }, next) => {
+              const config = await next();
+              const model = await ctx.llm.resolveModelInfo(config.provider, config.model, signal);
+              const effort = model.reasoning?.efforts[0]?.id;
+              return effort === undefined ? config : { ...config, reasoningEffort: effort };
+            }, { prepend: true });
+          }
           ctx.tools.restrict({ allow: [] });
           ctx.tools.register(defineTool({
             name: "submit_rubric",
@@ -204,6 +235,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       verifierMemoryPolicy = bindWorkerMemoryPolicy(host.ctx, verifier.agent, record.project.paths);
       builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: rubricBuilderPrompt(JSON.stringify({ ...input, attachments: undefined })) }, ...input.attachments] }));
       const build = builder.agent.whenIdle().then(async () => {
+        checkHelperFailure(builder.agent, "Rubric Builder");
         if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
         rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
         await publish(signal);
@@ -321,6 +353,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       candidateReview = pair.freezeCandidate(answer, control);
       pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
+      checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
       await pair.read(control);
       control.throwIfAborted();
       const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
@@ -348,6 +381,13 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || (testsRequired && !passedShell)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
     } catch (error) {
       signal.throwIfAborted();
+      // A failed native helper turn is an infrastructure failure, not evidence
+      // that the user's deliverable needs more work. Let the native loop report
+      // it instead of directing the Coordinator into repeated self-repair.
+      if (error instanceof CompletionHelperFailure) {
+        if (active && helpers.get(agent) === active) { helpers.delete(agent); retire(active); }
+        throw error;
+      }
       if (!wake.signal.aborted && !host.closing.signal.aborted) {
         if (active && helpers.get(agent) === active) { helpers.delete(agent); retire(active); }
         agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
