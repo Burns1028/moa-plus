@@ -20,7 +20,7 @@ const call = (name, args = {}) => [
   { type: 'finish', reason: { kind: 'tool-calls' } },
 ];
 
-async function fixture(mode, testsRequired) {
+async function fixture(mode, testsRequired, selectedEffort) {
   const directory = await mkdtemp(join(tmpdir(), 'moa-rc2-first-turn-'));
   const home = join(directory, 'home');
   const profileDirectory = join(home, 'profiles', 'fixture');
@@ -90,18 +90,27 @@ async function fixture(mode, testsRequired) {
     class ScriptedModel extends LlmAdapter {
       requests = [];
       handler = () => text('candidate');
-      async resolveModel(provider, model) { return { provider, id: model, name: model }; }
+      async resolveModel(provider, model) {
+        return { provider, id: model, name: model,
+          reasoning: { efforts: ['off', 'low', 'high'].map(id => ({ id, name: id })),
+            defaultEffort: selectedEffort === undefined ? 'low' : 'high' } };
+      }
       async *stream(request) { this.requests.push(request); yield* this.handler(request); }
     }
     const adapter = new ScriptedModel();
     ctx.llm.registerAdapter(['test'], adapter);
     await ctx.plugin(ProjectMode, { completionVerification: true });
     const { agent } = await ctx.agents.create({
-      sessionId: 'rc2-first-turn', meta: { cwd: directory }, agentOptions: { provider: 'test', model: 'test' },
+      sessionId: 'rc2-first-turn', meta: { cwd: directory },
+      agentOptions: { provider: 'test', model: 'initial', reasoningEffort: 'high' },
       async setup(scope) {
         if (mode === 'ptc') await scope.plugin(await load('dsh-tool-executor-ptc'));
       },
     });
+    // The desktop Session Controller records this selection before the turn;
+    // no request header has been written yet, and options still name initial.
+    agent.model.select({ provider: 'test', model: 'selected',
+      ...(selectedEffort === undefined ? {} : { reasoningEffort: selectedEffort }) });
     await ctx.projectMode.setEnabled(agent.id, true, 0, 'enable');
     return { ctx, agent, adapter, directory, createUserMessage, snapshotJsonValue,
       async dispose() { await ctx.fiber.dispose(); await rm(directory, { recursive: true, force: true }); },
@@ -109,11 +118,13 @@ async function fixture(mode, testsRequired) {
   } catch (error) { await ctx.fiber.dispose(); await rm(directory, { recursive: true, force: true }); throw error; }
 }
 
-for (const mode of ['native', 'ptc']) for (const testsRequired of [false, true]) {
-  test(`rc2 full plugin first turn completes helpers and persists JSON cache (parent=${mode}, tests=${testsRequired})`, {
+const scenarios = ['native', 'ptc'].flatMap(mode => [false, true].map(testsRequired => ({ mode, testsRequired, selectedEffort: 'high' })));
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: undefined });
+for (const { mode, testsRequired, selectedEffort } of scenarios) {
+  test(`rc2 full plugin first turn completes helpers and persists JSON cache (parent=${mode}, tests=${testsRequired}, effort=${selectedEffort ?? 'default'})`, {
     skip: !modules || (testsRequired && process.platform !== 'win32'), timeout: 20000,
   }, async () => {
-    const f = await fixture(mode, testsRequired);
+    const f = await fixture(mode, testsRequired, selectedEffort);
     const errors = [], shellResults = [];
     let main = 0, builder = 0, verifier = 0, retry = '';
     f.ctx.on('agent/error', ({ error }) => errors.push(error));
@@ -152,6 +163,10 @@ for (const mode of ['native', 'ptc']) for (const testsRequired of [false, true])
       assert.equal(verifier, 3, JSON.stringify({ main, builder, retry, errors: errors.map(String), requests: f.adapter.requests.map(request => ({ id: request.sessionId, tools: request.tools.map(tool => tool.name) })) }));
       assert.equal(main, testsRequired ? 2 : 1);
       assert.deepEqual(errors, []);
+      for (const request of f.adapter.requests) {
+        assert.equal(request.model, 'selected');
+        assert.equal(request.reasoningEffort, String(request.sessionId).startsWith('moa-builder-') ? 'off' : selectedEffort ?? 'low');
+      }
       const completed = f.agent.session.snapshotEvents().some(event => event.type === 'turn/end' && event.data.reason.kind === 'completed');
       assert.equal(completed, !testsRequired);
       if (testsRequired) {
@@ -170,6 +185,36 @@ for (const mode of ['native', 'ptc']) for (const testsRequired of [false, true])
       assert.ok(files.some(file => file.endsWith('.json')));
       const stored = await Promise.all(files.filter(file => file.endsWith('.json')).map(file => readFile(join(cache, file), 'utf8')));
       assert.ok(stored.some(body => body.includes('project-mode-results')));
+    } finally { await f.dispose(); }
+  });
+}
+
+for (const failedRole of ['builder', 'verifier']) {
+  test(`rc2 native ${failedRole} failure ends the parent turn without a self-repair retry`, {
+    skip: !modules, timeout: 20000,
+  }, async () => {
+    const f = await fixture('native', false, 'high');
+    let parentRequests = 0;
+    try {
+      f.adapter.handler = request => {
+        const id = String(request.sessionId);
+        if (id.startsWith(`moa-${failedRole}-`)) throw new Error(`fixture-${failedRole}-infrastructure-failure`);
+        if (id.startsWith('moa-builder-')) return call('submit_rubric', {
+          rubric: '- Deliver the requested report [human requirement]', tests_required: false,
+        });
+        if (id.startsWith('moa-verifier-')) throw new Error('unexpected Verifier request after failed Builder');
+        if (++parentRequests > 1) f.agent.cancel({ kind: 'user' });
+        return text('The requested completed report');
+      };
+      f.agent.followup(f.createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'Deliver a report' }] }));
+      await f.agent.whenIdle();
+      assert.equal(parentRequests, 1);
+      const events = f.agent.session.snapshotEvents();
+      const ends = events.filter(event => event.type === 'turn/end');
+      assert.equal(ends.length, 1);
+      assert.equal(ends[0].data.reason.kind, 'error');
+      assert.match(ends[0].data.reason.error.message, new RegExp(`fixture-${failedRole}-infrastructure-failure`));
+      assert.doesNotMatch(JSON.stringify(events), /Outcome verification blocked/);
     } finally { await f.dispose(); }
   });
 }

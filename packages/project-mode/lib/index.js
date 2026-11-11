@@ -1246,6 +1246,16 @@ function lastText(agent, from = 0) {
 	const event = agent.session.snapshotEvents().slice(from).filter((e) => e.type === "assistant/message").at(-1);
 	return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
+var CompletionHelperFailure = class extends Error {};
+function checkHelperFailure(agent, role, from = 0) {
+	const end = agent.session.snapshotEvents().slice(from).findLast((event) => event.type === "turn/end");
+	if (end?.type === "turn/end" && end.data.reason.kind === "error") throw new CompletionHelperFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
+}
+/** New native loops record selection before preparing a step; legacy loops use request hooks. */
+function hasNativeModelSelection(agent) {
+	const model = Reflect.get(agent, "model");
+	return typeof model === "object" && model !== null && typeof Reflect.get(model, "current") === "function" && typeof Reflect.get(model, "select") === "function";
+}
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
 function bindCompletion(host) {
 	const helpers = /* @__PURE__ */ new Map();
@@ -1385,6 +1395,13 @@ function bindCompletion(host) {
 			"QueryAgent",
 			"KillAgent"
 		])];
+		const inherited = parent.session.requestHeader()?.config ?? parent.options;
+		const selected = hasNativeModelSelection(parent) ? parent.model.current() : void 0;
+		const { reasoningEffort: _inheritedEffort, ...controls } = inherited;
+		const agentOptions = selected === void 0 ? inherited : {
+			...controls,
+			...selected
+		};
 		const make = async (role) => host.ctx.agents.create({
 			sessionId: SessionId(`moa-${role}-${randomUUID()}`),
 			parentAgent: parent,
@@ -1393,13 +1410,22 @@ function bindCompletion(host) {
 				parentSession: parent.id,
 				origin: "subagent"
 			},
-			agentOptions: parent.session.requestHeader()?.config ?? parent.options,
+			agentOptions,
 			signal,
-			async setup(ctx) {
+			async setup(ctx, agent) {
 				ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
 				await presentNativeTools(ctx);
 				if (role === "builder") {
-					ctx.on("agent/request", async ({ signal }, next) => {
+					if (hasNativeModelSelection(agent)) {
+						const current = agent.model.current();
+						if (current) {
+							const effort = (await ctx.llm.resolveModelInfo(current.provider, current.model, signal)).reasoning?.efforts[0]?.id;
+							if (effort !== void 0) agent.model.select({
+								...current,
+								reasoningEffort: effort
+							});
+						}
+					} else ctx.on("agent/request", async ({ signal }, next) => {
 						const config = await next();
 						const effort = (await ctx.llm.resolveModelInfo(config.provider, config.model, signal)).reasoning?.efforts[0]?.id;
 						return effort === void 0 ? config : {
@@ -1501,6 +1527,7 @@ function bindCompletion(host) {
 				}, ...input.attachments]
 			}));
 			const build = builder.agent.whenIdle().then(async () => {
+				checkHelperFailure(builder.agent, "Rubric Builder");
 				if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
 				rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
 				await publish(signal);
@@ -1679,6 +1706,7 @@ function bindCompletion(host) {
 			candidateReview = pair.freezeCandidate(answer, control);
 			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
+			checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
 			await pair.read(control);
 			control.throwIfAborted();
 			const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
@@ -1713,6 +1741,7 @@ function bindCompletion(host) {
 					helpers.delete(agent);
 					retire(active);
 				}
+				if (error instanceof CompletionHelperFailure) throw error;
 				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
 			}
 		} finally {

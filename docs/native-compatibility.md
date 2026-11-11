@@ -47,6 +47,15 @@ uses `tools.presentAs("native")`; rc.2 mounts
 `tools.setExecutor` API. The parent keeps its selected native or PTC executor.
 This path runs when the first user turn creates Builder/Verifier helpers.
 
+On runtimes with native model selection, helpers inherit the Coordinator's
+current selection. The Builder selects the lightest supported reasoning effort
+before step preparation through `agent.model.select`; changing it later in
+`agent/request` is rejected by rc.2. The legacy request hook remains for rc.3.
+An errored native Builder or Verifier turn ends the parent through the native
+error path. It must not instruct the Coordinator to repair the plugin or repeat
+the user's work. An ordinary review verdict or superseded rubric still uses the
+existing re-verification flow.
+
 The `project-mode-results` projection uses `stateVersion: 5`. Starting a turn
 removes the prior optional `lastAssistant` field, keeping checkpoints plain JSON
 even when that turn ends before an AI reply. The native projection registry
