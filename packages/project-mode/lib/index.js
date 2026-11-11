@@ -4936,7 +4936,7 @@ const Config = z$1.object({
 		"llm-judge"
 	]).default("llm-judge"),
 	backgroundAfterSeconds: z$1.number().min(0).default(10),
-	completionVerification: z$1.boolean().default(true),
+	completionVerification: z$1.boolean().default(false),
 	dataDirectory: z$1.string().default("."),
 	coordinatorHiddenTools: z$1.array(z$1.string()).default([
 		"subagent",

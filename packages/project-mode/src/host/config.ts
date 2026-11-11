@@ -13,7 +13,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   backgroundStrategy: z.union(["after-seconds", "new-message", "llm-judge"]).default("llm-judge"),
   backgroundAfterSeconds: z.number().min(0).default(10),
-  completionVerification: z.boolean().default(true),
+  completionVerification: z.boolean().default(false),
   dataDirectory: z.string().default("."),
   coordinatorHiddenTools: z
     .array(z.string())

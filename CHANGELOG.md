@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6 — 2026-11-12
+
+- Simplify the Workers panel to a chronological timeline with input, output and artifacts for every turn. Keep all inputs together and remove the separate communication log and folded task cards.
+- Keep the Coordinator's opening task visible as input in the native Worker conversation. Fold later internal correspondence with the process after completion while retaining its original native placement.
+- Preserve text expansion, attachments, native artifact opening and timeline subscription ownership.
+- Disable automatic completion verification by default. Builder/Verifier helpers run only when `completionVerification` is explicitly enabled; the opt-in verification flow remains available.
+
 ## 0.2.5 — 2026-11-11
 
 - Group the Workers panel into compact task cards, with the latest open and earlier turns folded by default. Show two-line task and four-line final-result previews, expandable original Markdown, and attachment/artifact file chips.

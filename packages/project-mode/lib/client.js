@@ -6317,7 +6317,7 @@ window.__ModuleLoader__.load({
 .pm-workers-panel *{box-sizing:border-box}
 .pm-workers-panel-empty{display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}.pm-workers-panel-empty p{margin:0;max-width:28ch}
 .pm-axis-preview{margin:0;overflow-wrap:anywhere;line-height:1.6}.pm-axis-preview>summary{display:flex;align-items:flex-start;gap:6px;list-style:none;cursor:pointer}.pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-axis-preview>summary:after{content:"⌄";flex:none;font-size:12px;color:var(--dsw-alias-label-secondary,#888)}
-.pm-axis-preview>summary>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.pm-task-result .pm-axis-preview>summary>span{-webkit-line-clamp:4}.pm-axis-preview[open]>summary{font-size:11px;color:var(--dsw-alias-label-secondary,#888);margin-bottom:10px}.pm-axis-preview[open]>summary:after{content:"⌃"}.pm-axis-preview p:first-child{margin-top:0}.pm-axis-preview p:last-child{margin-bottom:0}
+.pm-axis-preview>summary>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.pm-axis-output .pm-axis-preview>summary>span{-webkit-line-clamp:4}.pm-axis-preview[open]>summary{font-size:11px;color:var(--dsw-alias-label-secondary,#888);margin-bottom:10px}.pm-axis-preview[open]>summary:after{content:"⌃"}.pm-axis-preview p:first-child{margin-top:0}.pm-axis-preview p:last-child{margin-bottom:0}
 .pm-workers-panel summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:3px;border-radius:3px}
 .pm-workers-list{padding:12px 7px;border-right:1px solid var(--dsw-alias-border-primary,#8883);overflow:auto;min-width:0}
 .pm-workers-list button{display:flex;align-items:center;gap:8px;width:100%;padding:9px 8px;border:0;border-radius:8px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
@@ -6327,10 +6327,9 @@ window.__ModuleLoader__.load({
 .pm-worker-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pm-worker-copy{min-width:0;flex:1}.pm-worker-phase{font-size:11px;color:var(--dsw-alias-label-secondary,#999);display:block;margin-top:2px}
 .pm-worker-axis{overflow:auto;padding:18px 20px;min-width:0}.pm-worker-axis header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.pm-worker-axis h3{font-size:14px;margin:0;font-weight:600;overflow-wrap:anywhere}
 .pm-worker-axis button,.pm-worker-axis a{font:inherit;color:var(--dsw-alias-label-link,#80a9ee);cursor:pointer}.pm-worker-axis button{border:0;background:transparent;padding:3px 0;text-align:left}
-.pm-task-card{border:1px solid var(--dsw-alias-border-primary,#8883);border-radius:10px;margin-bottom:12px;overflow:hidden}.pm-task-toggle{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;padding:14px;cursor:pointer;list-style:none}.pm-task-toggle::-webkit-details-marker{display:none}.pm-task-toggle:after{content:"⌄";font-size:12px;color:var(--dsw-alias-label-secondary,#888);grid-column:2;grid-row:1}.pm-task-card[open]>.pm-task-toggle:after{content:"⌃"}.pm-task-meta{display:flex;align-items:center;gap:8px;min-width:0}.pm-task-meta strong{font-size:12px;font-weight:600}.pm-task-outcome{font-size:10px;line-height:1.5;border-radius:4px;padding:1px 5px;color:var(--dsw-alias-label-secondary,#777);background:var(--dsw-alias-interactive-bg-hover,#8881)}.pm-task-outcome[data-outcome=failed]{color:var(--dsw-alias-state-danger-primary,#c44)}.pm-task-outcome[data-outcome=working]{color:var(--dsw-alias-label-link,#5883c0)}
-.pm-task-toggle>time{grid-column:1 / -1;font-size:10px;color:var(--dsw-alias-label-secondary,#888)}.pm-task-body{padding:0 14px 14px}.pm-task-section{margin:0 0 18px}.pm-task-section h4{font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#888);margin:0 0 6px}.pm-task-result{padding-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}
+.pm-axis-turn{position:relative;border-left:1px solid var(--dsw-alias-border-primary,#8883);padding:0 0 28px 16px;margin-left:3px}.pm-axis-turn:before{content:"";position:absolute;left:-4px;top:5px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-label-secondary,#888)}
+.pm-axis-turn-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}.pm-axis-turn-head strong{font-size:13px;font-weight:600}.pm-axis-turn-head time{font-size:10px;color:var(--dsw-alias-label-secondary,#888)}.pm-axis-outcome{margin-left:auto;font-size:10px;color:var(--dsw-alias-label-secondary,#888)}.pm-axis-outcome[data-outcome=failed]{color:var(--dsw-alias-state-danger-primary,#c44)}.pm-axis-section{margin:14px 0 0}.pm-axis-section h4{font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#888);margin:0 0 6px}.pm-axis-section>.pm-axis-empty{margin:0}
 .pm-axis-files{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:6px}.pm-axis-files li{min-width:0;max-width:100%}.pm-axis-files button,.pm-axis-files li>span{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:5px 8px;border:1px solid var(--dsw-alias-border-primary,#8883);border-radius:6px;font-size:12px}.pm-axis-files button:hover{background:var(--dsw-alias-interactive-bg-hover,#8882)}.pm-axis-files svg{flex:none}.pm-axis-files span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pm-task-messages{border-top:1px solid var(--dsw-alias-border-primary,#8882);padding-top:10px;font-size:12px}.pm-task-messages>summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#888)}.pm-task-message{padding-top:14px;overflow-wrap:anywhere}.pm-task-message+.pm-task-message{margin-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}.pm-task-message-meta{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--dsw-alias-label-secondary,#888);margin-bottom:5px}.pm-task-raw{margin-top:8px;font-size:11px}.pm-task-raw>summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#888)}
 .pm-axis-empty{color:var(--dsw-alias-label-secondary,#999);padding:4px 0;line-height:1.6}.pm-axis-more{margin:4px 0 12px}.pm-axis-error{color:var(--dsw-alias-label-secondary,#999);overflow-wrap:anywhere}
 `;
 		// src/client/worker-timeline.tsx
@@ -6387,98 +6386,65 @@ window.__ModuleLoader__.load({
 				})
 			})] });
 		}
-		function TaskCard({ turn, latest, t, labels, open }) {
-			const [expanded, setExpanded] = react.useState(latest);
-			const [showMessages, setShowMessages] = react.useState(false);
-			const manuallyToggled = react.useRef(false);
-			react.useEffect(() => {
-				if (!latest && !manuallyToggled.current) setExpanded(false);
-			}, [latest]);
-			const task = turn.inputs[0];
+		function TimelineTurn({ turn, t, labels, open }) {
 			const outcome = turn.outcome === null ? "working" : turn.outcome === "handoff" ? "continued" : turn.outcome === "completed" ? "completed" : turn.outcome === "aborted" ? "stopped" : "failed";
-			const body = (message) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
-				message,
+			const body = (messages) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
+				message: {
+					text: messages.map((message) => message.displayText ?? message.text).filter(Boolean).join("\n\n"),
+					attachments: messages.flatMap((message) => message.attachments ?? [])
+				},
 				labels,
 				collapseLabel: t("collapseText"),
 				open
 			});
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
-				className: "pm-task-card",
-				open: expanded,
-				onToggle: (event) => setExpanded(event.currentTarget.open),
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", {
-					className: "pm-task-toggle",
-					onClick: () => {
-						manuallyToggled.current = true;
-					},
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-						className: "pm-task-meta",
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: t("timelineTurn", { turn: turn.turn }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-							className: "pm-task-outcome",
-							"data-outcome": outcome,
-							children: t(outcome)
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("article", {
+				className: "pm-axis-turn",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "pm-axis-turn-head",
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: t("timelineTurn", { turn: turn.turn }) }),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt }),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "pm-axis-outcome",
+								"data-outcome": outcome,
+								children: t(outcome)
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+						className: "pm-axis-section",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineInputs") }), turn.inputs.length ? body(turn.inputs) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: "pm-axis-empty",
+							children: t("emptyInput")
 						})]
-					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt })]
-				}), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: "pm-task-body",
-					children: [
-						task && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-							className: "pm-task-section",
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineInputs") }), body(task)]
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-							className: "pm-task-section pm-task-result",
-							children: [
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineOutputs") }),
-								turn.outputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: body(message) }, message.id)),
-								!turn.outputs.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-									className: "pm-axis-empty",
-									children: t(turn.outcome === null ? "awaitingReply" : "emptyReply")
-								})
-							]
-						}),
-						!!turn.artifacts.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-							className: "pm-task-section",
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineArtifacts") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
-								className: "pm-axis-files pm-task-artifacts",
-								children: turn.artifacts.map((file) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-									type: "button",
-									title: file.description ? `${file.path}\n${file.description}` : file.path,
-									onClick: () => open(file.path),
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FileTypeIcon, {
-										path: file.path,
-										size: 16
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: file.path.split(/[\\/]/).at(-1) })]
-								}) }, file.path))
-							})]
-						}),
-						!!turn.inputs.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
-							className: "pm-task-messages",
-							onToggle: (event) => setShowMessages(event.currentTarget.open),
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: t("timelineMessages", { count: turn.inputs.length }) }), showMessages && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: "pm-task-message-list",
-								children: turn.inputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									className: "pm-task-message",
-									children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: "pm-task-message-meta",
-											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t(message.actor === "coordinator" ? "fromCoordinator" : message.actor === "agent" ? "fromAgent" : "fromUser") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time })]
-										}),
-										body(message),
-										message.displayText !== void 0 && message.displayText !== message.text && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
-											className: "pm-task-raw",
-											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: t("originalMessage") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
-												text: message.text,
-												labels,
-												variant: "compact"
-											})]
-										})
-									]
-								}, message.id))
-							})]
-						})
-					]
-				})]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+						className: "pm-axis-section pm-axis-output",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineOutputs") }), turn.outputs.length ? body(turn.outputs) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: "pm-axis-empty",
+							children: t(turn.outcome === null ? "awaitingReply" : "emptyReply")
+						})]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+						className: "pm-axis-section",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineArtifacts") }), turn.artifacts.length ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
+							className: "pm-axis-files",
+							children: turn.artifacts.map((file) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+								type: "button",
+								title: file.description ? `${file.path}\n${file.description}` : file.path,
+								onClick: () => open(file.path),
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FileTypeIcon, {
+									path: file.path,
+									size: 16
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: file.path.split(/[\\/]/).at(-1) })]
+							}) }, file.path))
+						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: "pm-axis-empty",
+							children: t("noArtifacts")
+						})]
+					})
+				]
 			});
 		}
 		function WorkersPanel({ client, open, timeline, sessionId, useTabInfo, t }) {
@@ -6614,9 +6580,8 @@ window.__ModuleLoader__.load({
 									})
 								]
 							}),
-							page?.turns.map((turn, index) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(TaskCard, {
+							page?.turns.toReversed().map((turn) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(TimelineTurn, {
 								turn,
-								latest: index === 0,
 								t,
 								labels,
 								open: (path) => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, path))
@@ -6787,6 +6752,9 @@ window.__ModuleLoader__.load({
 					} : null;
 				}
 				const turn = location?.kind === "step" || location?.kind === "turn" ? location.turn : void 0;
+				const source = context.state.incoming?.source;
+				const process = turn?.data.get("turn-process");
+				const openingInput = Boolean(source && (source.kind === "project-mode-assignment" || source.kind === "moa-message" && typeof source.senderId === "string" && source.senderId !== "" && source.senderId === source.rootId) && location?.kind === "step" && location.step.step === 1 && turn?.start && (!process || process.controlAnchorSeq === turn.start.seq || context.state.seq + .2 < process.controlAnchorSeq));
 				return {
 					key: context.key,
 					id: context.id,
@@ -6798,12 +6766,13 @@ window.__ModuleLoader__.load({
 						turn
 					} : context.start?.location ?? { kind: "unresolved" },
 					visibility: "visible",
-					groupTree: context.state.incoming ? "process" : "turn",
+					groupTree: context.state.incoming ? openingInput ? "input" : "process" : "turn",
 					data: {
 						turn: turn?.turn ?? 0,
 						step: location?.kind === "step" ? location.step.step : 0,
 						segmentStartSeq: context.state.segmentStartSeq,
-						...context.state.incoming ? { incoming: context.state.incoming } : {}
+						...context.state.incoming ? { incoming: context.state.incoming } : {},
+						...openingInput ? { openingInput: true } : {}
 					}
 				};
 			}
@@ -7092,12 +7061,11 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			selectWorker: "Select a worker to view its work.",
 			openConversation: "Open conversation ↗",
 			loadingTimeline: "Loading timeline…",
-			timelineTurn: "Task {turn}",
-			timelineInputs: "Task",
-			timelineOutputs: "Result",
-			timelineArtifacts: "Files",
-			timelineMessages: "Messages · {count}",
-			originalMessage: "Original message",
+			timelineTurn: "Turn {turn}",
+			timelineInputs: "Input",
+			timelineOutputs: "Output",
+			timelineArtifacts: "Artifacts",
+			emptyInput: "No new input in this turn",
 			collapseText: "Collapse full text",
 			fromCoordinator: "Coordinator",
 			fromAgent: "Agent",
@@ -7193,12 +7161,11 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			selectWorker: "选择一个 Worker 查看工作记录。",
 			openConversation: "打开对话 ↗",
 			loadingTimeline: "正在加载工作轴…",
-			timelineTurn: "任务 {turn}",
-			timelineInputs: "任务",
-			timelineOutputs: "结果",
-			timelineArtifacts: "文件",
-			timelineMessages: "沟通记录 · {count}",
-			originalMessage: "原始消息",
+			timelineTurn: "第 {turn} 轮",
+			timelineInputs: "输入",
+			timelineOutputs: "输出",
+			timelineArtifacts: "产物",
+			emptyInput: "本轮无新输入",
 			collapseText: "收起全文",
 			fromCoordinator: "主代理",
 			fromAgent: "子代理",
@@ -7317,15 +7284,21 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			});
 		}
 		/** Internal correspondence belongs to the native process, not a user bubble. */
-		function AgentMessage({ message, client, t, settled = false }) {
-			const [expanded, setExpanded] = react.useState(false);
+		function AgentMessage({ message, client, t, settled = false, opening = false }) {
+			const [expanded, setExpanded] = react.useState(opening);
 			const disclosure = react.useRef(null);
 			const previewId = react.useId();
 			react.useEffect(() => {
-				if (!settled) return;
+				if (!opening) return;
+				if (disclosure.current) disclosure.current.open = true;
+				setExpanded(true);
+			}, [opening]);
+			react.useEffect(() => {
+				if (!settled || opening) return;
 				if (disclosure.current) disclosure.current.open = false;
 				setExpanded(false);
-			}, [settled]);
+			}, [settled, opening]);
+			const compact = settled && !opening;
 			const source = message.source;
 			const id = [
 				source.senderSessionId,
@@ -7358,11 +7331,13 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				ref: disclosure,
 				className: "pm-agent-message",
 				"data-moa-message": true,
-				"data-settled": settled || void 0,
+				"data-settled": compact || void 0,
+				"data-opening-input": opening || void 0,
+				open: expanded,
 				onToggle: (event) => setExpanded(event.currentTarget.open),
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", {
 					"aria-label": t(expanded ? "collapse" : "expand", { name: `${sender} · ${t(kind)}` }),
-					"aria-describedby": expanded || settled ? void 0 : previewId,
+					"aria-describedby": expanded || compact ? void 0 : previewId,
 					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 						className: "pm-agent-heading",
 						children: [
@@ -7382,7 +7357,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "m6 4 4 4-4 4" })
 							})
 						]
-					}), !expanded && !settled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					}), !expanded && !compact && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						className: "pm-agent-preview",
 						id: previewId,
 						children: preview || (content.length ? t("messageContent") : t("emptyReply"))
@@ -7520,7 +7495,8 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [p.node.data.incoming && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(AgentMessage, {
 					...p,
 					message: p.node.data.incoming,
-					settled
+					settled,
+					opening: p.node.data.openingInput
 				}), selected && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerCapsuleList, {
 					...p,
 					turn: p.node.data.turn,

@@ -1,6 +1,6 @@
 # MoA tool API
 
-This describes the MoA+ v0.2.5 runtime. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
+This describes the MoA+ v0.2.6 runtime. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
 
 The Coordinator receives `Task`, `Fork`, `SendMessage`, `QueryAgent`, and `KillAgent`. Every managed participant receives `SendMessage` and `ProjectContext`. A Worker gets the creation/query/kill controls only when its creator explicitly enabled `nested`. Alternative native delegation entries are suppressed in the participating scope; ordinary conversations are unaffected.
 
@@ -188,6 +188,8 @@ Cancel requests cancellation of that owned native job. `stopping` remains visibl
 
 ## Completion criteria
 
+Automatic completion verification is opt-in: `completionVerification` defaults to `false`. Ordinary inputs do not create a Rubric Builder or Outcome Verifier, and no automatic completion gate is installed. Set `completionVerification: true` in the plugin configuration when that independent acceptance workflow is wanted. This setting applies to all human inputs; it does not classify messages by task length or keywords.
+
 With `completionVerification` enabled, participants have:
 
 ```json
@@ -222,7 +224,7 @@ The Remote service/storage/package identifiers retain their historical `projectM
 | --- | --- | --- |
 | `backgroundStrategy` | `llm-judge` | `after-seconds`, `new-message`, or `llm-judge`. |
 | `backgroundAfterSeconds` | `10` | Nonnegative threshold before applying the chosen slow-tool policy; declared backgroundOnMessage bypasses it for eligible input. |
-| `completionVerification` | `true` | Installs participant completion criteria and the Coordinator's independent outcome helpers. |
+| `completionVerification` | `false` | Opt in with `true` to install participant completion criteria and the Coordinator's independent outcome helpers. |
 | `dataDirectory` | `.` | New workspace-root memory layout. Explicit private layouts and already saved paths remain supported. |
 | `coordinatorHiddenTools` | Native delegation/workflow entries | Scoped replaced tool names; global preferences are not rewritten. |
 | `progressTextMaxChars` | `100` | UI/activity preview length; does not clip explicit history or automatic final results. |

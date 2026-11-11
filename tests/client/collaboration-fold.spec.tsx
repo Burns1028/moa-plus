@@ -9,6 +9,10 @@ import type * as Chat from "@deepseek-ai/dsh-client-ui-chat/client";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { humanBoundaryDefinition, workerTailDefinition } from "../../packages/project-mode/src/client/tail.ts";
+import { AgentMessage } from "../../packages/project-mode/src/client/agent-message.tsx";
+import { ProjectClient } from "../../packages/project-mode/src/client/runtime.ts";
+import { en } from "../../packages/project-mode/src/client/locales.ts";
+import { snapshot } from "./fixture.ts";
 import { nativeLoader } from "./native-loader.ts";
 
 const roots: Context[] = [];
@@ -28,6 +32,11 @@ const incoming = (seq: number) => event("user/message", seq, {
   id: `worker-${seq}`, role: "user",
   source: { kind: "moa-message", form: "relay", senderId: "child", rootId: "parent", operationId: `message-${seq}` },
   content: [{ type: "text", text: "From: child\nWorker evidence remains available." }],
+});
+const task = (seq: number, text: string) => event("user/message", seq, {
+  id: `task-${seq}`, role: "user",
+  source: { kind: "moa-message", form: "relay", senderId: "parent", rootId: "parent", operationId: `task-${seq}` },
+  content: [{ type: "text", text: `From: parent\n${text}` }],
 });
 const answer = (seq: number, turn = 1, step = 1, text = "Final answer") => event("assistant/message", seq, {
   turn, step, message: { id: `answer-${seq}`, role: "assistant", source: { kind: "model", provider: "fixture", model: "fixture" },
@@ -76,14 +85,18 @@ async function fixture(modules?: string) {
   assembler.activateTarget("chat");
   const read = () => { assembler.flush(); return assembler.get("chat")!; };
   const message = (id = "worker-5") => read().nodes.values().find(node =>
-    node.kind === "project-mode-workers-tail" && node.id === `message:${id}`,
+    node.kind === "project-mode-workers-tail" && (node.id === `message:${id}` || node.id === `result:${id}`),
   ) as Chat.ChatNode<"project-mode-workers-tail">;
+  const client = new ProjectClient({} as any);
+  client.store.accept(snapshot());
+  const t = (key: keyof typeof en, args?: Record<string, string>) => Object.entries(args ?? {})
+    .reduce((text, [key, value]) => text.replace(`{${key}}`, value), en[key] as string);
   const nativeStore = chat.__fold.createChatStore().create();
   const policy = chat.__fold.presentationPolicyFor("standard", "completion", "final");
   const useStore = (select: (value: any) => unknown) => React.useSyncExternalStore(
     nativeStore.store.subscribe, () => select(nativeStore.store.getSnapshot()),
   );
-  const seat = (key: string) => React.createElement(chat.__fold.ChatNodeSeat, {
+  const seat = (key: string, actualMessage = false) => React.createElement(chat.__fold.ChatNodeSeat, {
     nodeKey: key, nodeStore: read().nodes,
     useChatNode: () => read().nodes.get(key),
     useChatNodeProcess: () => read().nodes.processSource(key).getSnapshot(),
@@ -91,10 +104,16 @@ async function fixture(modules?: string) {
     useStore, actions: nativeStore.actions, deferCollapse: false,
     useGroupAction: () => React.useRef(null), cwd: "/owned-fixture", openFile: noop, inspectCall: noop,
     forkAt: noop, loadImage: noop, fileMentions: noop, t: (key: string) => key,
-    renderSlot: (_name: string, owner: any) => <>
-      <span>Worker evidence remains available.</span>
-      <button onClick={() => owner.turnProcess?.setOpen(!owner.turnProcess.open)}>Toggle collaboration</button>
-    </>,
+    renderSlot: (_name: string, owner: any) => {
+      const reason = read().timeline.turns.get(owner.node.data.turn)?.end?.data.reason.kind;
+      return <>
+        {actualMessage && owner.node.data.incoming
+          ? <AgentMessage message={owner.node.data.incoming} opening={owner.node.data.openingInput}
+              settled={reason === "completed" || reason === "handoff"} client={client} t={t} />
+          : <span>Worker evidence remains available.</span>}
+        <button onClick={() => owner.turnProcess?.setOpen(!owner.turnProcess.open)}>Toggle collaboration</button>
+      </>;
+    },
   });
   return { assembler, read, message, seat };
 }
@@ -105,6 +124,103 @@ const families = [
 ];
 for (const family of families) describe(`${family.name} native collaboration folding`, () => {
   const check = family.name === "rc2" && !family.modules ? it.skip : it;
+
+  check("keeps the Worker's opening task readable while native completion folds only later communication", async () => {
+    const f = await fixture(family.modules);
+    f.assembler.replaceWindow([
+      event("turn/start", 1, { turn: 1 }), event("step/start", 2, { turn: 1, step: 1 }),
+      task(3, "### Original task\n\nRead the data and write the document."),
+    ], false);
+    const opening = f.message("task-3"), anchor = opening.anchorSeq;
+    expect(opening.data.openingInput).toBe(true);
+    expect(opening.groupTree).toBe("input");
+    const question = render(f.seat(opening.key, true));
+    const questionCard = () => question.container.querySelector<HTMLDetailsElement>("[data-moa-message]")!;
+    expect(questionCard().open).toBe(true);
+    expect(question.getByRole("heading", { name: "Original task" })).toBeDefined();
+
+    // A second Coordinator message in the same Step arrives after execution
+    // evidence. It must not become an interleaved human input.
+    f.assembler.append(answer(4, 1, 1, "Data read. Now writing."));
+    f.assembler.append(task(5, "### Supplemental evidence\n\nKeep the original attachment references."));
+    const supplement = f.message("task-5");
+    expect(supplement.data.openingInput).toBeUndefined();
+    expect(supplement.groupTree).toBe("process");
+    const correspondence = render(f.seat(supplement.key, true));
+    const supplementCard = () => correspondence.container.querySelector<HTMLDetailsElement>("[data-moa-message]")!;
+    fireEvent.click(supplementCard().querySelector("summary")!);
+    expect(await correspondence.findByRole("heading", { name: "Supplemental evidence" })).toBeDefined();
+    for (const entry of final()) f.assembler.append(entry);
+    const completedOpening = f.message("task-3");
+    expect(completedOpening.anchorSeq).toBe(anchor);
+    expect(completedOpening.data.openingInput).toBe(true);
+    expect(completedOpening.groupTree).toBe("input");
+    const presentation = f.read().nodes.processSource(supplement.key).getSnapshot()!;
+    expect(presentation.turnClosed).toBe(true);
+    expect(presentation.hasInterleavedInput).toBe(false);
+    question.rerender(f.seat(opening.key, true));
+    correspondence.rerender(f.seat(supplement.key, true));
+    expect(question.container.querySelector("[data-turn-process-hidden]")).toBeNull();
+    expect(questionCard().open).toBe(true);
+    expect(question.getByRole("heading", { name: "Original task" })).toBeDefined();
+    expect(correspondence.container.querySelector("[data-turn-process-hidden]")).not.toBeNull();
+    expect(supplementCard().open).toBe(false);
+    expect(correspondence.queryByRole("heading", { name: "Supplemental evidence" })).toBeNull();
+    fireEvent.click(correspondence.container.querySelector("button")!);
+    expect(correspondence.container.querySelector("[data-turn-process-hidden]")).toBeNull();
+    fireEvent.click(supplementCard().querySelector("summary")!);
+    expect(await correspondence.findByRole("heading", { name: "Supplemental evidence" })).toBeDefined();
+    fireEvent.click(questionCard().querySelector("summary")!);
+    question.rerender(f.seat(opening.key, true));
+    expect(questionCard().open).toBe(false);
+  });
+
+  check("preserves the step-1 task and folds the step-9 supplement in a completed Worker conversation", async () => {
+    const f = await fixture(family.modules);
+    f.assembler.replaceWindow([
+      event("turn/start", 70, { turn: 2 }), event("step/start", 72, { turn: 2, step: 1 }),
+      task(73, "### Next task\n\nWrite the requested document."),
+      answer(76, 2, 1, "Data read. Now writing."), event("step/end", 120, { turn: 2, step: 1 }),
+      event("step/start", 128, { turn: 2, step: 9 }), task(129, "Supplemental data has arrived."),
+      answer(131, 2, 9, "Supplemental data read."), event("step/end", 138, { turn: 2, step: 9 }),
+      event("step/start", 139, { turn: 2, step: 10 }), answer(140, 2, 10, "Document complete."),
+      event("step/end", 417, { turn: 2, step: 10 }),
+      event("turn/end", 418, { turn: 2, reason: { kind: "completed" } }),
+    ], false);
+    const opening = f.message("task-73"), supplement = f.message("task-129");
+    expect(opening.data.turn).toBe(2); expect(opening.data.step).toBe(1);
+    expect(supplement.data.turn).toBe(2); expect(supplement.data.step).toBe(9);
+    expect(opening.groupTree).toBe("input"); expect(supplement.groupTree).toBe("process");
+    expect(f.read().nodes.processSource(supplement.key).getSnapshot()?.hasInterleavedInput).toBe(false);
+    const question = render(f.seat(opening.key, true)), internal = render(f.seat(supplement.key, true));
+    expect(question.container.querySelector("[data-turn-process-hidden]")).toBeNull();
+    expect(question.container.querySelector<HTMLDetailsElement>("[data-moa-message]")?.open).toBe(true);
+    expect(question.getByRole("heading", { name: "Next task" })).toBeDefined();
+    expect(internal.container.querySelector("[data-turn-process-hidden]")).not.toBeNull();
+    expect(internal.container.querySelector<HTMLDetailsElement>("[data-moa-message]")?.open).toBe(false);
+  });
+
+  for (const kind of ["project-mode-result", "moa-message"]) check(`keeps an opening Worker ${kind} report in the Coordinator's process`, async () => {
+    const f = await fixture(family.modules);
+    const report = event("user/message", 3, {
+      id: "report", role: "user",
+      source: kind === "project-mode-result"
+        ? { kind, form: "relay", completionId: "done", workerId: "child", workerTurn: 1 }
+        : { kind, form: "relay", rootId: "parent", senderId: "child", operationId: "report" },
+      content: [{ type: "text", text: "### Worker report\n\nFull evidence remains recoverable." }],
+    });
+    f.assembler.replaceWindow([
+      event("turn/start", 1, { turn: 1 }), event("step/start", 2, { turn: 1, step: 1 }), report,
+      answer(4, 1, 1, "Summarizing the report."), ...final(),
+    ], false);
+    const message = f.message("report");
+    expect(message.groupTree).toBe("process");
+    expect(message.data.openingInput).toBeUndefined();
+    expect(f.read().nodes.processSource(message.key).getSnapshot()?.hasInterleavedInput).toBe(false);
+    const ui = render(f.seat(message.key, true));
+    expect(ui.container.querySelector("[data-turn-process-hidden]")).not.toBeNull();
+    expect(ui.container.querySelector<HTMLDetailsElement>("[data-moa-message]")?.open).toBe(false);
+  });
 
   check("shows live communication, folds it after completion, and restores it through the native disclosure action", async () => {
     const f = await fixture(family.modules);
