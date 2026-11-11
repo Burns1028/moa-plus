@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes MoA+ v0.2.1, including Worker attachments, adaptive coordination, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes MoA+ v0.2.2, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
@@ -25,7 +25,7 @@ flowchart TB
 
 Patterns are decisions made through these tools and role prompts: create a clean specialist, branch useful history, ask a peer, compare results, or continue an existing Worker. The Coordinator retains ordinary execution tools and decides task ownership. Native DSH owns execution ordering, inbox admission, resource cleanup, and permissions; the plugin composes the collaboration around those guarantees.
 
-The default Adaptive guidance prefers suitable retained context through SendMessage, useful committed history through Fork, and clean Task contexts when independence matters. Ready independent work can start in parallel; incoming results unlock dependent work. QueryAgent supplies the native interruptible wait. Simple work can remain with the Coordinator. The five optional [orchestration prompts](orchestration.md) add task-specific collaboration instructions as editable user text, while the native runtime continues to own execution.
+The default Coordinator guidance prefers suitable retained context through SendMessage, useful committed history through Fork, and clean Task contexts when independence matters. Ready independent work can start in parallel; incoming results unlock dependent work. QueryAgent supplies the native interruptible wait. Simple work can remain with the Coordinator. The five optional [orchestration prompts](orchestration.md) add task-specific collaboration instructions as editable user text, while the native runtime continues to own execution.
 
 ## Reading order
 
@@ -33,7 +33,7 @@ The default Adaptive guidance prefers suitable retained context through SendMess
 | --- | --- |
 | [host/index.ts](../packages/project-mode/src/host/index.ts) | `ProjectMode[Service.init]`, `prepareAgent`, `attach`, `recover`, and authorized Remote methods compose the plugin. |
 | [host/prompts/](../packages/project-mode/src/host/prompts/) | Coordinator/Worker policies, Builder/Verifier instructions, identity/reporting text, and interrupt-judge instructions. Constants and pure text constructors live here; native message admission, source serialization, attachments and runtime state stay with their services. |
-| [shared/orchestration.ts](../packages/project-mode/src/shared/orchestration.ts) | Bundled titles, descriptions, and prompt text for fan-out, panel-team, blackboard-team, critique-loop, and auto-orchestration. This catalog owns text, with no persisted workflow state, remote service, or Skill loader. |
+| [shared/orchestration.ts](../packages/project-mode/src/shared/orchestration.ts) | Bundled titles, descriptions, and prompt text for 并行攻坚, 多方会审, 协同探索, 迭代精修, and 统筹推进. This catalog owns text, with no persisted workflow state, remote service, or Skill loader. |
 | [host/moa/tools.ts](../packages/project-mode/src/host/moa/tools.ts) | Model-facing definitions for Task, Fork, SendMessage, QueryAgent, KillAgent, and ProjectContext; validate arguments and call the responsible service. |
 | [host/moa/agents.ts](../packages/project-mode/src/host/moa/agents.ts) | `MoAAgents.task`, `fork`, `query`, `kill`, `context`, `recover`, and `lifecycle` implement controls through existing native capabilities. |
 | [host/moa/roles.ts](../packages/project-mode/src/host/moa/roles.ts) | `applyRoleRestrictions` mounts each specialist's execution-tool boundary. |

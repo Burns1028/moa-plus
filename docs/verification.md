@@ -1,5 +1,9 @@
 # Verification
 
+## MoA+ 0.2.2 documentation follow-up — 2026-11-11
+
+The final README check found the default coordination policy's former English heading in the English README. Both READMEs and the current orchestration guide now use Chinese mode names, including **自适应协调**. Version 0.2.2 keeps the Host and Client runtime bundles byte-identical to the fully validated 0.2.1 tree below; only documentation and release metadata change. The previously pushed tag is preserved. Package installation and CI are checked again for the new committed version before its stable tag is published.
+
 ## MoA+ 0.2.1 validation — 2026-11-11
 
 The release candidate combines the completion repair merged in `f0fd485` with five Chinese orchestration shortcuts: **并行攻坚**, **多方会审**, **协同探索**, **迭代精修**, and **统筹推进**. Candidate names, descriptions, search, lexicon and expanded instructions use the Chinese names. Native tool names, role presets, reporting ownership and execution boundaries retain their existing contracts.

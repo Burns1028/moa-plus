@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-11-11
+
+- Use Chinese orchestration mode names throughout the README and current guides, including 自适应协调. This release changes documentation and version metadata only; runtime bytes remain unchanged from v0.2.1.
+
 ## 0.2.1 — 2026-11-11
 
 - Add an audited DSH 0.2.2-rc.1 / DSH Next 2.0.22-next compatibility profile while retaining the rc.3 profile with 21 packages / 49 file paths. Select profiles by reviewed runtime bytes and package contracts, preserve original backups, and support explicit upgrades from prior patched bytes.

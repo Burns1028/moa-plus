@@ -20,7 +20,7 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-MoA+ **v0.2.1** supports the audited **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.2** supports the audited **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
 profile extends **21 native packages across 49 file paths**. Keep the plugin
 and its matching profile from the same release; a stock or differently prepared
@@ -31,12 +31,12 @@ Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares 
 
 Protected Worker shell execution requires macOS Seatbelt or Linux bubblewrap. Windows filesystem record protection remains available, but the current Windows shell backend cannot enforce the same record exclusions. A Verifier can continue through native file inspection when commands are optional; required command verification reports the missing capability and stops without dropping protection or requesting wider access. See [backend requirements][compatibility].
 
-The commands below use the v0.2.1 checkout. Use `main` instead to follow development.
+The commands below use the v0.2.2 checkout. Use `main` instead to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.1 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.2 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -64,9 +64,9 @@ Coordinator and Workers use the same native Agent Loop, with different identitie
 
 When a Worker turn finishes, its **complete final AI message** returns automatically to its designated reporting Agent. The Coordinator can review the result, continue with that Worker, or change direction. Retained conversations and workspaces let the team continue across assignments.
 
-### Adaptive coordination and optional patterns
+### 自适应协调与可选编排
 
-Adaptive guidance keeps simple work direct. For delegated work, the Coordinator prefers `SendMessage` to reuse a suitable Worker, `Fork` when committed history helps a new branch, and a fresh `Task` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `QueryAgent` waits when waiting is useful. When no actionable goal or unfinished concrete work exists, a brief acknowledgement or ordinary chat clarification can complete the response without ceremonial tools, memory updates, or blocking questions.
+The default Coordinator guidance keeps simple work direct. For delegated work, the Coordinator prefers `SendMessage` to reuse a suitable Worker, `Fork` when committed history helps a new branch, and a fresh `Task` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `QueryAgent` waits when waiting is useful. When no actionable goal or unfinished concrete work exists, a brief acknowledgement or ordinary chat clarification can complete the response without ceremonial tools, memory updates, or blocking questions.
 
 An enabled MoA+ Coordinator also offers five bundled `@` prompts: **并行攻坚** for independent slices, **多方会审** for a disputed decision, **协同探索** for tangled exploration, **迭代精修** for iterative artifact review, and **统筹推进** for a task with several collaboration phases. Type `@` and select the Chinese-named candidate by click, Enter, or Tab. The prompt expands into editable composer text; add the task and send normally. Workers and ordinary conversations do not offer these packs.
 
@@ -91,7 +91,7 @@ The demo starts with the wordmark's off/on states and theme adaptation, then ope
 ## Documentation and contribution
 
 - [Roles, lifecycle, and common flows][roles]
-- [Adaptive coordination and optional `@` patterns][orchestration]
+- [自适应协调与可选编排][orchestration]
 - [Code architecture][architecture] and [Tool API][tools]
 - [First-run guide][quickstart] and [compatibility / rollback][compatibility]
 - [Verification records][verification]

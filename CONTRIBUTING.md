@@ -4,7 +4,7 @@ Start with [MOA responsibilities](docs/moa-architecture.md), the [code architect
 
 ## Local setup
 
-Use Node 24.9+, npm and Git. MoA+ v0.2.1 supports the explicit DSH 0.2.1-rc.3 profile in this checkout (21 native packages across 49 file paths) and the separately audited DSH 0.2.2-rc.1 / Desktop Next profile. See docs/native-compatibility.md for exact runtime and platform requirements. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
+Use Node 24.9+, npm and Git. MoA+ v0.2.2 supports the explicit DSH 0.2.1-rc.3 profile in this checkout (21 native packages across 49 file paths) and the separately audited DSH 0.2.2-rc.1 / Desktop Next profile. See docs/native-compatibility.md for exact runtime and platform requirements. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
 
 ```sh
 npm ci

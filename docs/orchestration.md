@@ -1,8 +1,8 @@
-# Adaptive coordination and optional patterns
+# 自适应协调与可选编排
 
-This guide covers **MoA+ v0.2.1**. MoA+ uses one default Adaptive Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
+This guide covers **MoA+ v0.2.2**. MoA+ uses **自适应协调** as its default Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
 
-## Default Adaptive coordination
+## 默认自适应协调
 
 The Coordinator keeps simple work direct. When delegation helps, it first considers reusing a suitable Worker's retained context with `SendMessage`, then `Fork` when committed history is useful to a new branch, then a clean `Task` when the history is irrelevant or an independent judgment matters. These choices depend on the responsibility and available context.
 
@@ -84,6 +84,6 @@ Omitting `wait` makes an immediate query. A native wait can return for completio
 
 ## Implementation boundary
 
-The catalog in [`shared/orchestration.ts`](../packages/project-mode/src/shared/orchestration.ts) contains local titles, descriptions, and prompt text. [`client/orchestration-input.ts`](../packages/project-mode/src/client/orchestration-input.ts) contributes candidates and editable expansions through the native input-trigger source. [`host/prompts/coordinator.ts`](../packages/project-mode/src/host/prompts/coordinator.ts) supplies the default Adaptive guidance.
+The catalog in [`shared/orchestration.ts`](../packages/project-mode/src/shared/orchestration.ts) contains local titles, descriptions, and prompt text. [`client/orchestration-input.ts`](../packages/project-mode/src/client/orchestration-input.ts) contributes candidates and editable expansions through the native input-trigger source. [`host/prompts/coordinator.ts`](../packages/project-mode/src/host/prompts/coordinator.ts) supplies the default Coordinator guidance.
 
 The catalog is text, not a workflow engine, Skill, network service, or runtime enforcement layer. The selected instructions guide model behavior; DSH continues to own Agent execution, capacity, inbox admission, delivery, permissions, resource cleanup, and Stop. No separate scheduler or task-specific delegation gate is added. See the [architecture guide](architecture.md) for those ownership boundaries.
