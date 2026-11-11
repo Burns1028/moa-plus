@@ -33,7 +33,7 @@ The default Coordinator guidance prefers suitable retained context through SendM
 | --- | --- |
 | [host/index.ts](../packages/project-mode/src/host/index.ts) | `ProjectMode[Service.init]`, `prepareAgent`, `attach`, `recover`, and authorized Remote methods compose the plugin. |
 | [host/prompts/](../packages/project-mode/src/host/prompts/) | Coordinator/Worker policies, Builder/Verifier instructions, identity/reporting text, and interrupt-judge instructions. Constants and pure text constructors live here; native message admission, source serialization, attachments and runtime state stay with their services. |
-| [shared/orchestration.ts](../packages/project-mode/src/shared/orchestration.ts) | Bundled titles, descriptions, and prompt text for fan-out, panel-team, blackboard-team, critique-loop, and auto-orchestration. This catalog owns text, with no persisted workflow state, remote service, or Skill loader. |
+| [shared/orchestration.ts](../packages/project-mode/src/shared/orchestration.ts) | Bundled titles, descriptions, and prompt text for 并行攻坚, 多方会审, 协同探索, 迭代精修, and 统筹推进. This catalog owns text, with no persisted workflow state, remote service, or Skill loader. |
 | [host/moa/tools.ts](../packages/project-mode/src/host/moa/tools.ts) | Model-facing definitions for Task, Fork, SendMessage, QueryAgent, KillAgent, and ProjectContext; validate arguments and call the responsible service. |
 | [host/moa/agents.ts](../packages/project-mode/src/host/moa/agents.ts) | `MoAAgents.task`, `fork`, `query`, `kill`, `context`, `recover`, and `lifecycle` implement controls through existing native capabilities. |
 | [host/moa/roles.ts](../packages/project-mode/src/host/moa/roles.ts) | `applyRoleRestrictions` mounts each specialist's execution-tool boundary. |
