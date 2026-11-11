@@ -1736,18 +1736,12 @@ function bindCompletion(host) {
 			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedShell) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
 		} catch (error) {
 			signal.throwIfAborted();
-			if (error instanceof CompletionHelperFailure) {
-				if (active && helpers.get(agent) === active) {
-					helpers.delete(agent);
-					retire(active);
-				}
-				throw error;
-			}
 			if (!wake.signal.aborted && !host.closing.signal.aborted) {
 				if (active && helpers.get(agent) === active) {
 					helpers.delete(agent);
 					retire(active);
 				}
+				if (error instanceof CompletionHelperFailure) throw error;
 				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
 			}
 		} finally {
