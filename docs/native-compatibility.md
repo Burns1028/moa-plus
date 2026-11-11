@@ -56,6 +56,20 @@ error path. It must not instruct the Coordinator to repair the plugin or repeat
 the user's work. An ordinary review verdict or superseded rubric still uses the
 existing re-verification flow.
 
+The Coordinator and Builder read the same saved original requirements and source
+snapshots. A required native task-context section restores that material after a
+failed first admission or cold restart, even when the original inbox input never
+reached the Coordinator's committed model history. It is existing task context,
+not a new human message; notes remain progress records. Completed tasks no longer
+supply that context to a later task.
+
+The Verifier also treats the native structured `READ_ONLY_PATH_UNSUPPORTED`
+failure as a runtime capability error. It cancels and joins the native helper,
+then reports the error to the parent turn, instead of retrying tools, requesting
+broader permissions or asking the Coordinator to rework the deliverable. The
+rule applies even when no tests were required. Ordinary failed tests remain
+eligible for re-verification; console text does not establish this error code.
+
 The `project-mode-results` projection uses `stateVersion: 5`. Starting a turn
 removes the prior optional `lastAssistant` field, keeping checkpoints plain JSON
 even when that turn ends before an AI reply. The native projection registry

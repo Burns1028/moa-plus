@@ -26,6 +26,10 @@ const sourceVersionSchema = z.object({ path: z.string(), requirement: z.number()
 const inputSchema = z.object({ taskId: z.string(), turn: z.number(), finished: z.boolean().default(false), requirements: z.array(z.string()), sources: z.record(z.string(), z.string().nullable()), sourceVersions: z.array(sourceVersionSchema).default([]), attachments: z.array(z.custom<ContentBlock>()).default([]) });
 const boundSchema = criteriaSchema.extend({ taskId: z.string(), turn: z.number() });
 type Input = z.infer<typeof inputSchema>;
+function serializeInput(input: Input): string {
+  const { attachments: _attachments, ...snapshot } = input;
+  return JSON.stringify(snapshot);
+}
 const output = { schema: { type: "string" as const }, render: (_: unknown, value: string) => [{ type: "text" as const, text: value }] };
 const text = (message: { content: readonly ContentBlock[] }) => message.content.filter((b) => b.type === "text").map((b) => String(b.text)).join("\n");
 const msg = (body: string) => createUserMessage({ source: { kind: "moa-completion", form: "notice", summary: "MoA completion review" }, content: [{ type: "text", text: body }] });
@@ -53,6 +57,16 @@ function hasNativeModelSelection(agent: Agent): agent is Agent & { model: {
 
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
 export function bindCompletion(host: HostAccess): (agent: Agent) => void {
+  host.ctx.systemPrompt.context({
+    name: "project-mode:task", order: 655, required: true, interpolate: false,
+    text: ({ agent }) => {
+      const record = agent && host.record(agent.id);
+      if (record?.project.mode !== "enabled") return "";
+      const input = inputSchema.safeParse(record.operations[sourceKey]);
+      if (!input.success || input.data.finished) return "";
+      return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeInput(input.data)}`;
+    },
+  });
   const helpers = new Map<Agent, Helpers>();
   const mounted = new Map<Agent, () => void>();
   const running = new Map<Agent, Promise<Helpers>>();
@@ -233,7 +247,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     try {
       verifier = await make("verifier");
       verifierMemoryPolicy = bindWorkerMemoryPolicy(host.ctx, verifier.agent, record.project.paths);
-      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: rubricBuilderPrompt(JSON.stringify({ ...input, attachments: undefined })) }, ...input.attachments] }));
+      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: rubricBuilderPrompt(serializeInput(input)) }, ...input.attachments] }));
       const build = builder.agent.whenIdle().then(async () => {
         checkHelperFailure(builder.agent, "Rubric Builder");
         if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
@@ -336,8 +350,22 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const offset = pair.verifier.agent.session.snapshotEvents().length;
       const shellKind = (name: string) => ["bash", "pwsh"].includes(name.toLowerCase());
       const successfulShell = new Set<number>();
+      let capabilityFailure: CompletionHelperFailure | undefined;
+      let capabilityJoin: Promise<void> | undefined;
       stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-        if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || result.isError) return;
+        if (exec.agent !== pair.verifier.agent || !shellKind(exec.name)) return;
+        if (result.isError) {
+          if (!capabilityFailure && result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
+            // This native backend cannot honor the review's record protection.
+            // Stop before another model step can retry or seek wider access.
+            capabilityFailure = new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
+            capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
+            // Observe an early rejection while whenIdle is still joining. The
+            // original promise is awaited below and its failure is propagated.
+            void capabilityJoin.catch(error => host.ctx.logger.warn(`moa: verifier capability-stop cleanup: ${String(error)}`));
+          }
+          return;
+        }
         const value = result.value;
         const foregroundPassed = value && typeof value === "object" && !Array.isArray(value) && value.kind === "foreground" && value.exitCode === 0 && value.timedOut === false && value.aborted === false && value.signal === null;
         // Persistent shells keep their public string result. Their native
@@ -353,6 +381,14 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       candidateReview = pair.freezeCandidate(answer, control);
       pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
+      if (capabilityJoin) {
+        try { await waitForTurn(capabilityJoin, control); }
+        catch (error) {
+          control.throwIfAborted();
+          throw new CompletionHelperFailure(`${capabilityFailure!.message}; native cleanup failed`, { cause: error });
+        }
+      }
+      if (capabilityFailure) throw capabilityFailure;
       checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
       await pair.read(control);
       control.throwIfAborted();

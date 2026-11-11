@@ -1223,6 +1223,10 @@ const boundSchema = criteriaSchema.extend({
 	taskId: z.string(),
 	turn: z.number()
 });
+function serializeInput(input) {
+	const { attachments: _attachments, ...snapshot } = input;
+	return JSON.stringify(snapshot);
+}
 const output$1 = {
 	schema: { type: "string" },
 	render: (_, value) => [{
@@ -1258,6 +1262,19 @@ function hasNativeModelSelection(agent) {
 }
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
 function bindCompletion(host) {
+	host.ctx.systemPrompt.context({
+		name: "project-mode:task",
+		order: 655,
+		required: true,
+		interpolate: false,
+		text: ({ agent }) => {
+			const record = agent && host.record(agent.id);
+			if (record?.project.mode !== "enabled") return "";
+			const input = inputSchema.safeParse(record.operations[sourceKey]);
+			if (!input.success || input.data.finished) return "";
+			return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeInput(input.data)}`;
+		}
+	});
 	const helpers = /* @__PURE__ */ new Map();
 	const mounted = /* @__PURE__ */ new Map();
 	const running = /* @__PURE__ */ new Map();
@@ -1520,10 +1537,7 @@ function bindCompletion(host) {
 				source: { kind: "user" },
 				content: [{
 					type: "text",
-					text: rubricBuilderPrompt(JSON.stringify({
-						...input,
-						attachments: void 0
-					}))
+					text: rubricBuilderPrompt(serializeInput(input))
 				}, ...input.attachments]
 			}));
 			const build = builder.agent.whenIdle().then(async () => {
@@ -1692,8 +1706,18 @@ function bindCompletion(host) {
 			const offset = pair.verifier.agent.session.snapshotEvents().length;
 			const shellKind = (name) => ["bash", "pwsh"].includes(name.toLowerCase());
 			const successfulShell = /* @__PURE__ */ new Set();
+			let capabilityFailure;
+			let capabilityJoin;
 			stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || result.isError) return;
+				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name)) return;
+				if (result.isError) {
+					if (!capabilityFailure && result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
+						capabilityFailure = new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
+						capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
+						capabilityJoin.catch((error) => host.ctx.logger.warn(`moa: verifier capability-stop cleanup: ${String(error)}`));
+					}
+					return;
+				}
 				const value = result.value;
 				const foregroundPassed = value && typeof value === "object" && !Array.isArray(value) && value.kind === "foreground" && value.exitCode === 0 && value.timedOut === false && value.aborted === false && value.signal === null;
 				const meta = result.meta;
@@ -1706,6 +1730,13 @@ function bindCompletion(host) {
 			candidateReview = pair.freezeCandidate(answer, control);
 			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
+			if (capabilityJoin) try {
+				await waitForTurn(capabilityJoin, control);
+			} catch (error) {
+				control.throwIfAborted();
+				throw new CompletionHelperFailure(`${capabilityFailure.message}; native cleanup failed`, { cause: error });
+			}
+			if (capabilityFailure) throw capabilityFailure;
 			checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
 			await pair.read(control);
 			control.throwIfAborted();
