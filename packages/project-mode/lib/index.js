@@ -1278,6 +1278,8 @@ function bindCompletion(host) {
 			if (record?.project.mode !== "enabled") return "";
 			const input = inputSchema.safeParse(record.operations[sourceKey]);
 			if (!input.success || input.data.finished) return "";
+			const bound = boundSchema.safeParse(record.operations[`${key}:${record.project.coordinatorSessionId}`]);
+			if (host.config.completionVerification !== true && (!bound.success || bound.data.taskId !== input.data.taskId)) return "";
 			return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeInput(input.data)}`;
 		}
 	});
@@ -1584,7 +1586,7 @@ function bindCompletion(host) {
 		mounted.set(agent, () => {});
 		const off = agent.ctx.tools.register(defineTool({
 			name: "set_completion_criteria",
-			description: "Bind this task's completion criteria and exact completion promise to include in the final answer.",
+			description: host.record(agent.id) && host.config.completionVerification === "on-demand" ? "Request independent outcome verification for the current task and bind concrete completion criteria plus an exact, natural completion statement for the final answer. Use your judgment when a separate acceptance check is valuable; ordinary chat need not activate it. The Builder derives its rubric from original human requirements, not these criteria." : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
 			parameters: {
 				criteria: {
 					type: "string",
@@ -1601,7 +1603,10 @@ function bindCompletion(host) {
 			async execute(args, exec) {
 				if (exec.agent !== agent || !participant(agent)) throw new Error("moa/not-participant");
 				const record = recordFor(agent.id);
-				const taskId = host.record(agent.id) ? inputSchema.parse(record.operations[sourceKey]).taskId : agent.id;
+				const own = host.record(agent.id);
+				const input = inputSchema.safeParse(record.operations[sourceKey]);
+				if (own && (!input.success || input.data.finished)) throw new Error("No unfinished human task is available for independent verification.");
+				const taskId = own && input.success ? input.data.taskId : agent.id;
 				const start = agent.session.snapshotEvents().filter((event) => event.type === "turn/start").at(-1);
 				if (!start || start.type !== "turn/start") throw new Error("Missing completion task turn");
 				const value = {
@@ -1627,12 +1632,24 @@ function bindCompletion(host) {
 		mount(agent);
 		if (decision.kind !== "enter") return decision;
 		const human = decision.messages.filter((m) => m.source.kind === "user");
-		if (!human.length) return decision;
 		const prior = inputSchema.safeParse(host.record(agent.id)?.operations[sourceKey]);
 		const events = agent.session.snapshotEvents();
 		const start = events.filter((event) => event.type === "turn/start").at(-1);
 		if (!start || start.type !== "turn/start") throw new Error("Missing turn identity");
 		const priorCompleted = prior.success && events.some((event) => event.type === "turn/end" && event.data.turn === prior.data.turn && event.data.reason.kind === "completed");
+		if (!human.length) {
+			if (prior.success && !prior.data.finished && !priorCompleted && prior.data.turn !== start.data.turn) await host.update(agent.id, (r) => ({
+				...r,
+				operations: {
+					...r.operations,
+					[sourceKey]: z.json().parse({
+						...prior.data,
+						turn: start.data.turn
+					})
+				}
+			}));
+			return decision;
+		}
 		const base = prior.success && !prior.data.finished && !priorCompleted ? {
 			...prior.data,
 			turn: start.data.turn
@@ -1656,6 +1673,8 @@ function bindCompletion(host) {
 		const old = helpers.get(agent);
 		helpers.delete(agent);
 		if (old) retire(old);
+		const bound = boundSchema.safeParse(host.record(agent.id)?.operations[criteriaKey(agent.id)]);
+		if (host.config.completionVerification !== true && (!bound.success || bound.data.taskId !== input.taskId)) return decision;
 		const pending = create(agent, input, signal);
 		running.set(agent, pending);
 		try {
@@ -1678,6 +1697,7 @@ function bindCompletion(host) {
 			return;
 		}
 		if (!host.record(agent.id) || !current.success || current.data.finished) return;
+		if (host.config.completionVerification !== true && (!gate.success || !currentTask || gateCompleted)) return;
 		if (agent.inbox.nextStep.length) return;
 		const wake = new AbortController();
 		const listener = () => {
@@ -4936,7 +4956,7 @@ const Config = z$1.object({
 		"llm-judge"
 	]).default("llm-judge"),
 	backgroundAfterSeconds: z$1.number().min(0).default(10),
-	completionVerification: z$1.boolean().default(false),
+	completionVerification: z$1.union([z$1.const("on-demand"), z$1.boolean()]).default("on-demand"),
 	dataDirectory: z$1.string().default("."),
 	coordinatorHiddenTools: z$1.array(z$1.string()).default([
 		"subagent",
@@ -4981,7 +5001,7 @@ Review results and actual artifacts against the goal. Reuse completed results an
 
 Execution and completion
 Notify is a soft insertion; it does not cancel an active tool. Slow tools can move to native background jobs. query_background_tool reads progress or waits; cancel_background_tool cancels an owned job. AfterSeconds may return control within the same turn; a message-driven handoff ends the old turn and opens the new incoming-message turn. Real background results return automatically and can wake an idle agent.
-If a task has a precise completion promise, bind it with set_completion_criteria and include its exact text only when the criteria are met. The independent rubric/verifier gate may return concrete gaps for rework. Preserve native permissions, approvals, Stop, queue semantics and tool-result pairing. Do not report completion merely because dispatch or cancellation was accepted. Exact workspace paths are supplied in the session's project facts.`;
+When independent acceptance would add value for the current task and verification is available, request it with set_completion_criteria. Make that decision from the user's goal and the remaining uncertainty, without asking the user to toggle configuration. Use concrete criteria and a natural completion statement as the exact promise; include it only when its criteria are met. Routine acknowledgements do not need a review. The independent rubric/verifier gate may return concrete gaps for rework. Preserve native permissions, approvals, Stop, queue semantics and tool-result pairing. Do not report completion merely because dispatch or cancellation was accepted. Exact workspace paths are supplied in the session's project facts.`;
 // src/host/prompts/worker.ts
 /** Shared worker policy; concrete identity is injected in conversation history. */
 const workerPrompt = `You are a MoA+ worker or specialist. Complete your assigned responsibility and return a result that helps your reporting agent decide the next step. Your identity declaration in the conversation states your actual ID, work directory, workspace isolation, reportTo and shared project paths. A Fork inherits another agent's history, not its identity or authority.
@@ -5461,7 +5481,7 @@ let ProjectMode = (() => {
 				this.memoryBindings.get(agent)?.dispose();
 				this.memoryBindings.delete(agent);
 			});
-			if (this.config.completionVerification) this.completionAttach = bindCompletion(this.access);
+			if (this.config.completionVerification !== false) this.completionAttach = bindCompletion(this.access);
 			this.ctx.effect(() => async () => {
 				this.available = false;
 				this.closing.abort();
@@ -5646,7 +5666,7 @@ let ProjectMode = (() => {
 		roleText(agent) {
 			const own = this.record(agent.id);
 			if (own?.project.mode === "enabled") {
-				const completion = this.config.completionVerification ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery." : "Automatic outcome verification is not enabled in this runtime.";
+				const completion = this.config.completionVerification === true ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery." : this.config.completionVerification === "on-demand" ? "Independent outcome verification is available on demand. Decide whether the current task benefits from a separate acceptance check. When it does, call set_completion_criteria to request verification for this task, using concrete criteria and a short, natural completion statement as the exact promise. The independently authored rubric still comes only from original human requirements and source snapshots, not your criteria or implementation. No Builder or Verifier is created unless you request verification; ordinary acknowledgements and work that does not benefit from independent review can finish directly. Once requested, complete the work and include the promise only when its criteria are met; the verifier may return evidence-backed gaps for rework. A completed task does not enable verification for the next task." : "Automatic outcome verification is not enabled in this runtime.";
 				return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({
 					...own.project.paths,
 					contextIndex: contextIndexPath(own.project.paths)

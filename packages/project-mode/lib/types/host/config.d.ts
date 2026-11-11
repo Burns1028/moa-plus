@@ -2,7 +2,7 @@ import z from "@deepseek-ai/schemastery";
 export interface Config {
     backgroundStrategy: "after-seconds" | "new-message" | "llm-judge";
     backgroundAfterSeconds: number;
-    completionVerification: boolean;
+    completionVerification: boolean | "on-demand";
     dataDirectory: string;
     coordinatorHiddenTools: string[];
     progressTextMaxChars: number;

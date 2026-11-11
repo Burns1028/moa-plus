@@ -63,7 +63,7 @@ export async function fixture(
     keepFiles?: boolean;
     maxActiveSubagents?: number;
     workspace?: boolean;
-    completionVerification?: boolean;
+    completionVerification?: boolean | "on-demand";
     backgroundStrategy?: "after-seconds" | "new-message" | "llm-judge";
     backgroundAfterSeconds?: number;
     sandboxMode?: "read-only" | "workspace-write" | "danger-full-access";
