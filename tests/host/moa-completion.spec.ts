@@ -164,7 +164,7 @@ it("withdraws an answer missing its bound promise and verifies with an independe
   } finally { await f.dispose(); }
 });
 
-it("reworks a Partial verdict in the same native turn before a tool-backed Pass", async () => {
+it.each(["legacy", "structured"])("reworks a Partial verdict in the same native turn before a tool-backed Pass (format=%s)", async format => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     f.ctx.tools.register(defineTool({ name: "inspect_artifact", description: "Inspect artifact", parameters: {}, output: { schema: { type: "string" }, render: (_, value: string) => [{ type: "text", text: value }] }, execute: async () => "inspected" }));
@@ -178,7 +178,8 @@ it("reworks a Partial verdict in the same native turn before a tool-backed Pass"
         verify++;
         if (verify % 3 === 1) return call("read_rubric", {});
         if (verify % 3 === 2) return call("inspect_artifact", {});
-        return response(verify === 3 ? '{"status":"Partial","issues":["Missing conclusion"],"tests_required":false}' : '{"status":"Pass","issues":[],"tests_required":false}');
+        const verdict = { status: verify === 3 ? "Partial" : "Pass", issues: verify === 3 ? ["Missing conclusion"] : [] };
+        return format === "structured" ? call("submit_verdict", verdict) : response(JSON.stringify(verdict));
       }
       main++;
       if (main === 2) expect(JSON.stringify(options.messages)).toContain("Missing conclusion");
@@ -190,6 +191,97 @@ it("reworks a Partial verdict in the same native turn before a tool-backed Pass"
     expect(verify).toBe(6);
     expect(built).toBe(1);
     expect(agent.session.snapshotEvents().filter((e) => e.type === "turn/end")).toHaveLength(1);
+  } finally { await f.dispose(); }
+});
+
+it("accepts a private structured verdict alongside prose without another model step or task rework", async () => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-structured-verdict"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the report [human]", tests_required: false });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) {
+          expect(options.tools?.find(tool => tool.name === "submit_verdict")?.parameters).toMatchObject({ properties: { status: { enum: ["Pass", "Partial", "Block"] }, issues: { type: "array", items: { type: "string" } } } });
+          return call("read_rubric", {});
+        }
+        if (verifier === 2) return call("read_candidate", {});
+        if (verifier === 3) return [
+          ...response('I inspected the complete report.\n{"status":"Block","issues":["Text is not the submitted verdict"]}').slice(0, -1),
+          ...call("submit_verdict", { status: "Pass", issues: [] }).map(chunk => "index" in chunk ? { ...chunk, index: 1 } : chunk),
+        ];
+        return response("Legacy fallback cannot parse this prose.");
+      }
+      expect(options.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
+      if (++main > 1) agent.cancel({ kind: "user" });
+      return response("The completed report");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver the report" }] }));
+    await agent.whenIdle();
+    expect(main).toBe(1);
+    expect(verifier).toBe(3);
+    expect(agent.session.snapshotEvents().filter(event => event.type === "turn/end")).toMatchObject([{ data: { reason: { kind: "completed" } } }]);
+  } finally { await f.dispose(); }
+});
+
+it.each([false, true])("still requires actual inspection and required tests after structured submission (tests=%s)", async testsRequired => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-structured-evidence"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver and verify report [human]", tests_required: testsRequired });
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 1) return call("read_rubric", {});
+        if (testsRequired && verifier === 2) return call("read_candidate", {});
+        if (verifier === (testsRequired ? 3 : 2)) return call("submit_verdict", { status: "Pass", issues: [] });
+        return response('{"status":"Pass","issues":[]}');
+      }
+      if (++main === 2) {
+        expect(JSON.stringify(options.messages)).toContain("Verifier must read the rubric, inspect actual results using tools, and perform required tests");
+        agent.cancel({ kind: "user" });
+      }
+      return response("candidate");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver and verify report" }] }));
+    await agent.whenIdle();
+    expect(main).toBe(2);
+    expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
+  } finally { await f.dispose(); }
+});
+
+it("does not reuse a prior structured Pass when a new attempt has no submission", async () => {
+  const f = await fixture(undefined, { completionVerification: true });
+  try {
+    const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-structured-attempts"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    let main = 0, verifier = 0;
+    f.adapter.handler = options => {
+      const id = String(options.sessionId);
+      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
+      if (id.startsWith("moa-verifier-")) {
+        verifier++;
+        if ([1, 3, 6].includes(verifier)) return call("read_rubric", {});
+        if ([4, 7].includes(verifier)) return call("read_candidate", {});
+        if ([2, 8].includes(verifier)) return call("submit_verdict", { status: "Pass", issues: [] });
+        return response("This review ended without a submitted or JSON verdict.");
+      }
+      main++;
+      if (main === 2) expect(JSON.stringify(options.messages)).toContain("inspect actual results using tools");
+      if (main === 3) expect(JSON.stringify(options.messages)).toContain("valid JSON verdict");
+      if (main > 3) agent.cancel({ kind: "user" });
+      return response(`candidate ${main}`);
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
+    await agent.whenIdle();
+    expect(main).toBe(3);
+    expect(verifier).toBe(8);
+    expect(agent.session.snapshotEvents().filter(event => event.type === "turn/end")).toMatchObject([{ data: { reason: { kind: "completed" } } }]);
   } finally { await f.dispose(); }
 });
 
@@ -298,7 +390,7 @@ it("allows Stop while the verifier is waiting without committing completion", as
     f.adapter.handler = async (options) => {
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
-      if (id.startsWith("moa-verifier-")) { entered.resolve(); await release.promise; return response("late"); }
+      if (id.startsWith("moa-verifier-")) { entered.resolve(); await release.promise; return call("submit_verdict", { status: "Pass", issues: [] }); }
       return response("candidate");
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
@@ -571,6 +663,8 @@ it.skipIf(!hasBash).each([
   { promote: false, format: "plain" },
   { promote: true, format: "plain" },
   { promote: true, format: "fenced" },
+  { promote: false, format: "structured" },
+  { promote: true, format: "structured" },
 ])("accepts actual native Bash success from canonical exit facts (promotion=$promote, verdict=$format)", async ({ promote, format }) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
@@ -590,6 +684,7 @@ it.skipIf(!hasBash).each([
         if (++verifier === 1) return call("read_rubric", {});
         if (verifier === 2) return call("bash", { command: `${promote ? "sleep 0.12; " : ""}printf 'background capability is tested\\n'`, description: "Run verification", timeoutMs: promote ? 20 : 2000 });
         if (promote && verifier === 3) return call("job_output", { job_id: f.ctx.jobs.list(SessionId(id))[0].id, wait: true, timeout_ms: 2000 });
+        if (format === "structured") return call("submit_verdict", { status: "Pass", issues: [] });
         return response(format === "plain" ? '{"status":"Pass","issues":[]}' : 'I verified the candidate and ran the required command successfully.\n\n```json\n{"status":"Pass","issues":[]}\n```\nReady for delivery.');
       }
       if (++main > 1) { agent.cancel({ kind: "user" }); throw new Error("Native exit zero was rejected"); }

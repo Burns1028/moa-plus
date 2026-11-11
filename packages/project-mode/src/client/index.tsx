@@ -4,6 +4,7 @@ import type {} from "@deepseek-ai/dsh-client-locale/client";
 import type {} from "@deepseek-ai/dsh-api-gateway/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
+import type {} from "@deepseek-ai/dsh-client-ui-input-trigger/client";
 import type {
   PropsRuntime,
   PropsLocale,
@@ -13,6 +14,7 @@ import type { SessionFace } from "@deepseek-ai/dsh-api-session-controller/client
 import projectModeRemote from "../../lib/typert.remote-client.js";
 import { ProjectClient } from "./runtime.ts";
 import { bindCoordinatorInputPolicy } from "./input-policy.ts";
+import { bindOrchestrationInput } from "./orchestration-input.ts";
 import { bindWorkerParents } from "./worker-parent.ts";
 import { registerProjectPanels } from "./panels.tsx";
 import {
@@ -58,6 +60,9 @@ function applyProjectClient(ctx: Context) {
     registerProjectPanels(scope, client, open),
   );
   ctx.effect(() => bindWorkerParents(client, ctx.sessions));
+  ctx.inject(["inputTriggers"], (scope) => {
+    scope.effect(() => bindOrchestrationInput(client, scope.inputTriggers));
+  });
   const historyLoads = new WeakMap<SessionFace, Set<number>>();
   let disposed = false;
   ctx.effect(() => () => {

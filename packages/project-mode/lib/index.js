@@ -1164,7 +1164,7 @@ function outcomeVerifierPrompt(rubricPath) {
 
 This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
 
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Inspect file artifacts with available native tools and personally run relevant shell/build/tests with the available native shell (Bash or PowerShell) where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. Return JSON only: {"status":"Pass"|"Partial"|"Block","issues":["..."]}. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Rubric file: ${rubricPath}`;
+Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Inspect file artifacts with available native tools and personally run relevant shell/build/tests with the available native shell (Bash or PowerShell) where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1194,6 +1194,14 @@ const criteriaSchema = z.object({
 const rubricSchema = z.object({
 	rubric: z.string().min(1),
 	tests_required: z.boolean()
+});
+const verdictSchema = z.object({
+	status: z.enum([
+		"Pass",
+		"Partial",
+		"Block"
+	]),
+	issues: z.array(z.string())
 });
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
@@ -1243,8 +1251,8 @@ function bindCompletion(host) {
 	const helpers = /* @__PURE__ */ new Map();
 	const mounted = /* @__PURE__ */ new Map();
 	const running = /* @__PURE__ */ new Map();
-	const generations = /* @__PURE__ */ new Map();
-	const writes = /* @__PURE__ */ new Map();
+	let generations = /* @__PURE__ */ new WeakMap();
+	const writes = /* @__PURE__ */ new WeakMap();
 	const retired = /* @__PURE__ */ new Set();
 	const recordFor = (id) => host.record(id) ?? host.owner(id);
 	const criteriaKey = (id) => `${key}:${id}`;
@@ -1334,8 +1342,11 @@ function bindCompletion(host) {
 				signal
 			};
 			candidate = snapshot;
-			return () => {
-				if (candidate === snapshot) candidate = void 0;
+			return {
+				readVerdict: () => snapshot.verdict,
+				dispose: () => {
+					if (candidate === snapshot) candidate = void 0;
+				}
 			};
 		};
 		const read = async (signal) => {
@@ -1437,6 +1448,36 @@ function bindCompletion(host) {
 							if (!candidate) throw new Error("No active candidate review");
 							candidate.signal.throwIfAborted();
 							return candidate.answer;
+						}
+					}));
+					ctx.tools.register(defineTool({
+						name: "submit_verdict",
+						description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables. This ends the review; submission alone is not inspection or required test evidence.",
+						parameters: {
+							status: {
+								type: "string",
+								required: true,
+								enum: [
+									"Pass",
+									"Partial",
+									"Block"
+								]
+							},
+							issues: {
+								type: "array",
+								required: true,
+								items: { type: "string" },
+								description: "Concrete remaining gaps; empty when no issues remain"
+							}
+						},
+						output: output$1,
+						async execute(args, exec) {
+							if (!candidate) throw new Error("No active candidate review");
+							exec.signal.throwIfAborted();
+							candidate.signal.throwIfAborted();
+							candidate.verdict = verdictSchema.parse(args);
+							exec.concludeTurn();
+							return "Verdict submitted.";
 						}
 					}));
 				}
@@ -1599,7 +1640,7 @@ function bindCompletion(host) {
 		]);
 		let active;
 		let stopEvidence;
-		let clearCandidate;
+		let candidateReview;
 		try {
 			listener();
 			let pending = running.get(agent);
@@ -1635,10 +1676,11 @@ function bindCompletion(host) {
 				const call = pair.verifier.agent.session.snapshotEvents().filter((event) => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
 				if (call) successfulShell.add(call.seq);
 			});
-			clearCandidate = pair.freezeCandidate(answer, control);
+			candidateReview = pair.freezeCandidate(answer, control);
 			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
 			await pair.read(control);
+			control.throwIfAborted();
 			const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
 			const calls = events.filter((e) => e.type === "tool/call");
 			const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
@@ -1646,20 +1688,24 @@ function bindCompletion(host) {
 			const passedShell = successfulCalls.some((call) => successfulShell.has(call.seq)) || events.some((event) => event.type === "job/settled" && shellKind(event.data.kind) && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some((call) => call.type === "tool/call" && call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId));
 			let verdict;
 			try {
-				const body = lastText(pair.verifier.agent, offset).trim();
-				try {
-					verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-				} catch {
-					const fenced = body.split("```");
-					if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
-					verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+				const submittedVerdict = candidateReview.readVerdict();
+				if (submittedVerdict) verdict = submittedVerdict;
+				else {
+					const body = lastText(pair.verifier.agent, offset).trim();
+					try {
+						verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+					} catch {
+						const fenced = body.split("```");
+						if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
+						verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+					}
+					if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
 				}
-				if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
 			} catch {
-				agent.steer(msg("Outcome verification did not pass. Verifier must return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
+				agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
 				return;
 			}
-			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric") || testsRequired && !passedShell) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedShell) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
 		} catch (error) {
 			signal.throwIfAborted();
 			if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -1670,7 +1716,7 @@ function bindCompletion(host) {
 				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
 			}
 		} finally {
-			clearCandidate?.();
+			candidateReview?.dispose();
 			stopEvidence?.();
 			host.listeners.delete(listener);
 			if (control.aborted && active?.verifier.agent.status === "running") active.verifier.agent.cancel({ kind: "parent" });
@@ -1706,7 +1752,7 @@ function bindCompletion(host) {
 		if (pair) await close(pair);
 	});
 	host.ctx.effect(() => async () => {
-		generations.clear();
+		generations = /* @__PURE__ */ new WeakMap();
 		for (const off of mounted.values()) off();
 		mounted.clear();
 		await Promise.all([...helpers.values()].map(close).concat([...retired]));
@@ -3242,11 +3288,11 @@ function createQueryAgentTool(agents) {
 			},
 			history_offset: {
 				type: "integer",
-				description: "Newest-relative message offset"
+				description: "Newest-relative message offset. Must be supplied together with history_limit."
 			},
 			history_limit: {
 				type: "integer",
-				description: "Number of human and AI messages"
+				description: "Number of human and AI messages. Must be supplied together with history_offset."
 			}
 		},
 		output,
@@ -4734,7 +4780,7 @@ You alone maintain notes.md and archived.md. notes.md records the current stage,
 You and workers maintain the shared context knowledge base. Start from context/index.md (or the supplied existing index), then read relevant files on demand. Keep valuable reusable facts, decisions and methods there. Workers contribute findings; you primarily organize, consolidate and prune outdated or duplicate material. Keep routine progress in notes.md. ProjectContext accesses the actual shared directory even when a worker has an isolated worktree; read a file's version before replacing it and resolve a concurrent edit from the latest content.
 
 Control and communication
-- QueryAgent inspects current direct-child states. At a new user message, check workers first: users may have changed a worker's instructions directly. Request only the human/AI history window needed, using history_offset and history_limit. QueryAgent can also wait for selected or all children; an incoming message interrupts that wait so you can respond.
+- QueryAgent inspects current direct-child states. At a new user message, check workers first: users may have changed a worker's instructions directly. Request only the human/AI history window needed, using history_offset and history_limit. To wait, set wait="all" or wait="selected" with ids, and supply timeout_ms; omitting wait makes an immediate query. An incoming next-step message interrupts the wait so you can respond.
 - Task creates clean-history workers, up to 20 in one call. Explorer and Planner have glob, grep and read, with no Bash; Deep Research has web_search and web_fetch. Choose General-purpose when the responsibility needs running commands, builds or tests, even for a read-only check. Isolated is the default workspace; choose shared deliberately when the task should modify the common working directory. A worker normally reports to its creator; reportTo can designate another team member.
 - Fork creates a new identity from a selected member's committed history. Use it when that memory is useful for a branch or an independent approach; use Task when a fresh perspective should not inherit earlier reasoning. A Fork source is not its reporting authority.
 - SendMessage reuses an existing worker, supplies context or answers a question. delivery steer reaches the next safe step; queue leaves the input for the next turn. notify returns after acceptance. request asks a new question, keeps the tool call open for its answer and requires timeout_ms. Answer an existing question with mode=notify and its explicit request ID in reply_to. An interrupted or timed-out request can receive its late answer through the inbox. Read the returned state before deciding the next action.
@@ -4742,7 +4788,9 @@ Control and communication
 Workers have communication and shared-context access. They cannot create a further team unless nested delegation was explicitly enabled. Your ordinary native execution tools remain available; MoA controls replace the alternative native delegation tools.
 
 Working flow
-Orient from notes and the shared index, inspect workers, and dispatch or reuse workers before doing their assigned investigation yourself. Update notes with responsibilities and next steps. While they run, respond to user input and adjust directions as needed. A worker's ended turn automatically returns its complete final AI message, including an empty result when none was committed; inspect its history or ask it to continue when the result is insufficient. You do not need to poll for completion.
+Orient from notes and the shared index, inspect workers, and dispatch or reuse workers before doing their assigned investigation yourself. Update notes with responsibilities, dependencies and next steps. Use adaptive orchestration by default: prefer SendMessage to continue with a familiar worker; then Fork when a new branch benefits from useful committed history; choose Task for a clean independent context, including a review that should not inherit earlier reasoning.
+Dispatch independent ready work in parallel within native capacity; keep work with unmet dependencies pending. As a result or incoming input arrives, update the plan and unlock downstream work whose prerequisites are now satisfied. While workers run, advance another part of the goal and respond to user input. When waiting is the useful next step, use QueryAgent's native wait instead of repeated immediate queries. On a QueryAgent timeout, consider a reasonable task duration and observed progress; a timeout alone is not failure. If work is substantially overdue or progress is unclear, use SendMessage mode=request to ask for the blocker and ETA. Use KillAgent only when evidence establishes a stuck execution or a need to stop a wrong direction, and await cleanup before revising the assignment.
+A worker's ended turn automatically returns its complete final AI message, including an empty result when none was committed; inspect its history or ask it to continue when the result is insufficient. You do not need to poll for completion.
 Review results and actual artifacts against the goal. Reuse completed results and existing checks; follow up on specific gaps. Use independent review when it benefits the task, passing requirements and evidence rather than an author's reasoning when independence matters. Combine accepted results, maintain memory and report outcomes. Relevant work and returned results must be handled before normal final delivery.
 
 Execution and completion
@@ -5411,10 +5459,13 @@ let ProjectMode = (() => {
 		}
 		roleText(agent) {
 			const own = this.record(agent.id);
-			if (own?.project.mode === "enabled") return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({
-				...own.project.paths,
-				contextIndex: contextIndexPath(own.project.paths)
-			})}`;
+			if (own?.project.mode === "enabled") {
+				const completion = this.config.completionVerification ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery." : "Automatic outcome verification is not enabled in this runtime.";
+				return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({
+					...own.project.paths,
+					contextIndex: contextIndexPath(own.project.paths)
+				})}\n${completion}`;
+			}
 			const parent = this.owner(agent.id);
 			return parent ? parent.operations[`moa:agent:${agent.id}`] ? workerPrompt : `${workerPrompt}\nPaths: ${JSON.stringify({
 				...parent.project.paths,

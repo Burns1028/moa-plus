@@ -113,9 +113,9 @@ export declare const deliverySchema: z.ZodObject<{
     targetId: z.ZodOptional<z.ZodString>;
     message: z.ZodPipe<z.ZodUnknown, z.ZodTransform<UserMessage, unknown>>;
     state: z.ZodEnum<{
-        consumed: "consumed";
         pending: "pending";
         admitted: "admitted";
+        consumed: "consumed";
         suppressed: "suppressed";
     }>;
     attempts: z.ZodNumber;
@@ -150,8 +150,8 @@ export declare const outcomeSchema: z.ZodObject<{
     segmentStartSeq: z.ZodOptional<z.ZodNumber>;
     workerId: z.ZodString;
     status: z.ZodEnum<{
-        completed: "completed";
         deleted: "deleted";
+        completed: "completed";
         failed: "failed";
         stopped: "stopped";
         continued: "continued";
@@ -253,9 +253,9 @@ export declare const recordSchema: z.ZodObject<{
         targetId: z.ZodOptional<z.ZodString>;
         message: z.ZodPipe<z.ZodUnknown, z.ZodTransform<UserMessage, unknown>>;
         state: z.ZodEnum<{
-            consumed: "consumed";
             pending: "pending";
             admitted: "admitted";
+            consumed: "consumed";
             suppressed: "suppressed";
         }>;
         attempts: z.ZodNumber;
@@ -290,8 +290,8 @@ export declare const recordSchema: z.ZodObject<{
         segmentStartSeq: z.ZodOptional<z.ZodNumber>;
         workerId: z.ZodString;
         status: z.ZodEnum<{
-            completed: "completed";
             deleted: "deleted";
+            completed: "completed";
             failed: "failed";
             stopped: "stopped";
             continued: "continued";
@@ -379,7 +379,7 @@ export declare const domainSpec: {
             deliveries: {
                 completionId: string;
                 message: UserMessage;
-                state: "consumed" | "pending" | "admitted" | "suppressed";
+                state: "pending" | "admitted" | "consumed" | "suppressed";
                 attempts: number;
                 targetId?: string | undefined;
                 lastError?: string | undefined;
@@ -407,7 +407,7 @@ export declare const domainSpec: {
                 coordinatorSessionId: string;
                 coordinatorTurn: number;
                 workerId: string;
-                status: "completed" | "deleted" | "failed" | "stopped" | "continued";
+                status: "deleted" | "completed" | "failed" | "stopped" | "continued";
                 completionIds: string[];
                 segmentStartSeq?: number | undefined;
                 lastResultMessageId?: string | undefined;

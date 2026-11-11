@@ -200,6 +200,10 @@ The Coordinator additionally has independent native Rubric Builder and Outcome V
 
 Verifier reads the applicable rubric with `read_rubric` and the complete frozen final-answer text for the current attempt with `read_candidate`. An empty candidate remains empty. This lets it inspect a deliverable supplied directly in chat without inventing a file or running Bash just to read text. File artifacts and required builds/tests still need actual native inspection or completed execution; the author's claims are not evidence. Candidate snapshots are scoped to one review attempt and released on exit or interruption. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
 
+The hidden Verifier finishes with its private `submit_verdict(status, issues)` tool. `status` is `Pass`, `Partial`, or `Block`; `issues` is an array of strings. Submission ends that review without another model response. It belongs to the current candidate only, and does not count as inspection or replace a required successful Bash execution. The existing plain/fenced JSON verdict forms remain compatible. This tool is absent from Coordinator and Worker inventories.
+
+Coordinator facts state whether automatic outcome verification is configured. When enabled, they identify the host-managed rubric and final verification flow; when disabled, they explicitly say so. A leftover rubric file or a retained helper does not determine the current setting.
+
 ## UI and backend compatibility
 
 A real Worker turn returns its complete final committed AI message to `reportTo`, including an empty body when none exists. A message-driven background handoff is not a completed Worker task. Receipt identity and native committed message evidence prevent recovery from delivering the same result twice.

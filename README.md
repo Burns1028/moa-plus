@@ -30,7 +30,7 @@ Requires **Node 24.9+**, npm, and Git. MoA+ **v0.2.0** needs the matching **DSH 
 
 Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.
 
-The commands below install the published v0.2.0 release. For the latest wordmark control shown in the video, clone `main` instead of `v0.2.0`.
+The commands below install the published v0.2.0 release. The latest wordmark control and orchestration guidance are unreleased changes on this branch; clone `main` instead of `v0.2.0` to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
@@ -63,6 +63,14 @@ Coordinator and Workers use the same native Agent Loop, with different identitie
 
 When a Worker turn finishes, its **complete final AI message** returns automatically to its designated reporting Agent. The Coordinator can review the result, continue with that Worker, or change direction. Retained conversations and workspaces let the team continue across assignments.
 
+### Adaptive coordination and optional patterns
+
+The unreleased Adaptive guidance keeps simple work direct. For delegated work, the Coordinator prefers `SendMessage` to reuse a suitable Worker, `Fork` when committed history helps a new branch, and a fresh `Task` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `QueryAgent` waits when waiting is useful.
+
+An enabled MoA+ Coordinator also offers five bundled `@` prompts: `@fan-out` for independent slices, `@panel-team` for a disputed decision, `@blackboard-team` for tangled exploration, `@critique-loop` for iterative artifact review, and `@auto-orchestration` for a task with several collaboration phases. Type `@` and select a candidate by click, Enter, or Tab. The prompt expands into editable composer text; add the task and send normally. Workers and ordinary conversations do not offer these packs.
+
+These are local prompt texts using the existing tools and role presets. Native sending, file references, uploads, queue, and steer retain their usual behavior. See the [orchestration guide][orchestration] for pattern boundaries and examples.
+
 ### Shared knowledge, independent review
 
 The Coordinator maintains `notes.md` and `archived.md`; the Host refreshes full notes before each Coordinator inference. Coordinator and Workers contribute reusable findings through `context/index.md`, then read relevant files as needed. Isolated Workers access the same shared knowledge, so later work can build on confirmed findings without copying every execution detail into the main conversation.
@@ -82,6 +90,7 @@ The demo starts with the wordmark's off/on states and theme adaptation, then ope
 ## Documentation and contribution
 
 - [Roles, lifecycle, and common flows][roles]
+- [Adaptive coordination and optional `@` patterns][orchestration] (unreleased)
 - [Code architecture][architecture] and [Tool API][tools]
 - [First-run guide][quickstart] and [compatibility / rollback][compatibility]
 - [Verification records][verification]
@@ -93,6 +102,7 @@ MoA+ is an unofficial DSH plugin. The package name `dsh-plugin-project-mode` and
 MIT. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 [roles]: https://github.com/Burns1028/moa-plus/blob/main/docs/moa-architecture.md
+[orchestration]: docs/orchestration.md
 [architecture]: https://github.com/Burns1028/moa-plus/blob/main/docs/architecture.md
 [tools]: https://github.com/Burns1028/moa-plus/blob/main/docs/tool-api.md
 [verification]: https://github.com/Burns1028/moa-plus/blob/main/docs/verification.md
