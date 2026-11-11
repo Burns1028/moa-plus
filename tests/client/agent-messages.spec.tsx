@@ -59,15 +59,19 @@ async function bench() {
   assembler.activateTarget("chat");
   const read = () => { assembler.flush(); return assembler.get("chat")!; };
   const t = (key: keyof typeof en, args?: Record<string, string>) => Object.entries(args ?? {}).reduce((text, [k, v]) => text.replace(`{${k}}`, v), en[key] as string);
-  const draw = (node: Chat.ChatNode<"project-mode-workers-tail">, sessionId = "parent") => render(React.createElement(entry.component as React.ComponentType<any>, {
+  const draw = (node: Chat.ChatNode<"project-mode-workers-tail">, sessionId = "parent") => {
+    const element = () => React.createElement(entry.component as React.ComponentType<any>, {
     ...entry.inject?.(), sessionId: sid(sessionId), node, t,
     useChat: (select: any) => select(read()),
     useSession: (select: any) => select({ openState: "open", loadingOlder: false }),
-  }));
+    });
+    const ui = render(element());
+    return { ...ui, refresh: () => ui.rerender(element()) };
+  };
   return { assembler, read, draw, client };
 }
 
-it.each(["parent", "another-worker"])("shows a worker message on the right in %s as one compact preview that opens its original Markdown, preserving ordinary native contexts", async recipient => {
+it.each(["parent", "another-worker"])("shows a worker message in %s as a compact process card that opens its original Markdown, preserving ordinary native contexts", async recipient => {
   const b = await bench();
   const body = "**Ready**\n\n- evidence\n\n" + "Complete reusable evidence. ".repeat(30) + "\n\n### Final evidence\n\nOriginal final paragraph.";
   b.assembler.replaceWindow([
@@ -82,7 +86,7 @@ it.each(["parent", "another-worker"])("shows a worker message on the right in %s
   const ui = b.draw(incoming, recipient);
   expect(screen.getByText("From Builder")).toBeDefined();
   const message = ui.container.querySelector<HTMLElement>("[data-moa-message]")!;
-  expect(getComputedStyle(message).marginLeft).toBe("auto");
+  expect(getComputedStyle(message).marginLeft).toBe("0px");
   expect(getComputedStyle(message).marginRight).toBe("0px");
   const disclosure = ui.container.querySelector("details")!;
   expect(disclosure).not.toBeNull();
@@ -116,7 +120,7 @@ it("keeps an incoming message readable after later output takes the capsule seat
   expect(b.read().nodes.get(first.key)?.anchorSeq).toBe(anchor);
   expect(segmentTail(b.read(), first)).toBeNull();
   expect(later.filter(n => segmentTail(b.read(), n))).toHaveLength(1);
-  expect(b.read().nodes.processSource(first.key).getSnapshot()?.hasInterleavedInput).toBe(true);
+  expect(b.read().nodes.processSource(first.key).getSnapshot()?.hasInterleavedInput).toBe(false);
   const ui = b.draw(first);
   expect(screen.getByText("Earlier progress")).toBeDefined();
   expect(ui.container.querySelector(".pm-capsules")).toBeNull();
@@ -140,13 +144,46 @@ it("retains a result-only capsule seat and original final content without its ro
   expect(segmentTail(b.read(), result)?.segmentStartSeq).toBe(3);
   const ui = b.draw(result);
   expect(screen.getByText("From Builder")).toBeDefined();
-  expect(getComputedStyle(ui.container.querySelector("[data-moa-message]")!).marginLeft).toBe("auto");
+  expect(getComputedStyle(ui.container.querySelector("[data-moa-message]")!).marginLeft).toBe("0px");
   const disclosure = ui.container.querySelector("details")!;
   expect(disclosure.open).toBe(false);
   fireEvent.click(disclosure.querySelector("summary")!);
   expect(await screen.findByRole("heading", { name: "Exact result" })).toBeDefined();
   expect(ui.container.textContent).not.toContain("Completion done");
   expect(ui.container.querySelectorAll(".pm-capsule")).toHaveLength(1);
+});
+
+it("previews the actual final answer and keeps reasoning separate from the message disclosure", async () => {
+  const b = await bench();
+  b.assembler.replaceWindow([
+    event("turn/start", 1, { turn: 1 }), event("step/start", 2, { turn: 1, step: 1 }),
+    event("user/message", 4, { id: "reasoned-result", role: "user", source: {
+      kind: "project-mode-result", form: "relay", workerId: "child", workerTurn: 1, completionId: "reasoned-done",
+    }, content: [
+      { type: "text", text: "Worker Builder (child), turn 1, outcome completed. Completion reasoned-done. Final assistant answer at seq 11:" },
+      { type: "reasoning", text: "Internal comparison of the two approaches." },
+      { type: "text", text: "### Deliverable\n\n**Ready**. [View artifact](https://example.invalid/artifact)." },
+    ] }),
+  ], false);
+  const node = [...b.read().nodes.values()].find(n => n.kind === "project-mode-workers-tail") as Chat.ChatNode<"project-mode-workers-tail">;
+  const ui = b.draw(node);
+  const message = ui.container.querySelector<HTMLDetailsElement>("[data-moa-message]")!;
+  expect(message.querySelector("summary")?.textContent).toContain("Deliverable Ready");
+  expect(ui.container.textContent).not.toContain("Internal comparison");
+  expect(ui.container.textContent).not.toContain("Message content");
+  expect(screen.getByText("Report")).toBeDefined();
+  fireEvent.click(message.querySelector("summary")!);
+  expect(await screen.findByRole("heading", { name: "Deliverable" })).toBeDefined();
+  expect(message.querySelector("summary .pm-agent-preview")).toBeNull();
+  expect(message.querySelector("summary h3")).toBeNull();
+  const reasoning = message.querySelector<HTMLDetailsElement>(".pm-agent-reasoning")!;
+  expect(reasoning.open).toBe(false);
+  expect(ui.container.textContent).not.toContain("Internal comparison");
+  fireEvent.click(screen.getByRole("link", { name: "View artifact" }));
+  expect(message.open).toBe(true);
+  fireEvent.click(reasoning.querySelector("summary")!);
+  expect(await screen.findByText("Internal comparison of the two approaches.")).toBeDefined();
+  expect(message.open).toBe(true);
 });
 
 it("shows a loaded MoA message even when its turn boundary is outside the history window", async () => {
@@ -160,4 +197,35 @@ it("shows a loaded MoA message even when its turn boundary is outside the histor
   b.draw(node, "child");
   expect(screen.getByText("From Coordinator")).toBeDefined();
   expect(screen.getByText("Continue the investigation.")).toBeDefined();
+});
+
+it.each(["completed", "handoff", "aborted"])("settles a message after %s while retaining manual access and visible failed work", async reason => {
+  const b = await bench();
+  b.assembler.replaceWindow([
+    event("turn/start", 1, { turn: 1 }), event("step/start", 2, { turn: 1, step: 1 }),
+    input(3, { kind: "moa-message", form: "relay", senderId: "child", rootId: "parent", operationId: "settle" },
+      "From: child\n### Evidence\n\nFull original report."),
+  ], false);
+  const node = [...b.read().nodes.values()].find(n => n.kind === "project-mode-workers-tail") as Chat.ChatNode<"project-mode-workers-tail">;
+  const ui = b.draw(node);
+  const card = ui.container.querySelector<HTMLDetailsElement>("[data-moa-message]")!;
+  expect(card.querySelector(".pm-agent-preview")).not.toBeNull();
+  fireEvent.click(card.querySelector("summary")!);
+  expect(await screen.findByRole("heading", { name: "Evidence" })).toBeDefined();
+  b.assembler.append(event("turn/end", 5, { turn: 1, reason: { kind: reason,
+    ...(reason === "aborted" ? { reason: { kind: "user" } } : {}),
+  } }));
+  ui.refresh();
+  if (reason === "aborted") {
+    expect(card.open).toBe(true);
+    expect(screen.getByRole("heading", { name: "Evidence" })).toBeDefined();
+  } else {
+    expect(card.open).toBe(false);
+    expect(card.querySelector(".pm-agent-preview")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Evidence" })).toBeNull();
+    fireEvent.click(card.querySelector("summary")!);
+    expect(await screen.findByRole("heading", { name: "Evidence" })).toBeDefined();
+    ui.refresh();
+    expect(card.open).toBe(true);
+  }
 });

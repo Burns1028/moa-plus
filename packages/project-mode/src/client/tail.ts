@@ -109,7 +109,8 @@ export const workerTailDefinition: ConversationNodeDefinition<{
       : "immediate",
   buildViewNode(context) {
     const location = [context.start, ...context.matches].find(
-      (match) => match?.location.kind === "step",
+      (match) => match?.location.kind === "step" ||
+        (context.state?.incoming && match?.location.kind === "turn"),
     )?.location;
     if (!context.state || (location?.kind !== "step" && !context.state.incoming)) {
       const previous = context.current.get("chat") as
@@ -118,19 +119,25 @@ export const workerTailDefinition: ConversationNodeDefinition<{
         | undefined;
       return previous ? { ...previous, visibility: "hidden" } : null;
     }
+    // Native messages may be admitted between steps. Retain that explicit
+    // Turn owner without assigning them to an earlier or later Step.
+    const turn = location?.kind === "step" || location?.kind === "turn"
+      ? location.turn : undefined;
     const node: ChatNode<"project-mode-workers-tail"> = {
       key: context.key,
       id: context.id,
       kind: "project-mode-workers-tail",
       target: "chat",
       anchorSeq: context.state.seq + 0.2,
-      location: location?.kind === "step"
-        ? { kind: "turn", turn: location.turn }
+      location: turn
+        ? { kind: "turn", turn }
         : context.start?.location ?? { kind: "unresolved" },
       visibility: "visible",
-      groupTree: context.state.incoming ? "input" : "turn",
+      // Agent traffic belongs to the native process disclosure. Marking it as
+      // human input keeps the entire completed turn permanently expanded.
+      groupTree: context.state.incoming ? "process" : "turn",
       data: {
-        turn: location?.kind === "step" ? location.turn.turn : 0,
+        turn: turn?.turn ?? 0,
         step: location?.kind === "step" ? location.step.step : 0,
         segmentStartSeq: context.state.segmentStartSeq,
         ...(context.state.incoming ? { incoming: context.state.incoming } : {}),

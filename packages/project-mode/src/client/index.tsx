@@ -189,10 +189,14 @@ function applyProjectClient(ctx: Context) {
         const closed = p.useChat(
           (s) => s.timeline.turns.get(p.node.data.turn)?.end !== undefined,
         );
+        const settled = p.useChat((s) => {
+          const reason = s.timeline.turns.get(p.node.data.turn)?.end?.data.reason.kind;
+          return reason === "completed" || reason === "handoff";
+        });
         const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
         return (
           <>
-            {p.node.data.incoming && <AgentMessage {...p} message={p.node.data.incoming} />}
+            {p.node.data.incoming && <AgentMessage {...p} message={p.node.data.incoming} settled={settled} />}
             {selected && <WorkerCapsuleList
               {...p}
               turn={p.node.data.turn}

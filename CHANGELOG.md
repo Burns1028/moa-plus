@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4 — 2026-11-11
+
+- Fold internal Agent communication into the native work process after completion, keeping the final answer visible. Preserve live progress, human interleaving, failed/stopped turns and capsule ownership.
+- Replace large user-style Agent bubbles with compact sender/type cards and answer previews. Keep Markdown outside the disclosure control and reasoning in a separate disclosure, preserving the complete original content.
+
 ## 0.2.3 — 2026-11-11
 
 - Restore isolated Task/Fork preparation on Windows by accepting the audited native provider's partial enforcement while preserving Session policy and owned-resource checks.

@@ -20,7 +20,7 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-MoA+ **v0.2.3** 支持经过审查的 **DSH 0.2.1-rc.3** 与
+MoA+ **v0.2.4** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 兼容配置。rc.3 清单扩展了
 **22 个原生包、50 个文件路径**。插件与对应兼容配置必须来自同一版本，
 原版或其他版本准备的运行时不能替代。桌面准备步骤和精确支持范围见
@@ -30,12 +30,12 @@ MoA+ **v0.2.3** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 
 更新后的 rc.2 Desktop Next 配置支持 Windows 受保护 Worker 使用原生非持久 PowerShell，以及已安装的 Bash。Coordinator 原子更新现有记录时，保护持续生效，进程必须由原生 Windows Job 管理。持久终端和未适配生命周期的进程提供者仍拒绝受保护调用。rc.3 配置仍需 macOS Seatbelt 或 Linux bubblewrap，尚未加入这项 Windows 扩展。支持的策略与文件范围见[后端要求][compatibility]。
 
-下方命令使用 v0.2.3 checkout。跟进开发版本时，将克隆分支改为 `main`。
+下方命令使用 v0.2.4 checkout。跟进开发版本时，将克隆分支改为 `main`。
 
 克隆项目，准备独立的 Web 运行环境：
 
 ```sh
-git clone --branch v0.2.3 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.4 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -83,7 +83,7 @@ Rubric Builder 根据原始需求与规格制定验收标准；Outcome Verifier 
 
 MoA+ 沿用 DSH 原生界面。**胶囊就是子会话**：点击进入 Worker，也可以在原生左侧列表的 Coordinator 下找到同一个 Worker。用户可以直接给它下达指令，通过 Back 回到 Coordinator。胶囊保留在 Worker 参与工作的 turn 或消息段中。
 
-Agent 来信标明发送者，从原文预览展开为完整 Markdown。可关闭的 Workers 与 notes.md 标签页展示输入、最终回复、产物和当前工作记录。团队工作期间，新的用户输入仍能及时接入。
+Agent 沟通使用紧凑卡片，标明发送者、消息类型和简短预览；展开后查看完整 Markdown，思考内容单独折叠。执行期间展示协作过程，回答完成后自动收起，让最终回答保持清晰。可关闭的 Workers 与 notes.md 标签页展示输入、最终回复、产物和当前工作记录。团队工作期间，新的用户输入仍能及时接入。
 
 页首演示先展示字标的开关状态和主题适配，再打开保留的 Note Bundle 任务，查看胶囊、Worker 会话、Agent 原始来信、Workers 时间线、notes 和结果。在这次真实执行中，Exporter 实现标题排序，Docs 编写指南；用户直接给 Docs 补充要求，Coordinator 查看 Worker 记录后核对最终结果。这次录制回看已有执行，没有新跑模型任务。可以查看[任务与实际检查](docs/demo-moa-plus.md)或[运行时验证记录][verification]。早期 Project Mode 视频保留在 [v0.1.23 演示归档](docs/demo-workflow.md)中。
 

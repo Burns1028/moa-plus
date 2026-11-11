@@ -20,7 +20,7 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-MoA+ **v0.2.3** supports the audited **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.4** supports the audited **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
 profile extends **22 native packages across 50 file paths**. Keep the plugin
 and its matching profile from the same release; a stock or differently prepared
@@ -31,12 +31,12 @@ Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares 
 
 The updated rc.2 Desktop Next profile supports protected Workers through native nonpersistent PowerShell, and Bash where installed, on Windows. It preserves existing records across Coordinator atomic updates and requires native Windows Job containment. Persistent terminals and unadapted process providers still refuse protected use. The rc.3 profile retains its macOS Seatbelt/Linux bubblewrap requirement; it does not include this Windows extension. See [backend requirements][compatibility] for the supported policy and filesystem scope.
 
-The commands below use the v0.2.3 checkout. Use `main` instead to follow development.
+The commands below use the v0.2.4 checkout. Use `main` instead to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.3 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.4 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -84,7 +84,7 @@ Select the compact **MoA+ wordmark** before the first message: gray is off and g
 
 MoA+ keeps collaboration in the native DSH interface. **Capsules are child conversations**: click one to open its Worker, or find the same Worker beneath the Coordinator in the sidebar. You can give the Worker instructions directly and use Back to return to the Coordinator. Capsules stay with the turn or message segment where the Worker participated.
 
-Agent messages show their sender and expand from an original-text preview to full Markdown. The closable Workers and notes.md tabs show inputs, final replies, artifacts, and current work records. New user input remains responsive while the team works.
+Agent communication appears in compact cards with a sender, message type and short preview; expand a card for the complete Markdown, with thinking kept in its own disclosure. Communication stays visible during execution and folds after completion, leaving the final answer prominent. The closable Workers and notes.md tabs show inputs, final replies, artifacts, and current work records. New user input remains responsive while the team works.
 
 The demo starts with the wordmark's off/on states and theme adaptation, then opens the retained Note Bundle task to show capsules, Worker conversations, original Agent messages, the Workers timeline, notes, and results. In that real run, Exporter implemented title sorting, Docs wrote the guide, a human added instructions inside Docs, and the Coordinator checked the Worker history before verifying the result. The recording revisits that execution without starting a new model task. See the [task and actual checks](docs/demo-moa-plus.md) or [runtime verification][verification]. The earlier Project Mode recording remains in the [v0.1.23 demo archive](docs/demo-workflow.md).
 

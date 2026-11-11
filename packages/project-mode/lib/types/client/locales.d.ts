@@ -13,6 +13,12 @@ export declare const en: {
     readonly fromUser: "User";
     readonly messageFrom: "From {name}";
     readonly messageContent: "Message content";
+    readonly agentMessage: "Message";
+    readonly agentReport: "Report";
+    readonly agentAssignment: "Assignment";
+    readonly agentRequest: "Request";
+    readonly agentReply: "Reply";
+    readonly agentReasoning: "Thinking";
     readonly truncatedContent: "… {count} characters";
     readonly awaitingReply: "Awaiting a reply…";
     readonly emptyReply: "No AI reply in this turn";
