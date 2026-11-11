@@ -1,5 +1,6 @@
 import type { FileSystem } from "@deepseek-ai/dsh-fs";
 import type { SandboxExecutionPolicy, SandboxProvider } from "@deepseek-ai/dsh-sandbox";
+import { type SubprocessRuntime } from "@deepseek-ai/dsh-subprocess";
 export type MoAWorkspaceRecord = {
     mode: "shared";
     ownerId: string;
@@ -27,11 +28,13 @@ export interface MoAWorkspaceCapabilities {
     fs: FileSystem;
     policy: () => SandboxExecutionPolicy;
     sandbox: Pick<SandboxProvider, "confine">;
+    subprocess?: Pick<SubprocessRuntime, "spawn" | "resolveExecutable">;
 }
 export declare class MoAWorkspaceManager {
     private readonly capabilities;
     constructor(capabilities: MoAWorkspaceCapabilities);
     private git;
+    private runScoped;
     private paths;
     prepare(input: {
         ownerId: string;

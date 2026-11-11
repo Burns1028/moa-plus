@@ -1,14 +1,15 @@
-diff --git a/lib/index.js b/lib/index.js
-index c42c0b2..41ea0e2 100644
+===================================================================
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -1,4 +1,4 @@
+@@ -1,5 +1,5 @@
 -import { SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature, matchesSignature as matchesSignature$1 } from "@deepseek-ai/dsh-sandbox";
 +import { ReadOnlyPathUnsupportedError, SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature, matchesSignature as matchesSignature$1 } from "@deepseek-ai/dsh-sandbox";
  import { LocalBashExecutor } from "@deepseek-ai/dsh-bash-local";
  //#region lib/types/helpers.js
  /**
-@@ -36,6 +36,7 @@ var SandboxBashExecutor = class SandboxBashExecutor extends LocalBashExecutor {
+ * Classify a failed run against the selected backend's denial dialect.
+@@ -35,15 +35,17 @@
+ 		"sandbox",
  		"sandboxPolicy"
  	];
  	mode;
@@ -16,7 +17,17 @@ index c42c0b2..41ea0e2 100644
  	/**
  	* Per-process confinement facts retained until settlement. Providers may
  	* vary enforcement and diagnostic dialect between overlapping calls, so a
-@@ -65,7 +66,8 @@ var SandboxBashExecutor = class SandboxBashExecutor extends LocalBashExecutor {
+ 	* shared latest-wrap value would classify a process against the wrong facts.
+ 	* Unconfined processes have no entry.
+ 	*/
+ 	processFacts = /* @__PURE__ */ new Map();
++	managedRangeSpecs = /* @__PURE__ */ new WeakSet();
+ 	constructor(ctx, config) {
+ 		super(ctx, config);
+ 		this.mode = ctx.sandboxPolicy.defaultMode;
+ 	}
+@@ -64,35 +66,93 @@
+ 	}
  	async execute(spec) {
  		const policy = spec.sandboxPolicy;
  		const { mode } = policy;
@@ -26,3 +37,131 @@ index c42c0b2..41ea0e2 100644
  			...result,
  			sandbox: {
  				mode,
+ 				denied: false
+ 			}
+ 		}));
++		// Each execution owns its own admission flag, including overlapping uses
++		// of one resolved spec. Legacy backends without a lease remain unchanged.
++		spec = { ...spec };
+ 		let confined;
+-		const ex = await this.executeArgv(spec, async (signal) => {
+-			const prepared = await this.confine(spec.command, {
+-				...policy,
+-				mode
+-			}, signal);
+-			signal.throwIfAborted();
+-			confined = prepared;
+-			return prepared.argv;
+-		}, (process) => {
+-			const facts = confined;
+-			this.processFacts.set(process, {
+-				mode,
+-				enforcement: facts.enforcement,
+-				denialSignatures: facts.denialSignatures,
+-				runnerFailureRules: facts.runnerFailureRules,
+-				runnerProgram: facts.argv[0],
+-				workdir: spec.workdir
+-			});
++		let preparationDone = Promise.resolve();
++		let cleanup;
++		const release = () => {
++			if (confined?.cleanup === void 0) return Promise.resolve();
++			return cleanup ??= Promise.resolve().then(() => confined.cleanup());
++		};
++		const rangeExit = Promise.withResolvers();
++		// Publish the one lifetime promise as soon as preparation returns its
++		// lease, before local admission can race composition teardown.
++		const lifetime = rangeExit.promise.then(async () => {
++			await preparationDone;
++			await release();
+ 		});
++		void lifetime.catch(() => {});
++		let joined = false;
++		const bindLifetime = (process) => {
++			if (joined || confined !== void 0 && confined.cleanup === void 0) return;
++			joined = true;
++			const waitForExit = process.managed.waitForExit.bind(process.managed);
++			// done/result cover only the direct command. This uncancelled native
++			// observation covers descendants and a timeout's late preparation.
++			Promise.resolve().then(() => waitForExit()).then((exited) => {
++				if (exited) rangeExit.resolve();
++				else rangeExit.reject(new Error("sandbox managed range did not confirm exit"));
++			}, rangeExit.reject);
++			process.managed.waitForExit = async (signal) => {
++				if (!await waitForExit(signal)) return false;
++				await lifetime;
++				return true;
++			};
++		};
++		let ex;
++		try {
++			ex = await this.executeArgv(spec, (signal) => {
++				const preparation = Promise.resolve().then(() => this.confine(spec.command, {
++					...policy,
++					mode
++				}, signal)).then((prepared) => {
++					// Capture the lease before cancellation can reject late preparation.
++					confined = prepared;
++					if (prepared.cleanup !== void 0) {
++						this.managedRangeSpecs.add(spec);
++						prepared.bindProcessLifetime?.(lifetime);
++					}
++					signal.throwIfAborted();
++					return prepared.argv;
++				});
++				preparationDone = preparation.then(() => {}, () => {});
++				return preparation;
++			}, (process) => {
++				const facts = confined;
++				this.processFacts.set(process, {
++					mode,
++					enforcement: facts.enforcement,
++					denialSignatures: facts.denialSignatures,
++					runnerFailureRules: facts.runnerFailureRules,
++					runnerProgram: facts.argv[0],
++					workdir: spec.workdir
++				});
++				bindLifetime(process);
++			});
++		} catch (error) {
++			// No process handle was admitted. Preparation may still be returning
++			// from an uncancellable native ACL operation, so join its rollback.
++			await preparationDone;
++			rangeExit.resolve();
++			try { await lifetime; }
++			catch (cleanupError) { throw new AggregateError([error, cleanupError], "sandbox preparation and cleanup failed"); }
++			throw error;
++		}
++		// Deadline expiry during preparation creates a virtual local handle and
++		// skips onStarted. Its join must still await the eventual lease rollback.
++		bindLifetime(ex);
+ 		return SandboxBashExecutor.decorateResult(ex, (result) => {
+ 			if (confined === void 0) return {
+ 				...result,
+ 				sandbox: {
+@@ -116,8 +176,14 @@
+ 			if (confined !== void 0 && isRunnerSpawnFailure(error, confined.argv[0], spec.workdir)) throw new SandboxUnavailableError(mode, String(error));
+ 			throw error;
+ 		});
+ 	}
++	spawnSpec(spec, ...args) {
++		const spawn = super.spawnSpec(spec, ...args);
++		if (this.managedRangeSpecs.has(spec)) spawn.requireManagedRange = true;
++		return spawn;
++	}
++
+ 	/**
+ 	* Decorate the handle's foreground projection in place, memoized once. The
+ 	* handle keeps its identity (never wrapped in a second object) because the
+ 	* per-process facts and `onProcessDone` key on the exact instance.
+@@ -162,9 +228,9 @@
+ 		return this.ctx.sandbox.confine([
+ 			"bash",
+ 			"-c",
+ 			command
+-		], policy, signal);
++		], policy, signal, { processLifetime: "managed" });
+ 	}
+ };
+ //#endregion
+ export { SandboxBashExecutor, SandboxBashExecutor as default };

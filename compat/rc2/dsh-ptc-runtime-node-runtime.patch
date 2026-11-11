@@ -1,0 +1,30 @@
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1106,9 +1106,9 @@
+ 			...packaged ? [] : [heapFlag],
+ 			...bootstrapArgs(this.ctx.fs, this.config.launch, this.config.maxMessageBytes, this.retainsState)
+ 		];
+ 		const policy = this.policy;
+-		this.confined = policy.mode === "danger-full-access" ? void 0 : await this.ctx.sandbox.confine(argv, {
++		this.confined = policy.mode === "danger-full-access" && !policy.readOnlyPaths?.length ? void 0 : await this.ctx.sandbox.confine(argv, {
+ 			...policy,
+ 			mode: policy.mode
+ 		}, this.controller.signal);
+ 		if (this.closed) return;
+@@ -1280,13 +1280,14 @@
+ 		const bindings = validateBindings(spec);
+ 		const owner = this.mode.retainsState ? spec.stateOwner : void 0;
+ 		let worker = owner === void 0 ? void 0 : this.owners.get(owner);
+ 		worker?.assertIdle();
+-		if (worker && !worker.closed && (worker.policy.mode !== spec.sandboxPolicy.mode || worker.policy.workspaceRoot !== spec.sandboxPolicy.workspaceRoot || worker.policy.sessionId !== spec.sandboxPolicy.sessionId || !sameAdditionalRoots(worker.policy.additionalWritableRoots, spec.sandboxPolicy.additionalWritableRoots))) throw new Error("persistent PTC: release the retained environment before changing its sandbox policy");
++		if (worker && !worker.closed && (worker.policy.mode !== spec.sandboxPolicy.mode || worker.policy.workspaceRoot !== spec.sandboxPolicy.workspaceRoot || worker.policy.sessionId !== spec.sandboxPolicy.sessionId || !sameAdditionalRoots(worker.policy.additionalWritableRoots, spec.sandboxPolicy.additionalWritableRoots) || !sameAdditionalRoots(worker.policy.readOnlyPaths, spec.sandboxPolicy.readOnlyPaths))) throw new Error("persistent PTC: release the retained environment before changing its sandbox policy");
+ 		if (!worker || worker.closed) {
+ 			if (worker) this.workers.delete(worker);
+ 			worker = new ProgramWorker(this.ctx, this.config, {
+ 				...spec.sandboxPolicy,
++                ...(spec.sandboxPolicy.readOnlyPaths ? { readOnlyPaths: [...spec.sandboxPolicy.readOnlyPaths] } : {}),
+ 				...spec.sandboxPolicy.additionalWritableRoots === void 0 ? {} : { additionalWritableRoots: [...spec.sandboxPolicy.additionalWritableRoots] }
+ 			}, this.processes, this.mode, owner !== void 0);
+ 			this.workers.add(worker);
+ 			if (owner !== void 0) this.owners.set(owner, worker);

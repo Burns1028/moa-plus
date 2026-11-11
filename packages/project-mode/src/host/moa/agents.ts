@@ -162,6 +162,7 @@ export class MoAAgents {
           throw new Error("moa/workspace-sandbox-unavailable");
         },
       },
+      subprocess: presets?.serviceFor(agent, "subprocess") ?? agent.ctx.get("subprocess"),
     });
   }
   task(

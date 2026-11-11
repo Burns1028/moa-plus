@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 — 2026-11-11
+
+- Restore isolated Task/Fork preparation on Windows by accepting the audited native provider's partial enforcement while preserving Session policy and owned-resource checks.
+- Support protected Worker commands through the rc.2 native nonpersistent PowerShell/Bash executors. Preserve record protection during Coordinator atomic updates, overlapping Session contributions and isolated-worktree access; keep Windows enforcement classified as partial.
+- Retain protection until native Windows Job exit, including late preparation, background execution and provider teardown. Refuse weaker containment and unsupported process owners before target admission; preserve cleanup failures.
+- Use native subprocess ownership for workspace commands, explicitly unset ambient Git routing, and audit runtime package metadata alongside code. Ship matching original/previous-release upgrade patches and service declarations.
+- Keep user-facing collaboration mode names in Chinese. Windows persistent terminals, PTC and other unadapted protected process owners remain explicit limitations.
+
 ## 0.2.2 — 2026-11-11
 
 - Use Chinese orchestration mode names throughout the README and current guides, including 自适应协调. This release changes documentation and version metadata only; runtime bytes remain unchanged from v0.2.1.

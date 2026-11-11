@@ -1,0 +1,209 @@
+===================================================================
+--- a/lib/types-DFdfvhLN.js
++++ b/lib/types-DFdfvhLN.js
+@@ -1,5 +1,5 @@
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { ERROR_INSUFFICIENT_BUFFER, Win32Error, allocPtrSlot, allocUint32, decodePtr, decodeUint32, drainPipe, extendWin32ProcessBindings, isNullPtr, isNullPtr as isNullPtr$1, spawnInheritedJobProcess, spawnPipedProcess, throwLastError, throwLastError as throwLastError$1, throwWin32, waitForProcessExit } from "@deepseek-ai/dsh-win32-process";
+ import { createHash } from "node:crypto";
+ import { createLazyRequire } from "@deepseek-ai/dsh-lazy-require";
+@@ -589,8 +589,11 @@
+ * @param lowLabelSidPtr - the Low integrity SID the mandatory label names.
+ * @param worldSidPtr - the Everyone SID the ambient-delete deny names.
+ */
+ function grantWrite(api, path, sidPtr, lowLabelSidPtr, worldSidPtr) {
++  for (const boundary of processRecordBoundaries.values()) {
++    if (containsDirectory(path, boundary.path)) throw new Error("Windows ACL grant cannot lower an active readonly record mandatory-integrity boundary: " + boundary.path);
++  }
+ 	assertOutsideProgramDirectory(path);
+ 	try {
+ 		grantWriteOnce(api, path, sidPtr, lowLabelSidPtr, worldSidPtr);
+ 	} catch (error) {
+@@ -1467,5 +1470,177 @@
+ 		if (failures.length > 0) throw new AggregateError(failures, `AclSandbox dispose completed with ${failures.length} cleanup failure(s)`);
+ 	}
+ };
+ //#endregion
+-export { workspaceWriteSid as a, win32 as c, tempWriteSid as i, ACL_DIAGNOSIS_SKILL as n, AclWriteGrant as o, registerAclDiagnosisSkill as r, assertTempRootOutsideWorkspace as s, AclSandbox as t };
++
++//#region lib/types/readonly-records.js
++// The filesystem provider serializes admission/publication/cleanup. This module
++// owns only its exact non-inherited ACEs; unrelated current DACL entries survive.
++const processRecordAcls = new Map();
++const processRecordBoundaries = new Map();
++const RECORD_DENY = 0xD0116;
++const ANCESTOR_DENY = 0xD0150;
++function aclRecordKey(path) { return path.toLowerCase(); }
++function nativeBytes(ptr, length) {
++  return Buffer.from(requireKoffi().decode(ptr, 0, 'uint8', length));
++}
++function sidBytes(api, ptr) {
++  if (isNullPtr(ptr) || !api.isValidSid(ptr)) throw new Error('readonly record protection requires a valid SID');
++  return nativeBytes(ptr, api.getLengthSid(ptr));
++}
++function currentUserSidBytes(api) {
++  const token = openCurrentProcessToken(api);
++  try {
++    const size = allocUint32();
++    api.getTokenInformation(token, 1, null, 0, size);
++    const data = Buffer.alloc(decodeUint32(size));
++    if (!data.length || !api.getTokenInformation(token, 1, data, data.length, size)) throwLastError(api, 'GetTokenInformation', 'TokenUser for record protection');
++    return sidBytes(api, decodePtrAt(data, 0));
++  } finally { if (!api.closeHandle(token)) throwLastError(api, 'CloseHandle', 'record protection token'); }
++}
++function recordAce(type, mask, sid) {
++  const ace = Buffer.alloc(8 + sid.length);
++  ace[0] = type; ace.writeUInt16LE(ace.length, 2); ace.writeUInt32LE(mask, 4); sid.copy(ace, 8);
++  return ace;
++}
++function readRecordDacl(api, path, user) {
++  const owner = allocPtrSlot(), group = allocPtrSlot(), acl = allocPtrSlot(), sacl = allocPtrSlot(), descriptor = allocPtrSlot();
++  const result = api.getNamedSecurityInfoW(path, 1, 5, owner, group, acl, sacl, descriptor);
++  if (result) throwWin32(api, 'GetNamedSecurityInfoW', result, 'protectReadOnlyRecords('+path+')');
++  const allocated = decodePtr(descriptor);
++  try {
++    if (!sidBytes(api, decodePtr(owner)).equals(user)) throw new Error('readonly record and writable ancestors must belong to the current Host user: '+path);
++    const ptr = decodePtr(acl);
++    if (ptr === null) throw new Error('readonly record protection refuses a null DACL: '+path);
++    const size = decodeUint16At(ptr, 2), count = decodeUint16At(ptr, 4);
++    if (size < 8 || size > 65535) throw new Error('invalid record DACL: '+path);
++    const bytes = nativeBytes(ptr, size), entries=[];
++    let offset=8;
++    for(let index=0;index<count;index++) {
++      const length=bytes.readUInt16LE(offset+2);
++      if(length<4 || offset+length>size) throw new Error('invalid record ACE: '+path);
++      entries.push(Buffer.from(bytes.subarray(offset,offset+length)));offset+=length;
++    }
++    // OWNER_RIGHTS removes owner-implicit WRITE_DAC, so Host management must be
++    // authorized by its existing user ACE rather than that implicit permission.
++    const hostAccess = entries.some(ace=>ace[0]===0 && !(ace[1]&8) && ace.length>=8+user.length && ace.subarray(8).equals(user) && (ace.readUInt32LE(4)&0xE0000)===0xE0000);
++    if(!hostAccess) throw new Error('readonly record protection requires existing explicit Host user management rights: '+path);
++    return { revision:bytes[0], entries };
++  } finally { if(allocated!==null && !isNullPtr(api.localFree(allocated))) throwLastError(api,'LocalFree','record descriptor'); }
++}
++function writeRecordDacl(api,path,current,entries) {
++  const length=8+entries.reduce((n,ace)=>n+ace.length,0);
++  if(length>65535) throw new Error('readonly record DACL exceeds ACL size limit');
++  const acl=Buffer.alloc(length);acl[0]=current.revision;acl.writeUInt16LE(length,2);acl.writeUInt16LE(entries.length,4);
++  let offset=8;for(const ace of entries){ace.copy(acl,offset);offset+=ace.length;}
++  const result=api.setNamedSecurityInfoW(path,1,4,null,null,acl,null);
++  if(result) throwWin32(api,'SetNamedSecurityInfoW',result,'protectReadOnlyRecords('+path+')');
++}
++function addRecordProtection(api,path,mask,sid,owner,user) {
++  return withPathLock(api,path,()=>{
++    const key=aclRecordKey(path),old=processRecordAcls.get(key);
++    if(old && old.owner!==owner) throw new Error('readonly record is leased by a different filesystem mutation owner: '+path);
++    const current=readRecordDacl(api,path,user), deny=recordAce(1,mask,sid), sidKey=sid.toString('hex');
++    const ownerSid=Buffer.from([1,1,0,0,0,0,0,3,4,0,0,0]);
++    const ownerAce=recordAce(0,0x20000,ownerSid);
++    const prior=old?.sids.get(sidKey);
++    if(prior){if(prior.mask!==mask) throw new Error('inconsistent record protection mask');prior.count++;old.count++;return;}
++    // Existing identical non-owned entries cannot safely be revoked by us.
++    if(current.entries.some(ace=>ace.equals(deny))) throw new Error('readonly record capability ACE already exists outside the live lease registry: '+path);
++    const ownerPresent=current.entries.some(ace=>(ace[0]===0||ace[0]===1) && !(ace[1]&8) && ace.length===20 && ace.subarray(8).equals(ownerSid));
++    if(ownerPresent && !current.entries.some(ace=>ace.equals(ownerAce))) throw new Error('readonly record has an unreviewed OWNER_RIGHTS policy: '+path);
++    const entries=[deny,...current.entries];
++    const ownerAdded=!ownerPresent;
++    if(ownerAdded){const inherited=entries.findIndex(ace=>ace[1]&16);entries.splice(inherited<0?entries.length:inherited,0,ownerAce);}
++    writeRecordDacl(api,path,current,entries);
++    const state=old??{owner,count:0,ownerAdded,ownerAce,sids:new Map()};
++    state.sids.set(sidKey,{count:1,mask,deny});state.count++;processRecordAcls.set(key,state);
++  });
++}
++function removeRecordProtection(api,path,sid,owner,user) {
++  return withPathLock(api,path,()=>{
++    const key=aclRecordKey(path),state=processRecordAcls.get(key),sidKey=sid.toString('hex'),entry=state?.sids.get(sidKey);
++    if(!state || state.owner!==owner || !entry) throw new Error('readonly record lease ownership was lost: '+path);
++    if(entry.count>1){entry.count--;state.count--;return;}
++    const current=readRecordDacl(api,path,user);
++    const removals=[entry.deny,...state.count===1&&state.ownerAdded?[state.ownerAce]:[]];
++    const entries=[...current.entries];
++    for(const owned of removals){const index=entries.findIndex(ace=>ace.equals(owned));if(index<0)throw new Error('readonly record owned ACE changed during its lease: '+path);entries.splice(index,1);}
++    writeRecordDacl(api,path,current,entries);
++    state.sids.delete(sidKey);state.count--;
++    if(state.count===0)processRecordAcls.delete(key);
++  });
++}
++
++// A native Low integrity child cannot mutate a Medium-or-higher object whose
++// mandatory label enforces NO_WRITE_UP. Windows treats an unlabeled object as
++// Medium with NO_WRITE_UP. We stop before this immutable parent; no system or
++// profile ancestor is ACL-ed merely because it contains a workspace.
++function isMandatoryWriteBoundary(api,path) {
++  const {labelAcl,descriptor}=readCurrentSecurity(api,path);
++  try {
++    if(labelAcl===null)return true;
++    const size=decodeUint16At(labelAcl,2),count=decodeUint16At(labelAcl,4);let offset=8,seen=false,boundary=false;
++    if(size<8||size>65535)throw new Error('invalid mandatory label ACL: '+path);
++    for(let index=0;index<count;index++){
++      const length=decodeUint16At(labelAcl,offset+2);
++      if(length<4||offset+length>size)throw new Error('invalid mandatory label ACE: '+path);
++      if(decodeUint8At(labelAcl,offset)===17 && !(decodeUint8At(labelAcl,offset+1)&8)){
++        if(seen||length!==20||decodeUint8At(labelAcl,offset+8)!==1||decodeUint8At(labelAcl,offset+9)!==1)throw new Error('unreviewed mandatory label: '+path);
++        for(let i=0;i<5;i++)if(decodeUint8At(labelAcl,offset+10+i)!==0)throw new Error('unreviewed mandatory label authority: '+path);
++        if(decodeUint8At(labelAcl,offset+15)!==16)throw new Error('unreviewed mandatory label authority: '+path);
++        seen=true;
++        boundary=(decodeUint32At(labelAcl,offset+4)&1)!==0 && decodeUint32At(labelAcl,offset+16)>4096;
++      }
++      offset+=length;
++    }
++    return !seen || boundary;
++  }finally{if(descriptor!==null && !isNullPtr(api.localFree(descriptor)))throwLastError(api,'LocalFree','mandatory label descriptor');}
++}
++
++/** Protect existing records using the same per-session SID already in the native restricted token. */
++function protectReadOnlyRecords({paths,workspaceRoot,writeSid,owner}) {
++  if(process.platform!=='win32')throw new Error('Windows readonly record protection requires Windows');
++  if(!owner || typeof owner!=='object')throw new Error('readonly record protection requires a native filesystem mutation owner');
++  const root=realpathSync.native(workspaceRoot),targets=new Map(),boundaries=new Set(),api=win32Sync();
++  if(!lstatSync(root).isDirectory())throw new Error("record policy workspace must be a directory");
++  for(const input of paths){
++    const info=lstatSync(input),path=realpathSync.native(input);
++    if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1)throw new Error('readonly record must be a regular single-link file: '+input);
++    targets.set(path,RECORD_DENY);
++    for(let parent=dirname(path);;parent=dirname(parent)){
++      const stat=lstatSync(parent);if(!stat.isDirectory()||stat.isSymbolicLink())throw new Error('readonly record ancestor must be a normal directory: '+parent);
++      if(isMandatoryWriteBoundary(api,parent)){
++        // A Medium object cannot be treated as immutable if a writable Low
++        // parent could delete/replace it through FILE_DELETE_CHILD.
++        for(let outer=dirname(parent);;outer=dirname(outer)){
++          const info=lstatSync(outer);
++          if(!info.isDirectory()||info.isSymbolicLink()||!isMandatoryWriteBoundary(api,outer))throw new Error("readonly record boundary has an unreviewed writable/reparse outer ancestor: "+outer);
++          if(dirname(outer)===outer)break;
++        }
++        boundaries.add(parent);break;
++      }
++      assertOutsideProgramDirectory(parent);
++      targets.set(parent,ANCESTOR_DENY);
++      if(dirname(parent)===parent)throw new Error("readonly record ancestry has no immutable mandatory-integrity boundary");
++    }
++  }
++  const user=currentUserSidBytes(api),slot=allocPtrSlot();
++  if(!api.convertStringSidToSidW(writeSid,slot))throwLastError(api,'ConvertStringSidToSidW','readonly record capability');
++  const sidPtr=decodePtr(slot);let sid;
++  try{sid=sidBytes(api,sidPtr);}finally{if(sidPtr!==null)api.localFree(sidPtr);}
++  const installed=[];
++  for(const path of boundaries){const key=aclRecordKey(path),prior=processRecordBoundaries.get(key);if(prior)prior.count++;else processRecordBoundaries.set(key,{path,count:1});}
++  const releaseBoundaries=()=>{for(const path of boundaries){const key=aclRecordKey(path),state=processRecordBoundaries.get(key);if(!state)throw new Error("readonly record integrity boundary ownership was lost");if(--state.count===0)processRecordBoundaries.delete(key);}};
++  try{for(const [path,mask] of [...targets].sort((a,b)=>a[0].length-b[0].length)){addRecordProtection(api,path,mask,sid,owner,user);installed.push(path);}}
++  catch(error){const failures=[];for(const path of installed.reverse())try{removeRecordProtection(api,path,sid,owner,user);}catch(cleanup){failures.push(cleanup);}if(failures.length)throw new AggregateError([error,...failures],'readonly record protection admission and rollback failed');releaseBoundaries();throw error;}
++  let cleanup;
++  return ()=>cleanup??=Promise.resolve().then(()=>{
++    const failures=[];
++    for(const path of [...installed].reverse())try{removeRecordProtection(api,path,sid,owner,user);}catch(error){failures.push(error);}
++    if(failures.length)throw new AggregateError(failures,'readonly record protection cleanup failed');
++    releaseBoundaries();
++  });
++}
++//#endregion
++
++export { workspaceWriteSid as a, win32 as c, tempWriteSid as i, ACL_DIAGNOSIS_SKILL as n, AclWriteGrant as o, registerAclDiagnosisSkill as r, assertTempRootOutsideWorkspace as s, AclSandbox as t, protectReadOnlyRecords as p };
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,2 +1,2 @@
+-import { a as workspaceWriteSid, i as tempWriteSid, n as ACL_DIAGNOSIS_SKILL, o as AclWriteGrant, r as registerAclDiagnosisSkill, s as assertTempRootOutsideWorkspace, t as AclSandbox } from "./types-DFdfvhLN.js";
+-export { ACL_DIAGNOSIS_SKILL, AclSandbox, AclWriteGrant, assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid };
++import { p as protectReadOnlyRecords, a as workspaceWriteSid, i as tempWriteSid, n as ACL_DIAGNOSIS_SKILL, o as AclWriteGrant, r as registerAclDiagnosisSkill, s as assertTempRootOutsideWorkspace, t as AclSandbox } from "./types-DFdfvhLN.js";
++export { protectReadOnlyRecords, ACL_DIAGNOSIS_SKILL, AclSandbox, AclWriteGrant, assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid };

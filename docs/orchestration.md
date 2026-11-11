@@ -1,6 +1,6 @@
 # 自适应协调与可选编排
 
-This guide covers **MoA+ v0.2.2**. MoA+ uses **自适应协调** as its default Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
+This guide covers **MoA+ v0.2.3**. MoA+ uses **自适应协调** as its default Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
 
 ## 默认自适应协调
 

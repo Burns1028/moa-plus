@@ -1,12 +1,12 @@
 # Compatibility
 
-MoA+ **v0.2.2** supplies audited profiles for **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.3** supplies audited profiles for **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next**, with **Node 24.9+**.
 Every installation needs the matching explicit native extensions from the same
 release. These are local compatibility extensions, not claims of upstream
 acceptance or support for every DSH version.
 
-The rc.3 profile covers **21 packages / 49 file paths**, including Worker
+The rc.3 profile covers **22 packages / 50 file paths**, including Worker
 ordinary-file uploads and attachment-aware query views. The separate rc.2
 profile preserves the newer native pipeline and UI; its exact runtime files,
 hashes, and upgrade variants are listed in `compat/rc2/manifest.json`.
@@ -17,7 +17,7 @@ Read [native compatibility profiles](native-compatibility.md) and the rc.2
 
 The historical **v0.2.0** tag uses its earlier **19-package / 43-path** rc.3
 manifest and does not include Worker ordinary-file uploads or attachment-aware
-query views. Do not combine v0.2.2 with that older prepared runtime.
+query views. Do not combine v0.2.3 with that older prepared runtime.
 
 The historical **v0.1.23** tag used three earlier extensions: Agent-local tool suppression, per-session steer submission, and native sidebar branches. It does not include the current Agent/background/residency runtime. Keep a plugin checkout, runtime template/lockfile, and compatibility manifest from the same revision.
 
@@ -55,7 +55,7 @@ Read the [background/cancellation contract](native-moa-contract.md), [promptless
 
 Workers need the matching native sandboxed filesystem and Bash providers to protect the Coordinator's notes/archive. Restricted Bash uses macOS Seatbelt or Linux bubblewrap; Linux installations must have a working `bwrap` backend. Landlock-only, Windows ACL and custom-runner restriction dialects currently refuse restricted Bash rather than discard the record policy. Hardlinked or symlinked record entries also refuse that call; on bwrap, the Coordinator must recreate a missing record before restricted Bash runs. Other files and Coordinator/ordinary sessions keep their native permissions. These requirements apply to Worker record ownership even in full-access mode.
 
-## Desktop Next and Windows limits
+## Desktop Next and Windows scope
 
 The rc.2 profile includes native PowerShell producer ownership, structured
 preparation failures, receiving-Session file receipts, and the matching Client
@@ -63,11 +63,21 @@ seams. A job-backed foreground PowerShell failure retains its original native
 error identity instead of becoming an unclassified error reconstructed from job
 text. Package versions alone do not establish that these capabilities exist.
 
-The current Windows process sandbox cannot exclude the Coordinator's protected
-records from an otherwise writable workspace. Persistent PowerShell also refuses
-that protection policy before opening a terminal. Protected Worker shell commands
-therefore remain unavailable, including after permission escalation; native
-filesystem protection and ordinary Coordinator execution retain their behavior.
+The updated rc.2 profile supports protected Worker commands through native
+nonpersistent PowerShell and Bash where available. The existing Windows ACL
+owner protects regular, single-link records and their verified owned ancestors;
+the native filesystem preserves protection through Coordinator atomic updates.
+Every protected execution requires the actual Windows Job range, including
+background exit and cleanup. Initial missing records, reparse/multiply-linked
+records, unsupported ownership or MIC boundaries, additional writable roots and
+full-access policies refuse the restricted call. The backend retains its
+`partial` enforcement classification.
+
+Persistent PowerShell/PTY, PTC's persistent Node process and the experimental
+worktree/forge command owners do not implement the new protection lifetime and
+still refuse protected Windows use. Ordinary Coordinator execution retains its
+native behavior. This is a profile-specific native extension; the rc.3 profile
+does not implement it and retains the platform requirements above.
 
 When shell execution is optional, an independent Verifier can remove a tool that
 reports the native unsupported-protection error for the current review and

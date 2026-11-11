@@ -1,0 +1,14 @@
+===================================================================
+--- a/lib/types/types.d.ts
++++ b/lib/types/types.d.ts
+@@ -66,8 +66,10 @@
+  * not a hidden subprocess-service default — decides them (the `dsh-shell`
+  * request/spec split is the owning template).
+  */
+ export interface SubprocessSpawnSpec {
++    /** Refuse before starting the target if the provider cannot own a complete native process range. */
++    readonly requireManagedRange?: true;
+     /** Executable and arguments; `argv[0]` is the program. Never shell-interpreted here. */
+     argv: readonly string[];
+     /** Working directory for the child. */
+     cwd: string;

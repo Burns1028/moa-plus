@@ -4,7 +4,7 @@ Start with [MOA responsibilities](docs/moa-architecture.md), the [code architect
 
 ## Local setup
 
-Use Node 24.9+, npm and Git. MoA+ v0.2.2 supports the explicit DSH 0.2.1-rc.3 profile in this checkout (21 native packages across 49 file paths) and the separately audited DSH 0.2.2-rc.1 / Desktop Next profile. See docs/native-compatibility.md for exact runtime and platform requirements. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
+Use Node 24.9+, npm and Git. MoA+ v0.2.3 supports the explicit DSH 0.2.1-rc.3 profile in this checkout (22 native packages across 50 file paths) and the separately audited DSH 0.2.2-rc.1 / Desktop Next profile. See docs/native-compatibility.md for exact runtime and platform requirements. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
 
 ```sh
 npm ci
@@ -44,7 +44,7 @@ The single-worker command is useful on a busy machine because several native int
 | Five primitives, role/identity/workspace/reporting integration | `tests/host/moa-agents.spec.ts`, `moa-controls-integration.spec.ts`, `moa-residency.spec.ts` |
 | Request/ReplyTo, timeout, interruption, cycles, and recovery | `tests/host/moa-messages.spec.ts` |
 | Native background transfer, canonical results, real Bash exit, and hard continuation | `tests/native-contract/moa-background.spec.ts` |
-| Ralph and independent source/tool-backed completion gates | `tests/host/moa-completion.spec.ts` |
+| 迭代精修 and independent source/tool-backed completion gates | `tests/host/moa-completion.spec.ts` |
 | Current-state Git snapshots and owned cleanup | `tests/host/moa-workspaces.spec.ts` |
 | Background failure isolation and Worker membership | `tests/host/fault-isolation.spec.ts`, `review.spec.ts` |
 | Same-turn closure, Stop and continuation | `tests/host/native.spec.ts`, `native-tool-continuation.spec.ts` |
@@ -58,6 +58,8 @@ The single-worker command is useful on a busy machine because several native int
 | Browser factory and native Remote discovery | `tests/client/boot.spec.ts`, `bundle.spec.ts`, `tests/integration/native-discovery.spec.ts` |
 | Installation into fresh consumers | `scripts/verify-package.mjs` |
 | Isolated runtime preparation, ownership, retry and verification | `tests/launcher/project-mode.test.mjs` |
+| rc.2 Windows protected records, native atomic publication, SID/MIC boundaries | `tests/compat/rc2-windows-*.test.mjs` |
+| rc.2 native range/cleanup handoff, strict spawn refusal and provider teardown | `tests/compat/rc2-shell-lifetime.test.mjs` |
 
 Use [manual verification](docs/manual-verification.md) for real application changes. `tests/application/acceptance-provider` is a scripted model adapter, not proof of natural delegation quality. Do not send test prompts to an existing personal conversation.
 
@@ -66,5 +68,16 @@ Use [manual verification](docs/manual-verification.md) for real application chan
 Keep README installation claims consistent with the compatibility helper. Keep current release capabilities separate from the historical v0.1.23 media and installation instructions. A version bump must be accompanied by a matching tag and release assets. Update Tool API for transport changes and the architecture guide for ownership changes. Preserve published tags/assets; prepare a new release for runtime changes.
 
 The optional first-run launcher lives in `scripts/project-mode.mjs`; its exact native dependency template and lockfile live in `runtime/rc3`. Keep preparation explicit, reuse the existing compatibility manifest, and verify setup in a new directory. Never use an existing personal profile as an installation fixture. The launcher CI exercises macOS and Linux; a full Windows installation has not been verified.
+
+The updated rc.2 Desktop Next profile separately implements protected Windows
+nonpersistent PowerShell/Bash execution, using existing regular records, the
+native filesystem owner and Windows Job exit. Run its OS regressions against a
+disposable matching runtime with `MOA_COMPAT_MODULES`; use only newly owned
+temporary directories for ACL tests. Keep the `partial` enforcement label and
+refuse unsupported policies or lifecycle owners. Persistent PTY, PTC and the
+experimental command consumers do not gain that lease automatically. The rc.3
+runtime has only compatible optional declarations, not this Windows lease
+implementation. Do not generalize a scripted OS check into full-preset or
+real-model acceptance.
 
 Keep contributions free of credentials, profiles, personal paths, conversations, private screenshots and raw application logs. Do not commit `.superpowers`, `node_modules` or consumer tarballs. Include the MIT license and third-party notices with redistributed bundles.

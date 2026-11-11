@@ -61,7 +61,7 @@ function preflight({ directory: compat, manifest }, crossVersion = false) {
     .map((entry) => ({
       ...entry,
       files: entry.files.filter(
-        (file) => !runtimeOnly || file.file.endsWith(".js"),
+        (file) => !runtimeOnly || file.file.endsWith(".js") || file.file === "package.json",
       ),
     }))
     .find((entry) =>

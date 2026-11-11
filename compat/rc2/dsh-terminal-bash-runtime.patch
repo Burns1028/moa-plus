@@ -1,0 +1,14 @@
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -959,9 +959,9 @@
+ */
+ const PWSH_PROMPT_SETUP = "function prompt { [Console]::Write([char]27 + ']133;D;' + [int]$LASTEXITCODE + [char]7); 'dsh> ' }";
+ async function spawnArgv(ctx, config, policy, signal) {
+ 	const argv = [config.shellPath, ...config.shellArgs];
+-	if (policy.mode === "danger-full-access") return argv;
++	if (policy.mode === "danger-full-access" && !policy.readOnlyPaths?.length) return argv;
+ 	const sandbox = ctx.get("sandbox");
+ 	if (sandbox === void 0) throw new Error(`terminal-bash: sandbox mode "${policy.mode}" requires a ctx.sandbox provider in the execution world`);
+ 	return (await sandbox.confine(argv, {
+ 		...policy,

@@ -318,11 +318,16 @@ it("runs single-file cleanup with literal argv and retains native sandbox denial
   const fs = new LocalFileSystem(new Context(), { cwd: root, diffBasisMaxBytes: 1048576 });
   const commands: readonly string[][] = [];
   let enforcement: "full" | "partial" = "full";
+  let missingEnforcement = false, unknownEnforcement = false, deny = false;
   const manager = new MoAWorkspaceManager({ fs,
     policy: () => ({ mode: "workspace-write", workspaceRoot: root }),
     sandbox: { confine: async (argv) => {
+      if (deny) throw new Error("native workspace operation denied");
       (commands as string[][]).push([...argv]);
-      return { argv: [...argv], enforcement, denialSignatures: [], runnerFailureRules: [] };
+      const wrapped = { argv: [...argv], enforcement, denialSignatures: [], runnerFailureRules: [] };
+      if (missingEnforcement) Reflect.deleteProperty(wrapped, "enforcement");
+      if (unknownEnforcement) Reflect.set(wrapped, "enforcement", "unrecognized");
+      return wrapped;
     } },
   });
   const remove = (manager as unknown as { runRemove(cwd: string, path: string): Promise<void> }).runRemove.bind(manager);
@@ -334,9 +339,19 @@ it("runs single-file cleanup with literal argv and retains native sandbox denial
     expect(commands[0][2]).not.toContain(path);
     await expect(stat(path)).rejects.toThrow();
     await remove(root, path);
-    await writeFile(path, "preserve after denied confinement");
     enforcement = "partial";
-    await expect(remove(root, path)).rejects.toThrow("workspace-sandbox-partial");
+    await writeFile(path, "native partial confinement");
+    await remove(root, path);
+    await expect(stat(path)).rejects.toThrow();
+    await writeFile(path, "preserve after denied confinement");
+    missingEnforcement = true;
+    await expect(remove(root, path)).rejects.toThrow("workspace-sandbox-invalid-enforcement");
+    missingEnforcement = false;
+    unknownEnforcement = true;
+    await expect(remove(root, path)).rejects.toThrow("workspace-sandbox-invalid-enforcement");
+    unknownEnforcement = false;
+    deny = true;
+    await expect(remove(root, path)).rejects.toThrow("native workspace operation denied");
     expect(await readFile(path, "utf8")).toBe("preserve after denied confinement");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

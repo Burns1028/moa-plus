@@ -41,6 +41,15 @@ definition from the same native scope/ToolSet as execution, preserving per-Agent
 visibility. This preserves SendMessage Request/Reply lifetime without a separate
 executor or message loop.
 
+Isolated Task/Fork preparation and owned cleanup execute fixed Git/Node argv
+through the acting Session's native sandbox policy. They accept the provider's
+declared `full` or `partial` enforcement, matching the stock native worktree
+service; missing or unknown enforcement is refused. Windows keeps its documented
+partial ACL boundary. This neither upgrades its claim to full enforcement nor
+selects `danger-full-access`. Native policy refusals, read-only mode, protected
+record paths, canonical project containment and owned-resource checks remain in
+force; using a workspace API cannot bypass them.
+
 Completion helpers select their own native tool presentation. The legacy registry
 uses `tools.presentAs("native")`; rc.2 mounts
 `@deepseek-ai/dsh-tool-executor-native` through the helper's scoped
@@ -135,12 +144,43 @@ implementation forward. An unrecognized implementation is never changed with
 an older diff. Broad compatibility requires shared API and lifecycle contracts;
 matching a version string or a method name alone does not establish those facts.
 
-Worker shell record protection currently requires macOS Seatbelt or Linux
-bubblewrap. Windows ACL cannot express the same path restriction while the
-Coordinator atomically replaces its records; restricted Bash and PowerShell are
-therefore refused before spawning. Filesystem tools retain scoped protection,
-and Coordinator/ordinary execution keeps its native behavior. Installing on
-Windows does not imply that restricted Worker shell execution is available.
+The updated rc.2 Desktop Next profile implements Windows record protection for
+the native nonpersistent PowerShell and Bash sandbox executors. It reuses the
+existing Session's private-temp SID, the native filesystem mutation locks and
+the actual Windows Job process range. Existing regular single-link records
+remain protected while the Coordinator performs native atomic updates; missing,
+reparse or multiply-linked records refuse the call. Source records outside an
+isolated worktree remain protected through the reviewed owned-ancestor/MIC
+boundary. Full-access and additional-root policies are not substituted for the
+reviewed single-workspace policy. Windows still reports `partial` enforcement.
+
+Persistent PowerShell/PTY, PTC's persistent Node owner and the experimental
+worktree/forge command consumers do not acknowledge this new Windows lease
+lifetime, so protected use refuses before acquisition. They cannot discard
+`readOnlyPaths` through a full-access fast path. Ordinary Coordinator sessions
+retain their native behavior. A preset using one of these unsupported protected
+process owners is not made compatible merely by installing the plugin.
+
+The rc.3 profile has the shared optional lifecycle declarations but does not
+implement the new Windows ACL/filesystem lease. Its restricted shell calls still
+require macOS Seatbelt or Linux bubblewrap; Landlock-only and custom-runner
+dialects also refuse unsupported protection. The isolated Web launcher's locked
+rc.3 runtime does not acquire the rc.2 Windows implementation.
+
+The Windows owner regressions use owned temporary directories and actual
+restricted children. They cover first-visible staging attacks, data/deletion/
+rename/hardlink and same-user `WRITE_DAC` attempts, overlapping Session SIDs,
+native Host atomic updates, isolated-worktree record reads, ancestor mutation
+admission and cleanup, and active MIC-boundary lowering refusal. The shell
+lifetime suite additionally covers strict spawn refusal, background Job exit,
+late preparation, cleanup errors and composition teardown. Run:
+
+```sh
+node --test tests/compat/rc2-windows-*.test.mjs tests/compat/rc2-shell-lifetime.test.mjs
+```
+
+These OS/runtime checks establish their specific owner boundaries. They do not
+claim full Windows confinement, all presets or every model-driven workflow.
 
 The current two families are tested targets, not a claim about every historical
 or future DSH release. Broader support requires compatible public APIs or a new

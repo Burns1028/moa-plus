@@ -3,6 +3,12 @@ import type {
   SandboxExecutionPolicy,
   SandboxProvider,
 } from "@deepseek-ai/dsh-sandbox";
+import {
+  scrubbedParentEnv,
+  type SubprocessHandle,
+  type SubprocessOutcome,
+  type SubprocessRuntime,
+} from "@deepseek-ai/dsh-subprocess";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -52,6 +58,7 @@ export interface MoAWorkspaceCapabilities {
   fs: FileSystem;
   policy: () => SandboxExecutionPolicy;
   sandbox: Pick<SandboxProvider, "confine">;
+  subprocess?: Pick<SubprocessRuntime, "spawn" | "resolveExecutable">;
 }
 
 export class MoAWorkspaceManager {
@@ -63,34 +70,99 @@ export class MoAWorkspaceManager {
     signal?: AbortSignal,
     extraEnv: Record<string, string> = {},
   ) {
+    return (await this.runScoped(cwd, ["git", ...args], signal, extraEnv)).trim();
+  }
+
+  private async runScoped(
+    cwd: string,
+    argv: string[],
+    signal?: AbortSignal,
+    extraEnv: Record<string, string> = {},
+  ): Promise<string> {
     const policy = this.capabilities.policy();
     if (policy.mode === "read-only")
       throw new Error("project-mode/workspace-read-only");
+    const unconfined = policy.mode === "danger-full-access" && !policy.readOnlyPaths?.length;
     const wrapped =
-      policy.mode === "danger-full-access"
-        ? { argv: ["git", ...args] }
+      unconfined
+        ? { argv }
         : await this.capabilities.sandbox.confine(
-            ["git", ...args],
-            { ...policy, mode: "workspace-write" },
+            argv,
+            { ...policy, mode: policy.mode === "danger-full-access" ? policy.mode : "workspace-write" },
             signal,
+            this.capabilities.subprocess ? { processLifetime: "managed" } : undefined,
           );
-    if ("enforcement" in wrapped && wrapped.enforcement !== "full")
-      throw new Error("project-mode/workspace-sandbox-partial");
-    const env = { ...process.env };
-    for (const key of Object.keys(env))
-      if (key.startsWith("GIT_")) delete env[key];
-    Object.assign(env, {
-      GIT_CONFIG_NOSYSTEM: "1",
-      GIT_TERMINAL_PROMPT: "0",
-      ...extraEnv,
-    });
-    const { stdout } = await exec(wrapped.argv[0], wrapped.argv.slice(1), {
-      cwd,
-      env,
-      signal,
-      maxBuffer: 8 * 1024 * 1024,
-    });
-    return stdout.trim();
+    const cleanup = "cleanup" in wrapped ? wrapped.cleanup : undefined;
+    const bindProcessLifetime = "bindProcessLifetime" in wrapped ? wrapped.bindProcessLifetime : undefined;
+    const lifetime = Promise.withResolvers<void>();
+    // The provider joins this operation's existing range/cleanup barrier during
+    // teardown. Observe early rejection while retaining the same join promise.
+    void lifetime.promise.catch(() => {});
+    let running: SubprocessHandle | undefined;
+    let rangeExited = false;
+    let failure: unknown;
+    try {
+      bindProcessLifetime?.(lifetime.promise);
+      if (!unconfined &&
+        (!("enforcement" in wrapped) || (wrapped.enforcement !== "full" && wrapped.enforcement !== "partial")))
+        throw new Error("project-mode/workspace-sandbox-invalid-enforcement");
+      signal?.throwIfAborted();
+      const env: NodeJS.ProcessEnv = scrubbedParentEnv();
+      for (const key of Object.keys(env))
+        // Native subprocess overlays its parent environment. An explicit unset
+        // must survive that merge instead of inheriting the removed value again.
+        if (key.toUpperCase().startsWith("GIT_")) env[key] = undefined;
+      Object.assign(env, { GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", ...extraEnv });
+      if (!this.capabilities.subprocess) {
+        if (cleanup) throw new Error("project-mode/workspace-managed-subprocess-unavailable");
+        const { stdout } = await exec(wrapped.argv[0], wrapped.argv.slice(1), {
+          cwd, env, signal, maxBuffer: 8 * 1024 * 1024,
+        });
+        return stdout;
+      }
+      const executableEnv = Object.fromEntries(Object.entries(env)
+        .filter((entry): entry is [string, string] => entry[1] !== undefined));
+      const executable = await this.capabilities.subprocess.resolveExecutable(wrapped.argv[0], executableEnv, signal);
+      signal?.throwIfAborted();
+      running = this.capabilities.subprocess.spawn({
+        argv: [executable, ...wrapped.argv.slice(1)], cwd, env, signal, graceMs: 1000,
+        ...(cleanup ? { requireManagedRange: true } : {}),
+        stdio: { stdin: "ignore", stdout: { maxBytes: 8 * 1024 * 1024 }, stderr: { maxBytes: 8 * 1024 * 1024 } },
+      });
+      let outcome: SubprocessOutcome;
+      try { outcome = await running.done; }
+      catch (error) { running.terminate(); throw error; }
+      finally {
+        // The direct outcome can precede descendant exit. Cancellation does not
+        // shorten this native range barrier or release its protection early.
+        rangeExited = await running.waitForExit();
+        if (!rangeExited) throw new Error("project-mode/workspace-process-exit-not-confirmed");
+      }
+      signal?.throwIfAborted();
+      const stdout = running.collected.stdout?.readFrom(0);
+      const stderr = running.collected.stderr?.readFrom(0);
+      if (stdout?.lossy || stderr?.lossy) throw new Error("project-mode/workspace-command-output-limit");
+      if (outcome.exitCode !== 0 || outcome.signal !== null)
+        throw Object.assign(new Error(stderr?.text || "project-mode/workspace-command-failed"), {
+          code: outcome.exitCode, signal: outcome.signal, stdout: stdout?.text ?? "", stderr: stderr?.text ?? "",
+        });
+      return stdout?.text ?? "";
+    } catch (error) {
+      failure = error;
+      throw error;
+    } finally {
+      if (cleanup && (!running || rangeExited)) {
+        try { await cleanup(); }
+        catch (error) {
+          lifetime.reject(error);
+          throw new Error("project-mode/workspace-sandbox-cleanup-failed", {
+            cause: failure === undefined ? error : new AggregateError([failure, error], "Workspace execution and cleanup failed"),
+          });
+        }
+      }
+      if (!running || rangeExited) lifetime.resolve();
+      else lifetime.reject(failure ?? new Error("project-mode/workspace-process-exit-not-confirmed"));
+    }
   }
 
   private async paths(sourceDirectory: string, signal?: AbortSignal) {
@@ -312,20 +384,7 @@ export class MoAWorkspaceManager {
   }
 
   private async runCommand(cwd: string, argv: string[], signal?: AbortSignal) {
-    const policy = this.capabilities.policy();
-    if (policy.mode === "read-only")
-      throw new Error("project-mode/workspace-read-only");
-    const wrapped =
-      policy.mode === "danger-full-access"
-        ? { argv }
-        : await this.capabilities.sandbox.confine(
-            argv,
-            { ...policy, mode: "workspace-write" },
-            signal,
-          );
-    if ("enforcement" in wrapped && wrapped.enforcement !== "full")
-      throw new Error("project-mode/workspace-sandbox-partial");
-    await exec(wrapped.argv[0], wrapped.argv.slice(1), { cwd, signal });
+    await this.runScoped(cwd, argv, signal);
   }
 
   private async runRemove(cwd: string, path: string) {

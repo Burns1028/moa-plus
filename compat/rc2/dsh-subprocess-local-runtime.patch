@@ -1,0 +1,54 @@
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1473,8 +1473,11 @@
+ 	/** Test hook for platform process inspection; production resolves lazily on terminal spawn. */
+ 	terminalInspector;
+ 	constructor(ctx) {
+ 		super(ctx);
++        ctx.inject(["sandbox"], sandboxCtx => {
++            sandboxCtx.effect(() => () => this.disposeManagedProcesses(), "process ranges before sandbox capabilities");
++        });
+ 		ctx.effect(() => {
+ 			const onHostExit = () => {
+ 				this.terminateForHostExit();
+ 			};
+@@ -1547,8 +1550,9 @@
+ 	spawn(spec) {
+ 		validateSubprocessSpec(spec);
+ 		const env = targetEnvironment(spec);
+ 		const containmentMode = this.selectContainmentMode("ordinary");
++		if (spec.requireManagedRange === true && containmentMode === "fallback") throw new Error("subprocess-local: this execution requires a native managed process range; fallback containment is unavailable");
+ 		let handle;
+ 		const internals = {
+ 			...this.internals,
+ 			onSpillFailure: this.reportSpillFailure
+===================================================================
+--- a/package.json
++++ b/package.json
+@@ -42,9 +42,10 @@
+   "license": "MIT",
+   "peerDependencies": {
+     "@deepseek-ai/dsh-subprocess": "0.2.2-rc.1",
+     "@deepseek-ai/dsh-timeout": "0.2.2-rc.1",
+-    "@deepseek-ai/cordis": "~4.1.0"
++    "@deepseek-ai/cordis": "~4.1.0",
++    "@deepseek-ai/dsh-sandbox": "0.2.2-rc.1"
+   },
+   "dependencies": {
+     "@deepseek-ai/dsh-lazy-require": "0.2.2-rc.1",
+     "@deepseek-ai/dsh-win32-process": "0.2.2-rc.1",
+@@ -55,6 +56,11 @@
+     "@deepseek-ai/dsh-loader-smoke": "0.2.2-rc.1",
+     "@deepseek-ai/dsh-subprocess": "0.2.2-rc.1",
+     "@deepseek-ai/dsh-timeout": "0.2.2-rc.1",
+     "@deepseek-ai/cordis": "~4.1.0"
++  },
++  "peerDependenciesMeta": {
++    "@deepseek-ai/dsh-sandbox": {
++      "optional": true
++    }
+   }
+-}
+\ No newline at end of file
++}

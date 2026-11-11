@@ -1,0 +1,280 @@
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -26,9 +26,20 @@
+ 	if (bindings !== void 0) return bindings;
+ 	const koffi = (await import("koffi")).default;
+ 	const advapi32 = koffi.load("advapi32.dll");
+ 	const kernel32 = koffi.load("kernel32.dll");
++	const securityAttributes = koffi.struct({ nLength: "uint32_t", lpSecurityDescriptor: "void *", bInheritHandle: "int" });
+ 	bindings = {
++		koffi,
++		securityAttributesSize: koffi.sizeof(securityAttributes),
++		createDirectoryW: kernel32.func("CreateDirectoryW", "int", ["str16", koffi.pointer(securityAttributes)]),
++		openProcess: kernel32.func("void * __stdcall OpenProcess(uint32_t access, int inherit, uint32_t pid)"),
++		openProcessToken: advapi32.func("int __stdcall OpenProcessToken(void *process, uint32_t access, _Out_ void **token)"),
++		getTokenInformation: advapi32.func("int __stdcall GetTokenInformation(void *token, int kind, void *information, uint32_t length, _Out_ uint32_t *needed)"),
++		convertSidToStringSidW: advapi32.func("int __stdcall ConvertSidToStringSidW(const void *sid, _Out_ void **text)"),
++		convertStringSecurityDescriptorToSecurityDescriptorW: advapi32.func("int __stdcall ConvertStringSecurityDescriptorToSecurityDescriptorW(const char16_t *text, uint32_t revision, _Out_ void **descriptor, void *size)"),
++		localFree: kernel32.func("void * __stdcall LocalFree(void *memory)"),
++		closeHandle: kernel32.func("int __stdcall CloseHandle(void *handle)"),
+ 		getFileSecurityW: advapi32.func("int __stdcall GetFileSecurityW(const char16_t *path, uint32_t requested, void *descriptor, uint32_t length, _Out_ uint32_t *needed)"),
+ 		setFileSecurityW: advapi32.func("int __stdcall SetFileSecurityW(const char16_t *path, uint32_t information, const void *descriptor)"),
+ 		replaceFileW: kernel32.func("int __stdcall ReplaceFileW(const char16_t *replaced, const char16_t *replacement, const char16_t *backup, uint32_t flags, void *exclude, void *reserved)"),
+ 		getLastError: kernel32.func("uint32_t __stdcall GetLastError()")
+@@ -87,8 +98,54 @@
+ async function replaceFileWin32(replaced, replacement) {
+ 	const api = await win32();
+ 	if (api.replaceFileW(toNamespacedPath(replaced), toNamespacedPath(replacement), null, 0, null, null) === 0) throw win32Error("ReplaceFileW", api.getLastError(), replaced);
+ }
++/** Create private Windows staging before any restricted child can acquire a write handle. */
++async function createPrivateStagingWin32(path) {
++	const api = await win32();
++	let processHandle;
++	let token;
++	let sidText;
++	let descriptor;
++	let created = false;
++	let failure;
++	try {
++		processHandle = api.openProcess(1024, 0, process.pid);
++		if (!processHandle) throw win32Error("OpenProcess", api.getLastError(), path);
++		const tokenSlot = [null];
++		if (!api.openProcessToken(processHandle, 8, tokenSlot)) throw win32Error("OpenProcessToken", api.getLastError(), path);
++		token = tokenSlot[0];
++		const needed = [0];
++		api.getTokenInformation(token, 1, null, 0, needed);
++		if (!needed[0]) throw win32Error("GetTokenInformation", api.getLastError(), path);
++		const user = Buffer.alloc(needed[0]);
++		if (!api.getTokenInformation(token, 1, user, user.length, needed)) throw win32Error("GetTokenInformation", api.getLastError(), path);
++		const sid = api.koffi.decode(user, 0, "void *");
++		const sidSlot = [null];
++		if (!api.convertSidToStringSidW(sid, sidSlot)) throw win32Error("ConvertSidToStringSidW", api.getLastError(), path);
++		sidText = sidSlot[0];
++		const userSid = api.koffi.decode(sidText, "char16_t", -1);
++		const descriptorSlot = [null];
++		// OWNER_RIGHTS disables owner-implicit WRITE_DAC for same-user restricted children.
++		const sddl = `D:P(A;OICI;FA;;;${userSid})(A;OICI;RC;;;S-1-3-4)`;
++		if (!api.convertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, descriptorSlot, null)) throw win32Error("ConvertStringSecurityDescriptorToSecurityDescriptorW", api.getLastError(), path);
++		descriptor = descriptorSlot[0];
++		if (!api.createDirectoryW(toNamespacedPath(path), { nLength: api.securityAttributesSize, lpSecurityDescriptor: descriptor, bInheritHandle: 0 })) throw win32Error("CreateDirectoryW", api.getLastError(), path);
++		created = true;
++	} catch (error) {
++		failure = error;
++	} finally {
++		const failures = [];
++		for (const memory of [descriptor, sidText]) if (memory && api.localFree(memory)) failures.push(win32Error("LocalFree", api.getLastError(), path));
++		for (const handle of [token, processHandle]) if (handle && !api.closeHandle(handle)) failures.push(win32Error("CloseHandle", api.getLastError(), path));
++		if (failures.length) {
++			if (created) try { await rm(path, { recursive: true, force: true }); } catch (error) { failures.push(error); }
++			if (failure) failures.unshift(failure);
++			throw new AggregateError(failures, "Windows staging security cleanup failed");
++		}
++	}
++	if (failure) throw failure;
++}
+ //#endregion
+ //#region lib/types/fsio.js
+ /**
+ * Cordis-free local filesystem mechanics. This provider layer returns validated UTF-8 text,
+@@ -568,13 +625,16 @@
+ 	}));
+ 	let handle;
+ 	let stagingCreated = false;
+ 	try {
+-		await mkdir(stagingDir, { mode: 448 });
++		if (platform === "win32" && options.protectedTarget) await createPrivateStagingWin32(stagingDir);
++		else await mkdir(stagingDir, { mode: 448 });
+ 		stagingCreated = true;
+ 		await chmod(stagingDir, 448);
++		await internals.inspectStagingCreated?.({ stagingDir, tempPath });
+ 		handle = await open(tempPath, "wx", 384);
+ 		await handle.chmod(384);
++		await internals.inspectStagingFileCreated?.({ stagingDir, tempPath });
+ 		if (platform === "win32" && existingDestination) await copyFileDacl(absolutePath, tempPath);
+ 		await handle.writeFile(content, {
+ 			encoding: "utf8",
+ 			...signal ? { signal } : {}
+@@ -593,11 +653,15 @@
+ 		} catch (error) {
+ 			await throwGuardedCreateFailure(error, absolutePath, displayPath, inspectPublicationTarget);
+ 		}
+ 		else if (platform === "win32" && existingDestination) try {
++			if (options.protectedTarget) {
++				const current = await lstat(absolutePath, { bigint: true });
++				if (!current.isFile() || current.isSymbolicLink() || current.nlink !== 1n) throw new FsError(`cannot replace protected record "${displayPath}": identity changed`, "FS_READ_ONLY_PATH");
++			}
+ 			await replaceFile(absolutePath, tempPath);
+ 		} catch (error) {
+-			if (!isENOENT(error)) throw error;
++			if (!isENOENT(error) || options.protectedTarget) throw error;
+ 			await rename(tempPath, absolutePath);
+ 		}
+ 		else await rename(tempPath, absolutePath);
+ 		try {
+@@ -814,8 +878,10 @@
+ 	/** Per-targetKey tail promise: serializes mutating ops so the read→guard→write
+ 	* window can't interleave, making concurrent writes/edits deterministically
+ 	* ordered (one wins, the rest see the new version and reject as stale). */
+ 	locks = /* @__PURE__ */ new Map();
++	processPathProtectionOwner = {};
++	processPathProtections = /* @__PURE__ */ new Map();
+ 	constructor(ctx, config) {
+ 		super(ctx);
+ 		const resolved = config;
+ 		if (!Number.isSafeInteger(resolved.diffBasisMaxBytes) || resolved.diffBasisMaxBytes <= 0 || resolved.diffBasisMaxBytes > MAX_DIFF_BASIS_BYTES) throw new Error(`fs-local: diffBasisMaxBytes must be a positive safe integer no greater than ${MAX_DIFF_BASIS_BYTES}`);
+@@ -841,8 +907,70 @@
+ 			}
+ 		};
+ 		return acquire(0);
+ 	}
++	/** Install native process path protection under the same owner as atomic mutations. */
++	async acquireProcessPathProtection(paths, installer, signal) {
++		throwIfAborted(signal, "process path protection");
++		if (!Array.isArray(paths) || !paths.length || paths.some(path => typeof path !== "string" || !isAbsolute(path) || path.includes("\0"))) throw new FsError("process path protection requires absolute record paths", "FS_READ_ONLY_PATH");
++		const targets = await Promise.all(paths.map(path => this.resolve(path, { signal })));
++		const canonicalPaths = [...new Set(targets.map(target => target.targetKey))].sort();
++		// Admission and release also conflict with a mutation of any containing
++		// directory. Ordinary mutations keep only their own exact target keys:
++		// independent file writes do not acquire a common/global ancestor lock.
++		const protectionLockKeys = [];
++		for (const path of canonicalPaths) {
++			for (let ancestor = path;; ancestor = dirname(ancestor)) {
++				protectionLockKeys.push(ancestor);
++				if (dirname(ancestor) === ancestor) break;
++			}
++		}
++		return this.withLocks(protectionLockKeys, async () => {
++			throwIfAborted(signal, "process path protection");
++			for (let index = 0; index < paths.length; index++) {
++				const fresh = await this.resolve(paths[index], { signal });
++				await this.requireProcessProtectedRecord(paths[index]);
++				if (fresh.targetKey !== targets[index].targetKey) throw new FsError("process path protection record identity changed", "FS_READ_ONLY_PATH");
++			}
++			for (const path of canonicalPaths) await this.requireProcessProtectedRecord(path);
++			const remove = await installer(canonicalPaths, this.processPathProtectionOwner);
++			if (typeof remove !== "function") throw new TypeError("process path protection installer must return its cleanup function");
++			if (signal?.aborted) {
++				await remove();
++				throwIfAborted(signal, "process path protection");
++			}
++			for (const path of canonicalPaths) this.processPathProtections.set(path, (this.processPathProtections.get(path) ?? 0) + 1);
++			let cleanup;
++			return { cleanup: () => cleanup ??= this.withLocks(protectionLockKeys, async () => {
++				await remove();
++				for (const path of canonicalPaths) {
++					const count = this.processPathProtections.get(path) - 1;
++					if (count) this.processPathProtections.set(path, count);
++					else this.processPathProtections.delete(path);
++				}
++			}) };
++		});
++	}
++	async requireProcessProtectedRecord(path) {
++		let entry;
++		try { entry = await lstat(path, { bigint: true }); }
++		catch (error) {
++			if (isENOENT(error) || isENOTDIR(error)) throw new FsError(`process protection requires an existing record: ${path}`, "FS_READ_ONLY_PATH", { cause: error });
++			throw error;
++		}
++		if (!entry.isFile() || entry.isSymbolicLink() || entry.nlink !== 1n) throw new FsError(`process protection requires an existing regular, single-link record: ${path}`, "FS_READ_ONLY_PATH");
++	}
++	async processProtectedWrite(path) {
++		if (!this.processPathProtections.has(path)) return false;
++		await this.requireProcessProtectedRecord(path);
++		return true;
++	}
++	checkProcessProtectedRemoval(path) {
++		for (const record of this.processPathProtections.keys()) {
++			const inside = relative(path, record);
++			if (inside === "" || inside !== ".." && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)) throw new FsError(`cannot remove active process-protected record "${path}"`, "FS_READ_ONLY_PATH");
++		}
++	}
+ 	async resolve(path, opts) {
+ 		if (opts?.signal?.aborted) throw new FsError("resolve aborted", "FS_ABORTED");
+ 		const local = await resolveLocalTarget(opts?.cwd ?? this.config.cwd, expandHomePrefix(path));
+ 		if (opts?.signal?.aborted) throw new FsError("resolve aborted", "FS_ABORTED");
+@@ -928,13 +1056,15 @@
+ 		}));
+ 	}
+ 	async writeText(target, content, expected, signal) {
+ 		return this.withLock(target.targetKey, async () => {
++			const protectedTarget = await this.processProtectedWrite(target.targetKey);
+ 			const existing = await this.writeTarget(target, expected);
+ 			const before = existing !== null && Buffer.byteLength(content, "utf8") < this.config.diffBasisMaxBytes ? await readTextForDiff(target.targetKey, this.config.diffBasisMaxBytes, signal) : null;
+ 			await writeFileAtomic(target.targetKey, content, existing?.mode, signal, this.internals, {
+ 				displayPath: target.displayPath,
+-				createIfAbsent: expected?.kind === "createIfAbsent"
++				createIfAbsent: expected?.kind === "createIfAbsent",
++				protectedTarget
+ 			});
+ 			const after = await probe(target.targetKey);
+ 			return {
+ 				operation: existing ? "update" : "create",
+@@ -945,16 +1075,17 @@
+ 		});
+ 	}
+ 	async editText(target, edit, expected, signal) {
+ 		return this.withLock(target.targetKey, async () => {
++			const protectedTarget = await this.processProtectedWrite(target.targetKey);
+ 			const existing = await probe(target.targetKey);
+ 			if (!existing) throw new FsError(`cannot edit "${target.displayPath}": file changed since it was read`, "FS_STALE_VERSION");
+ 			if (existing.type !== "file") throw new FsError(`cannot edit "${target.displayPath}": not a regular file`, "FS_NOT_REGULAR_FILE");
+ 			if (expected && existing.version !== expected.version) throw new FsError(`cannot edit "${target.displayPath}": file changed since it was read`, "FS_STALE_VERSION");
+ 			const original = await readForEdit(target.targetKey, target.displayPath, signal);
+ 			const edited = applyLiteralEdit(original.content, edit.oldString, edit.newString, edit.replaceAll, target.displayPath);
+ 			const content = restoreLineEndings(edited.content, original.lineEndings);
+-			await writeFileAtomic(target.targetKey, content, existing.mode, signal, this.internals, { displayPath: target.displayPath });
++			await writeFileAtomic(target.targetKey, content, existing.mode, signal, this.internals, { displayPath: target.displayPath, protectedTarget });
+ 			const after = await probe(target.targetKey);
+ 			return {
+ 				version: this.versionAfterWrite(after, target),
+ 				before: original.content,
+@@ -963,12 +1094,13 @@
+ 		});
+ 	}
+ 	async patchText(target, hunks, expected, signal) {
+ 		return this.withLock(target.targetKey, async () => {
++			const protectedTarget = await this.processProtectedWrite(target.targetKey);
+ 			const existing = await this.requireFile(target, expected, "patch");
+ 			const original = await readForEdit(target.targetKey, target.displayPath, signal);
+ 			const after = this.patchContent(target, original.content, hunks);
+-			await writeFileAtomic(target.targetKey, restoreLineEndings(after, original.lineEndings), existing.mode, signal, this.internals, { displayPath: target.displayPath });
++			await writeFileAtomic(target.targetKey, restoreLineEndings(after, original.lineEndings), existing.mode, signal, this.internals, { displayPath: target.displayPath, protectedTarget });
+ 			return {
+ 				version: this.versionAfterWrite(await probe(target.targetKey), target),
+ 				before: original.content,
+ 				after
+@@ -976,8 +1108,9 @@
+ 		});
+ 	}
+ 	async deleteFile(target, expected, signal) {
+ 		return this.withLock(target.targetKey, async () => {
++			this.checkProcessProtectedRemoval(target.targetKey);
+ 			await this.requireFile(target, expected, "delete");
+ 			const before = await readTextForDiff(target.targetKey, this.config.diffBasisMaxBytes, signal);
+ 			await this.internals.inspectBeforeMutation?.(target);
+ 			if (signal?.aborted) throw new FsError("delete aborted", "FS_ABORTED");
+@@ -987,8 +1120,10 @@
+ 	}
+ 	async moveFile(source, destination, options, signal) {
+ 		if (source.targetKey === destination.targetKey) throw new FsError(`cannot move "${source.displayPath}" to itself`, "FS_SAME_TARGET");
+ 		return this.withLocks([source.targetKey, destination.targetKey], async () => {
++			this.checkProcessProtectedRemoval(source.targetKey);
++			const protectedTarget = await this.processProtectedWrite(destination.targetKey);
+ 			const sourceInfo = await this.requireFile(source, options.expectedSource, "move");
+ 			const existing = await this.writeTarget(destination, options.expectedDestination);
+ 			const original = await readForEdit(source.targetKey, source.displayPath, signal);
+ 			const after = options.hunks === void 0 ? original.content : this.patchContent(source, original.content, options.hunks);
+@@ -998,9 +1133,10 @@
+ 			if (signal?.aborted) throw new FsError("move aborted", "FS_ABORTED");
+ 			await writeFileAtomic(destination.targetKey, content, sourceInfo.mode, void 0, this.internals, {
+ 				displayPath: destination.displayPath,
+ 				createIfAbsent: options.expectedDestination?.kind === "createIfAbsent",
+-				existingDestination: existing !== null
++				existingDestination: existing !== null,
++				protectedTarget
+ 			});
+ 			const outcome = {
+ 				operation: existing ? "update" : "create",
+ 				version: this.versionAfterWrite(await probe(destination.targetKey), destination),

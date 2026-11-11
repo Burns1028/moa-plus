@@ -1,0 +1,14 @@
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -143,9 +143,9 @@
+ 	try {
+ 		const timeout = __addDisposableResource(env_1, deadline(signal, config.timeoutMs, "WORKTREE_TIMEOUT"), false);
+ 		timeout.signal.throwIfAborted();
+ 		const command = [await ctx.subprocess.resolveExecutable(argv[0], void 0, timeout.signal), ...argv.slice(1)];
+-		const wrapped = policy.mode === "danger-full-access" ? command : (await ctx.sandbox.confine(command, {
++		const wrapped = policy.mode === "danger-full-access" && !policy.readOnlyPaths?.length ? command : (await ctx.sandbox.confine(command, {
+ 			...policy,
+ 			mode: policy.mode
+ 		}, timeout.signal)).argv;
+ 		timeout.signal.throwIfAborted();
