@@ -3,10 +3,7 @@ import type {
   InputTriggerSource,
 } from "@deepseek-ai/dsh-client-ui-input-trigger/client";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
-import {
-  orchestrationPacks,
-  type OrchestrationPackId,
-} from "../shared/orchestration.ts";
+import { orchestrationPacks } from "../shared/orchestration.ts";
 import type { ProjectClient } from "./runtime.ts";
 
 /** Native @ completions expand to editable text; the native composer still owns sending. */
@@ -14,7 +11,8 @@ export function bindOrchestrationInput(
   client: ProjectClient,
   triggers: Pick<InputTriggerServiceContract, "registerSource">,
 ): () => void {
-  const names = Object.keys(orchestrationPacks) as OrchestrationPackId[];
+  const packs = Object.values(orchestrationPacks);
+  const names = packs.map((pack) => pack.title);
   const enabled = (id: SessionId) => {
     const project = client.store.project(id)?.project,
       mode = client.mode(id).value;
@@ -22,12 +20,10 @@ export function bindOrchestrationInput(
       ? mode.role === "coordinator" && mode.enabled
       : project?.mode === "enabled";
   };
-  const expansion = (id: SessionId, name: string) =>
-    enabled(id) && Object.hasOwn(orchestrationPacks, name)
-      ? {
-          text: `${orchestrationPacks[name as OrchestrationPackId].prompt}\n\n`,
-        }
-      : undefined;
+  const expansion = (id: SessionId, name: string) => {
+    const pack = packs.find((pack) => pack.title === name);
+    return enabled(id) && pack ? { text: `${pack.prompt}\n\n` } : undefined;
+  };
   const source: InputTriggerSource = {
     trigger: "@",
     name: "MoA+",
@@ -36,12 +32,16 @@ export function bindOrchestrationInput(
       if (!enabled(session.sessionId) || request.quoted || request.drilled)
         return [];
       const query = request.query.toLowerCase();
-      return names
-        .filter((name) => name.includes(query))
-        .map((name) => ({
-          name,
-          label: orchestrationPacks[name].title,
-          description: orchestrationPacks[name].description,
+      return packs
+        .filter(
+          (pack) =>
+            pack.title.toLowerCase().includes(query) ||
+            pack.description.toLowerCase().includes(query),
+        )
+        .map((pack) => ({
+          name: pack.title,
+          label: pack.title,
+          description: pack.description,
           section: "MoA+",
         }));
     },

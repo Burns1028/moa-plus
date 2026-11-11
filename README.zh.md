@@ -20,20 +20,22 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-当前开发分支已增加 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 的兼容配置，
-同时保留 rc.3 支持。桌面安装步骤、已验证能力及 Windows Worker Shell 限制见
-[原生兼容配置](docs/native-compatibility.md)。下方 v0.2.0 安装说明仍对应已发布的 tag。
+MoA+ **v0.2.1** 支持经过审查的 **DSH 0.2.1-rc.3** 与
+**DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 兼容配置。rc.3 清单扩展了
+**21 个原生包、49 个文件路径**。插件与对应兼容配置必须来自同一版本，
+原版或其他版本准备的运行时不能替代。桌面准备步骤和精确支持范围见
+[原生兼容配置](docs/native-compatibility.md)。
 
-需要 **Node 24.9+**、npm 和 Git。MoA+ **v0.2.0** 需要配套的 **DSH 0.2.1-rc.3 兼容运行时**，其显式清单扩展了 **19 个原生包、43 个文件路径**。原版 rc.3 或其他插件版本准备的运行时不能替代。
+需要 **Node 24.9+**、npm 和 Git。下方独立 Web 启动器准备锁定的 rc.3 运行时；Desktop Next 使用单独的对应兼容配置。
 
-Worker 的 Bash 记录保护使用 macOS Seatbelt 或 Linux bubblewrap。Linux、Windows 安装前请查看[后端要求][compatibility]。
+受保护 Worker 的 Shell 执行需要 macOS Seatbelt 或 Linux bubblewrap。Windows 的原生文件工具仍能保护工作记录，但当前 Shell 后端无法执行同样的记录排除策略。命令不是必需时，Verifier 可以继续使用原生文件工具取证；必须执行命令时，会明确报告能力缺失并停止，不移除保护或申请更高权限。详见[后端要求][compatibility]。
 
-下方命令安装已发布的 v0.2.0。最新字标控件与编排指引属于当前分支的未发布改动；跟进开发版本时，将克隆分支从 `v0.2.0` 改为 `main`。
+下方命令使用 v0.2.1 checkout。跟进开发版本时，将克隆分支改为 `main`。
 
 克隆项目，准备独立的 Web 运行环境：
 
 ```sh
-git clone --branch v0.2.0 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.1 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -61,11 +63,11 @@ Coordinator 与 Workers 使用同一套原生 Agent Loop，由身份、工具与
 
 Worker 每轮工作结束时，系统把**本轮最后一条完整 AI 消息**送给指定汇报对象。Coordinator 可以审阅结果、沿用这个 Worker，或调整方向。保留的会话与工作区让团队能够继续下一轮分工。
 
-### Adaptive 协调与可选编排
+### 自适应协调与可选编排
 
-未发布的 Adaptive 指引保留简单任务直接完成的方式。需要分工时，Coordinator 优先用 `SendMessage` 复用合适的 Worker；新分支需要已有历史时用 `Fork`；需要干净上下文时用 `Task`。它在原生容量内并行派发已就绪的独立分支，结果到达后继续解锁后续工作，需要等待时使用原生 `QueryAgent` 等待。
+自适应指引保留简单任务直接完成的方式。需要分工时，Coordinator 优先用 `SendMessage` 复用合适的 Worker；新分支需要已有历史时用 `Fork`；需要干净上下文时用 `Task`。它在原生容量内并行派发已就绪的独立分支，结果到达后继续解锁后续工作，需要等待时使用原生 `QueryAgent` 等待。没有明确行动目标或未完成的具体工作时，简短回应或普通聊天澄清本身就是完整答复，不需要仪式化调用工具、更新记忆或阻塞等待提问。
 
-已启用 MoA+ 的 Coordinator 还提供五个内置 `@` 提示：`@fan-out` 用于独立切片，`@panel-team` 用于争议决策，`@blackboard-team` 用于交织探索，`@critique-loop` 用于制品迭代审阅，`@auto-orchestration` 用于多阶段协作。输入 `@` 后，点击候选项或按 Enter、Tab 选择。提示会展开为可编辑的输入框文本，补充任务后照常发送。Worker 和普通会话不提供这些提示。
+已启用 MoA+ 的 Coordinator 还提供五个内置 `@` 提示：**并行攻坚**用于独立切片，**多方会审**用于争议决策，**协同探索**用于交织探索，**迭代精修**用于制品迭代审阅，**统筹推进**用于多阶段协作。输入 `@` 后，点击中文候选项或按 Enter、Tab 选择。提示会展开为可编辑的输入框文本，补充任务后照常发送。Worker 和普通会话不提供这些提示。
 
 这些本地提示文本沿用现有工具与角色预设。原生发送、文件引用、上传、queue 和 steer 保持原有行为。模式边界与用法见[编排指南][orchestration]。
 
@@ -88,7 +90,7 @@ Agent 来信标明发送者，从原文预览展开为完整 Markdown。可关�
 ## 文档与参与
 
 - [角色、生命周期与常见流程][roles]
-- [Adaptive 协调与可选 `@` 编排][orchestration]（未发布）
+- [自适应协调与可选 `@` 编排][orchestration]
 - [代码架构][architecture]与[工具 API][tools]
 - [首次运行指南][quickstart]与[兼容及回滚说明][compatibility]
 - [验证记录][verification]

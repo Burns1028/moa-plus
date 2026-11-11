@@ -7,6 +7,9 @@ import { orchestrationPacks } from "../../packages/project-mode/src/shared/orche
 import { sid, snapshot } from "./fixture.ts";
 
 const cleanups: (() => void)[] = [];
+const titles = ["并行攻坚", "多方会审", "协同探索", "迭代精修", "统筹推进"];
+const oldVisibleNames =
+  /fan[- ]out|panel[- ]team|blackboard[- ]team|critique[- ]loop|auto[- ]orchestration/i;
 afterEach(() => {
   for (const dispose of cleanups.splice(0).reverse()) dispose();
 });
@@ -69,8 +72,12 @@ it("offers the five text shortcuts only to acknowledged MoA+ coordinators, inclu
   });
   await b.client.refreshMode(sid("parent"));
   expect((await b.candidates()).map((candidate) => candidate.name)).toEqual(
-    Object.keys(orchestrationPacks),
+    titles,
   );
+  expect((await b.candidates()).map((candidate) => candidate.label)).toEqual(
+    titles,
+  );
+  expect(JSON.stringify(await b.candidates())).not.toMatch(oldVisibleNames);
   expect(await b.candidates("ordinary")).toEqual([]);
   expect(await b.candidates("child")).toEqual([]);
   b.modes.set("child", {
@@ -87,12 +94,14 @@ it("offers the five text shortcuts only to acknowledged MoA+ coordinators, inclu
 it("expands a selected template through native ordinary text insertion without taking over submission", async () => {
   const b = bench();
   b.client.store.accept(snapshot());
-  for (const [name, pack] of Object.entries(orchestrationPacks)) {
-    expect(b.pick(name)).toEqual({ text: `${pack.prompt}\n\n` });
+  for (const pack of Object.values(orchestrationPacks)) {
+    const expanded = await b.pick(pack.title);
+    expect(expanded).toEqual({ text: `${pack.prompt}\n\n` });
+    expect(expanded?.text).not.toMatch(oldVisibleNames);
   }
   expect(b.source.matchSpace).toBeUndefined();
   expect(b.pick("not-a-pack")).toBeUndefined();
-  expect(b.pick("fan-out", "ordinary")).toBeUndefined();
+  expect(b.pick("并行攻坚", "ordinary")).toBeUndefined();
   expect(b.source.matchEnter).toBeUndefined();
   expect(b.source.matchClaim).toBeUndefined();
   expect(b.source.codec).toBeUndefined();
@@ -145,17 +154,25 @@ it("invalidates the subscribed session only when its effective pack eligibility 
   expect(changed).toHaveBeenCalledTimes(3);
 });
 
-it("keeps quoted/drilled file lookups separate and filters by shortcut name", async () => {
+it("searches Chinese names and descriptions, rejects old English shortcuts and keeps file lookups separate", async () => {
   const b = bench();
   b.client.store.accept(snapshot());
   expect(
-    (await b.candidates("parent", "crit")).map((candidate) => candidate.name),
-  ).toEqual(["critique-loop"]);
+    (await b.candidates("parent", "精修")).map((candidate) => candidate.name),
+  ).toEqual(["迭代精修"]);
+  for (const pack of Object.values(orchestrationPacks))
+    expect(
+      (await b.candidates("parent", pack.description)).map(
+        (candidate) => candidate.name,
+      ),
+    ).toEqual([pack.title]);
+  for (const oldName of Object.keys(orchestrationPacks)) {
+    expect(await b.candidates("parent", oldName)).toEqual([]);
+    expect(b.pick(oldName)).toBeUndefined();
+  }
   expect(await b.candidates("parent", "src/file.ts")).toEqual([]);
-  expect(await b.candidates("parent", "fan-out", { quoted: true })).toEqual([]);
-  expect(await b.candidates("parent", "fan-out", { drilled: true })).toEqual(
-    [],
-  );
+  expect(await b.candidates("parent", "并行", { quoted: true })).toEqual([]);
+  expect(await b.candidates("parent", "并行", { drilled: true })).toEqual([]);
 });
 
 it("refreshes native candidates after mode changes and rejects a stale enabled selection", async () => {
@@ -164,9 +181,7 @@ it("refreshes native candidates after mode changes and rejects a stale enabled s
   const changed = vi.fn();
   const unsubscribe = b.source.subscribeLexicon!(b.session(), changed);
   cleanups.push(unsubscribe);
-  expect(b.source.lexicon?.(b.session())).toEqual(
-    Object.keys(orchestrationPacks),
-  );
+  expect(b.source.lexicon?.(b.session())).toEqual(titles);
   b.modes.set("parent", {
     sessionId: sid("parent"),
     role: "coordinator",
@@ -177,7 +192,7 @@ it("refreshes native candidates after mode changes and rejects a stale enabled s
   await b.client.refreshMode(sid("parent"));
   expect(changed).toHaveBeenCalled();
   expect(await b.candidates()).toEqual([]);
-  expect(b.pick("fan-out")).toBeUndefined();
+  expect(b.pick("并行攻坚")).toBeUndefined();
   expect(b.source.lexicon?.(b.session())).toEqual([]);
   b.client.store.accept(snapshot());
   expect(await b.candidates()).toEqual([]);

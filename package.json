@@ -127,7 +127,7 @@
   "engines": {
     "node": ">=24.9.0"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Multi-agent collaboration for DeepSeek Harness: persistent agents, shared knowledge, direct communication, and independent review. Uses audited native compatibility profiles.",
   "keywords": [
     "deepseek",

@@ -1,10 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-11-11
 
+- Add an audited DSH 0.2.2-rc.1 / DSH Next 2.0.22-next compatibility profile while retaining the rc.3 profile with 21 packages / 49 file paths. Select profiles by reviewed runtime bytes and package contracts, preserve original backups, and support explicit upgrades from prior patched bytes.
+- Fix Desktop Next completion-helper startup by selecting the scoped native tool executor through the available native API. Honor the parent's selected model and effort, and select the Builder's lightest supported effort through the native model-selection boundary.
+- Keep the Coordinator and completion helpers aligned on active task requirements and native context, including complete preset prompts and later human clarifications, while retaining unfinished requirements.
+- Write lossless versioned projection checkpoints and replay older cached shapes instead of failing native Session cache persistence at the start of a turn.
+- Preserve original native PowerShell preparation failures through the default job-backed foreground path, including structured error identity and settled-job cleanup. Native cancellation, permissions, and producer ownership remain intact.
+- Stop failed completion helpers without directing the Coordinator into infrastructure self-repair. When commands are optional, remove an unavailable shell for that review and continue with actual native file or candidate inspection; required execution and confirmed runtime blocks remain explicit failures. Ordinary Partial/Block findings, Stop, incoming human direction, and real evidence requirements retain their behavior. Windows protected Worker shell execution remains limited by the backend.
+- Treat a brief acknowledgement or ordinary chat clarification as a complete deliverable when no actionable goal or unfinished concrete requirement exists. Keep tools, memory work, and structured questions relevant to an actual task.
+- Use platform-independent isolated-workspace cleanup through the existing native sandbox, preserving permission refusals and cleanup-failure recovery.
 - Avoid retaining disposed Agent contexts through completion generation and rubric-write bookkeeping; keep native write ordering and unload invalidation.
 - Add Adaptive Coordinator guidance for retained Worker reuse, useful-history forks, clean-context tasks, ready parallel branches, and native interruptible waits, while preserving direct handling of simple work.
-- Bundle five optional orchestration prompts: fan-out, panel-team, blackboard-team, critique-loop, and auto-orchestration. Enabled MoA Coordinators can expand them through native `@` candidate selection by click, Enter, or Tab; native Send, file references, uploads, queue, and steer retain their behavior. These are prompt texts over the existing tools and roles.
+- Bundle five optional orchestration prompts with Chinese display names: 并行攻坚, 多方会审, 协同探索, 迭代精修, and 统筹推进. Enabled MoA Coordinators can expand them through native `@` candidate selection by click, Enter, or Tab; native Send, file references, uploads, queue, and steer retain their behavior. These are prompt texts over the existing tools and roles.
 - Let continuable Workers upload ordinary files through the native composer, streamed storage, receiving-Session receipts, and child admission. Retain native permissions, cancellation, and exact-request retry behavior.
 - Preserve file/image references and readable paths in Coordinator queries, recent human inputs, and Worker timeline previews, including attachment-only messages.
 - Replace the draft MoA+ checkbox with a compact cover-style wordmark button. The off state is gray; the on state is electric lime in the dark theme and a darker green in the light theme. Started conversations retain a fixed mode identity.

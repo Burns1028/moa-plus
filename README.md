@@ -20,22 +20,23 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-The current development branch also provides a compatibility profile for
-**DSH 0.2.2-rc.1 / DSH Next 2.0.22-next**, while retaining the rc.3 profile.
-See [native compatibility profiles](docs/native-compatibility.md) for Desktop
-preparation, tested capabilities and Windows Worker shell limits. The tagged
-v0.2.0 instructions below remain specific to that release.
+MoA+ **v0.2.1** supports the audited **DSH 0.2.1-rc.3** and
+**DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
+profile extends **21 native packages across 49 file paths**. Keep the plugin
+and its matching profile from the same release; a stock or differently prepared
+runtime cannot substitute for it. See [native compatibility profiles](docs/native-compatibility.md)
+for Desktop preparation and the exact supported artifacts.
 
-Requires **Node 24.9+**, npm, and Git. MoA+ **v0.2.0** needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares the pinned rc.3 runtime; Desktop Next uses the separate matching profile.
 
-Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.
+Protected Worker shell execution requires macOS Seatbelt or Linux bubblewrap. Windows filesystem record protection remains available, but the current Windows shell backend cannot enforce the same record exclusions. A Verifier can continue through native file inspection when commands are optional; required command verification reports the missing capability and stops without dropping protection or requesting wider access. See [backend requirements][compatibility].
 
-The commands below install the published v0.2.0 release. The latest wordmark control and orchestration guidance are unreleased changes on this branch; clone `main` instead of `v0.2.0` to follow development.
+The commands below use the v0.2.1 checkout. Use `main` instead to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.0 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.1 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -65,9 +66,9 @@ When a Worker turn finishes, its **complete final AI message** returns automatic
 
 ### Adaptive coordination and optional patterns
 
-The unreleased Adaptive guidance keeps simple work direct. For delegated work, the Coordinator prefers `SendMessage` to reuse a suitable Worker, `Fork` when committed history helps a new branch, and a fresh `Task` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `QueryAgent` waits when waiting is useful.
+Adaptive guidance keeps simple work direct. For delegated work, the Coordinator prefers `SendMessage` to reuse a suitable Worker, `Fork` when committed history helps a new branch, and a fresh `Task` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `QueryAgent` waits when waiting is useful. When no actionable goal or unfinished concrete work exists, a brief acknowledgement or ordinary chat clarification can complete the response without ceremonial tools, memory updates, or blocking questions.
 
-An enabled MoA+ Coordinator also offers five bundled `@` prompts: `@fan-out` for independent slices, `@panel-team` for a disputed decision, `@blackboard-team` for tangled exploration, `@critique-loop` for iterative artifact review, and `@auto-orchestration` for a task with several collaboration phases. Type `@` and select a candidate by click, Enter, or Tab. The prompt expands into editable composer text; add the task and send normally. Workers and ordinary conversations do not offer these packs.
+An enabled MoA+ Coordinator also offers five bundled `@` prompts: **并行攻坚** for independent slices, **多方会审** for a disputed decision, **协同探索** for tangled exploration, **迭代精修** for iterative artifact review, and **统筹推进** for a task with several collaboration phases. Type `@` and select the Chinese-named candidate by click, Enter, or Tab. The prompt expands into editable composer text; add the task and send normally. Workers and ordinary conversations do not offer these packs.
 
 These are local prompt texts using the existing tools and role presets. Native sending, file references, uploads, queue, and steer retain their usual behavior. See the [orchestration guide][orchestration] for pattern boundaries and examples.
 
@@ -90,7 +91,7 @@ The demo starts with the wordmark's off/on states and theme adaptation, then ope
 ## Documentation and contribution
 
 - [Roles, lifecycle, and common flows][roles]
-- [Adaptive coordination and optional `@` patterns][orchestration] (unreleased)
+- [Adaptive coordination and optional `@` patterns][orchestration]
 - [Code architecture][architecture] and [Tool API][tools]
 - [First-run guide][quickstart] and [compatibility / rollback][compatibility]
 - [Verification records][verification]
