@@ -70,6 +70,13 @@ broader permissions or asking the Coordinator to rework the deliverable. The
 rule applies even when no tests were required. Ordinary failed tests remain
 eligible for re-verification; console text does not establish this error code.
 
+Coordinator, Builder and Verifier guidance keeps effort proportional to the
+actual request. With no actionable goal or ongoing work, an appropriate short
+acknowledgement or ordinary chat clarification can complete the turn. It does
+not need a blocking question card, workspace exploration or invented missing
+specifications. The same independent review still runs; there is no input-length
+classifier or bypass of the completion gate.
+
 The `project-mode-results` projection uses `stateVersion: 5`. Starting a turn
 removes the prior optional `lastAssistant` field, keeping checkpoints plain JSON
 even when that turn ends before an AI reply. The native projection registry

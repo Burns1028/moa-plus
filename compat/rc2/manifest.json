@@ -117,7 +117,25 @@
       {
         "file": "lib/index.js",
         "before": "157aa3964db76e64d3013e63daed72a61d7fc5f86b247b0103753290d7dd6ed9",
-        "after": "6423b1fa123bfb4dcdc94954e1aa83b0f4df1b3846271bd50debca3cdb9ca395"
+        "after": "40b0bc20d2a0e60818f20fff67ada3e6757e3b26f36c76c29b309f0dbf240d5b"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-pwsh",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-job-error-upgrade",
+    "patch": "dsh-tool-pwsh-job-error-upgrade-runtime.patch",
+    "runtimePatch": "dsh-tool-pwsh-job-error-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "6423b1fa123bfb4dcdc94954e1aa83b0f4df1b3846271bd50debca3cdb9ca395",
+        "after": "40b0bc20d2a0e60818f20fff67ada3e6757e3b26f36c76c29b309f0dbf240d5b"
       }
     ],
     "runtimeFingerprint": {

@@ -21,7 +21,7 @@ const call = (name, args = {}) => [
 ];
 
 const completePrompt = 'A preset-owned complete SYSTEM prompt.';
-async function fixture(mode, testsRequired, selectedEffort, shellAvailable = testsRequired, { persistent = false, completePreset = false } = {}) {
+async function fixture(mode, testsRequired, selectedEffort, shellAvailable = testsRequired, { persistent = false, completePreset = false, defaultPwshJobs = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'moa-rc2-first-turn-'));
   const home = join(directory, 'home');
   const profileDirectory = join(home, 'profiles', 'fixture');
@@ -92,7 +92,12 @@ async function fixture(mode, testsRequired, selectedEffort, shellAvailable = tes
       } else {
         await ctx.plugin((await load('dsh-pwsh-sandbox')).default);
         await ctx.plugin(await load('dsh-shell-env'));
-        await ctx.plugin(await load('dsh-tool-pwsh'), { promoteOnTimeout: false });
+        if (defaultPwshJobs) {
+          await ctx.plugin((await load('dsh-user-approval')).default, { policy: 'ask' });
+          await ctx.plugin(await load('dsh-tool-jobs'));
+          await ctx.plugin(await load('dsh-tool-pwsh'));
+        }
+        else await ctx.plugin(await load('dsh-tool-pwsh'), { promoteOnTimeout: false });
       }
     }
     if (completePreset) {
@@ -144,17 +149,22 @@ const scenarios = ['native', 'ptc'].flatMap(mode => [false, true].map(testsRequi
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: undefined, attemptShell: false });
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true });
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true, persistent: true });
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true, defaultPwshJobs: true });
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: false, completePreset: true });
-for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, completePreset } of scenarios) {
-  test(`rc2 full plugin first turn converges and persists JSON cache (parent=${mode}, tests=${testsRequired}, effort=${selectedEffort ?? 'default'}, shell=${persistent ? 'persistent' : attemptShell}, completePreset=${!!completePreset})`, {
+for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, completePreset, defaultPwshJobs } of scenarios) {
+  test(`rc2 full plugin first turn converges and persists JSON cache (parent=${mode}, tests=${testsRequired}, effort=${selectedEffort ?? 'default'}, shell=${persistent ? 'persistent' : defaultPwshJobs ? 'default-jobs' : attemptShell}, completePreset=${!!completePreset})`, {
     skip: !modules || (attemptShell && process.platform !== 'win32'), timeout: 20000,
   }, async () => {
-    const f = await fixture(mode, testsRequired, selectedEffort, attemptShell, { persistent, completePreset });
-    const errors = [], shellResults = [];
+    const f = await fixture(mode, testsRequired, selectedEffort, attemptShell, { persistent, completePreset, defaultPwshJobs });
+    const errors = [], shellResults = [], jobEvents = [], approvalEvents = [];
     let main = 0, builder = 0, verifier = 0, retry = '', shellOwner;
     f.ctx.on('agent/error', ({ error }) => errors.push(error));
     f.ctx.on('tools/result', (exec, result) => {
       if (exec.name === 'pwsh') { shellResults.push(result); shellOwner = exec.agent; }
+    });
+    f.ctx.on('session/event', (_session, event) => {
+      if ((event.type === 'job/registered' || event.type === 'job/settled') && event.data.kind === 'pwsh') jobEvents.push(event);
+      if (event.type === 'approval/asked') approvalEvents.push(event);
     });
     try {
       f.adapter.handler = request => {
@@ -196,7 +206,14 @@ for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, comp
       f.agent.followup(f.createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'Deliver a report' }] }));
       await f.agent.whenIdle();
       assert.equal(builder, 1);
-      assert.equal(verifier, attemptShell ? 2 : 3, JSON.stringify({ main, builder, retry, errors: errors.map(String), requests: f.adapter.requests.map(request => ({ id: request.sessionId, tools: request.tools.map(tool => tool.name) })) }));
+      if (defaultPwshJobs) {
+        assert.ok(jobEvents.some(event => event.type === 'job/registered'), 'the real jobs controller must admit the PowerShell producer');
+        assert.ok(jobEvents.some(event => event.type === 'job/settled'), 'the real jobs controller must settle the PowerShell producer');
+      }
+      assert.equal(verifier, attemptShell ? 2 : 3, JSON.stringify({ main, builder, retry, errors: errors.map(String),
+        jobs: jobEvents.map(event => ({ type: event.type, data: event.data })),
+        shellResults: shellResults.map(result => ({ isError: result.isError, code: result.error?.info?.code ?? null, error: result.error })),
+        requests: f.adapter.requests.map(request => ({ id: request.sessionId, tools: request.tools.map(tool => tool.name) })) }));
       assert.equal(main, 1);
       if (attemptShell) {
         assert.equal(errors.length, 1);
@@ -242,6 +259,12 @@ for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, comp
         assert.equal(shellResults[0].error?.info?.code, 'READ_ONLY_PATH_UNSUPPORTED');
         assert.equal(shellResults[0].error?.info?.name, 'ReadOnlyPathUnsupportedError');
         if (persistent) assert.deepEqual(f.ctx.terminals.list(shellOwner), []);
+        if (defaultPwshJobs) {
+          assert.equal(jobEvents.filter(event => event.type === 'job/registered').length, 1);
+          assert.equal(jobEvents.filter(event => event.type === 'job/settled' && event.data.status === 'failed').length, 1);
+          assert.deepEqual(f.ctx.jobs.list(shellOwner.id), []);
+          assert.deepEqual(approvalEvents, []);
+        }
       }
       // Explicit cache writes propagate serialization failures. This covers the
       // real first-turn path that an import/toggle-only smoke test cannot see.

@@ -124,6 +124,8 @@ it("describes distinct work ownership and selective knowledge contributions in a
     const coordinator = f.adapter.requests.find((request) => request.sessionId === agent.id)!;
     const policy = `${systemText(coordinator)}\n${runtimeText(coordinator)}`;
     expect(policy).toContain("Give each workstream a clear owner");
+    expect(policy).toContain("a brief acknowledgement or a short clarification in the normal chat reply is a complete response");
+    expect(policy).toContain("ordinary chat clarification should not block a turn on a question card");
     expect(policy).toContain("Reuse completed results and existing checks");
     expect(policy).toContain("unresolved question");
 
