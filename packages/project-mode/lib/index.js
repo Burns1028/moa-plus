@@ -8,6 +8,7 @@ import { defineDomain, domainTable } from "@deepseek-ai/dsh-storage-domain";
 import { FsVersion } from "@deepseek-ai/dsh-fs";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { scrubbedParentEnv } from "@deepseek-ai/dsh-subprocess";
 import { execFile } from "node:child_process";
 import { isDeepStrictEqual, promisify } from "node:util";
 import { Service } from "@deepseek-ai/cordis";
@@ -1984,27 +1985,94 @@ var MoAWorkspaceManager = class {
 		this.capabilities = capabilities;
 	}
 	async git(cwd, args, signal, extraEnv = {}) {
+		return (await this.runScoped(cwd, ["git", ...args], signal, extraEnv)).trim();
+	}
+	async runScoped(cwd, argv, signal, extraEnv = {}) {
 		const policy = this.capabilities.policy();
 		if (policy.mode === "read-only") throw new Error("project-mode/workspace-read-only");
-		const wrapped = policy.mode === "danger-full-access" ? { argv: ["git", ...args] } : await this.capabilities.sandbox.confine(["git", ...args], {
+		const unconfined = policy.mode === "danger-full-access" && !policy.readOnlyPaths?.length;
+		const wrapped = unconfined ? { argv } : await this.capabilities.sandbox.confine(argv, {
 			...policy,
-			mode: "workspace-write"
-		}, signal);
-		if ("enforcement" in wrapped && wrapped.enforcement !== "full") throw new Error("project-mode/workspace-sandbox-partial");
-		const env = { ...process.env };
-		for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
-		Object.assign(env, {
-			GIT_CONFIG_NOSYSTEM: "1",
-			GIT_TERMINAL_PROMPT: "0",
-			...extraEnv
-		});
-		const { stdout } = await exec(wrapped.argv[0], wrapped.argv.slice(1), {
-			cwd,
-			env,
-			signal,
-			maxBuffer: 8388608
-		});
-		return stdout.trim();
+			mode: policy.mode === "danger-full-access" ? policy.mode : "workspace-write"
+		}, signal, this.capabilities.subprocess ? { processLifetime: "managed" } : void 0);
+		const cleanup = "cleanup" in wrapped ? wrapped.cleanup : void 0;
+		const bindProcessLifetime = "bindProcessLifetime" in wrapped ? wrapped.bindProcessLifetime : void 0;
+		const lifetime = Promise.withResolvers();
+		lifetime.promise.catch(() => {});
+		let running;
+		let rangeExited = false;
+		let failure;
+		try {
+			bindProcessLifetime?.(lifetime.promise);
+			if (!unconfined && (!("enforcement" in wrapped) || wrapped.enforcement !== "full" && wrapped.enforcement !== "partial")) throw new Error("project-mode/workspace-sandbox-invalid-enforcement");
+			signal?.throwIfAborted();
+			const env = scrubbedParentEnv();
+			for (const key of Object.keys(env)) if (key.toUpperCase().startsWith("GIT_")) env[key] = void 0;
+			Object.assign(env, {
+				GIT_CONFIG_NOSYSTEM: "1",
+				GIT_TERMINAL_PROMPT: "0",
+				...extraEnv
+			});
+			if (!this.capabilities.subprocess) {
+				if (cleanup) throw new Error("project-mode/workspace-managed-subprocess-unavailable");
+				const { stdout } = await exec(wrapped.argv[0], wrapped.argv.slice(1), {
+					cwd,
+					env,
+					signal,
+					maxBuffer: 8388608
+				});
+				return stdout;
+			}
+			const executableEnv = Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== void 0));
+			const executable = await this.capabilities.subprocess.resolveExecutable(wrapped.argv[0], executableEnv, signal);
+			signal?.throwIfAborted();
+			running = this.capabilities.subprocess.spawn({
+				argv: [executable, ...wrapped.argv.slice(1)],
+				cwd,
+				env,
+				signal,
+				graceMs: 1e3,
+				...cleanup ? { requireManagedRange: true } : {},
+				stdio: {
+					stdin: "ignore",
+					stdout: { maxBytes: 8388608 },
+					stderr: { maxBytes: 8388608 }
+				}
+			});
+			let outcome;
+			try {
+				outcome = await running.done;
+			} catch (error) {
+				running.terminate();
+				throw error;
+			} finally {
+				rangeExited = await running.waitForExit();
+				if (!rangeExited) throw new Error("project-mode/workspace-process-exit-not-confirmed");
+			}
+			signal?.throwIfAborted();
+			const stdout = running.collected.stdout?.readFrom(0);
+			const stderr = running.collected.stderr?.readFrom(0);
+			if (stdout?.lossy || stderr?.lossy) throw new Error("project-mode/workspace-command-output-limit");
+			if (outcome.exitCode !== 0 || outcome.signal !== null) throw Object.assign(new Error(stderr?.text || "project-mode/workspace-command-failed"), {
+				code: outcome.exitCode,
+				signal: outcome.signal,
+				stdout: stdout?.text ?? "",
+				stderr: stderr?.text ?? ""
+			});
+			return stdout?.text ?? "";
+		} catch (error) {
+			failure = error;
+			throw error;
+		} finally {
+			if (cleanup && (!running || rangeExited)) try {
+				await cleanup();
+			} catch (error) {
+				lifetime.reject(error);
+				throw new Error("project-mode/workspace-sandbox-cleanup-failed", { cause: failure === void 0 ? error : new AggregateError([failure, error], "Workspace execution and cleanup failed") });
+			}
+			if (!running || rangeExited) lifetime.resolve();
+			else lifetime.reject(failure ?? /* @__PURE__ */ new Error("project-mode/workspace-process-exit-not-confirmed"));
+		}
 	}
 	async paths(sourceDirectory, signal) {
 		const { fs } = this.capabilities;
@@ -2158,17 +2226,7 @@ var MoAWorkspaceManager = class {
 		return records;
 	}
 	async runCommand(cwd, argv, signal) {
-		const policy = this.capabilities.policy();
-		if (policy.mode === "read-only") throw new Error("project-mode/workspace-read-only");
-		const wrapped = policy.mode === "danger-full-access" ? { argv } : await this.capabilities.sandbox.confine(argv, {
-			...policy,
-			mode: "workspace-write"
-		}, signal);
-		if ("enforcement" in wrapped && wrapped.enforcement !== "full") throw new Error("project-mode/workspace-sandbox-partial");
-		await exec(wrapped.argv[0], wrapped.argv.slice(1), {
-			cwd,
-			signal
-		});
+		await this.runScoped(cwd, argv, signal);
 	}
 	async runRemove(cwd, path) {
 		await this.runCommand(cwd, [
@@ -2326,7 +2384,8 @@ var MoAAgents = class {
 			}),
 			sandbox: sandbox ?? { confine: async () => {
 				throw new Error("moa/workspace-sandbox-unavailable");
-			} }
+			} },
+			subprocess: presets?.serviceFor(agent, "subprocess") ?? agent.ctx.get("subprocess")
 		});
 	}
 	task(agent, tasks, operationId, signal, seed) {

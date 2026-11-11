@@ -20,23 +20,23 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-MoA+ **v0.2.2** supports the audited **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.3** supports the audited **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
-profile extends **21 native packages across 49 file paths**. Keep the plugin
+profile extends **22 native packages across 50 file paths**. Keep the plugin
 and its matching profile from the same release; a stock or differently prepared
 runtime cannot substitute for it. See [native compatibility profiles](docs/native-compatibility.md)
 for Desktop preparation and the exact supported artifacts.
 
 Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares the pinned rc.3 runtime; Desktop Next uses the separate matching profile.
 
-Protected Worker shell execution requires macOS Seatbelt or Linux bubblewrap. Windows filesystem record protection remains available, but the current Windows shell backend cannot enforce the same record exclusions. A Verifier can continue through native file inspection when commands are optional; required command verification reports the missing capability and stops without dropping protection or requesting wider access. See [backend requirements][compatibility].
+The updated rc.2 Desktop Next profile supports protected Workers through native nonpersistent PowerShell, and Bash where installed, on Windows. It preserves existing records across Coordinator atomic updates and requires native Windows Job containment. Persistent terminals and unadapted process providers still refuse protected use. The rc.3 profile retains its macOS Seatbelt/Linux bubblewrap requirement; it does not include this Windows extension. See [backend requirements][compatibility] for the supported policy and filesystem scope.
 
-The commands below use the v0.2.2 checkout. Use `main` instead to follow development.
+The commands below use the v0.2.3 checkout. Use `main` instead to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.2 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.3 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run

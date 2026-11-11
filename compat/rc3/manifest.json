@@ -528,11 +528,34 @@
       {
         "file": "lib/types/index.d.ts",
         "before": "2738a2a57d62450251f3328ef92d0691d6c485766519013a2f3dfe72a6149182",
-        "after": "0eb5b2537e34c0f873bc8bdb211301841d40054de09df9ae4c9f6425e713da60"
+        "after": "26aed6f255aacf81f01f50ecbc4a99462b0e9fdd826a2c632b11622879fc2fbf"
       },
       {
         "file": "lib/index.js",
         "before": "b56373befbfcfe281c17c8892e9a4b2cdcb96851290b3ed0ff56b08915e2f743",
+        "after": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly-confine-lifetime-upgrade",
+    "patch": "dsh-sandbox-confine-lifetime-upgrade.patch",
+    "runtimePatch": "dsh-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "0eb5b2537e34c0f873bc8bdb211301841d40054de09df9ae4c9f6425e713da60",
+        "after": "26aed6f255aacf81f01f50ecbc4a99462b0e9fdd826a2c632b11622879fc2fbf"
+      },
+      {
+        "file": "lib/index.js",
+        "before": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6",
         "after": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6"
       }
     ],
@@ -792,6 +815,29 @@
     "runtimeFingerprint": {
       "package": "dec23e04cde3fe7a7642d1c226e2005b2df27df7286ac6a36564a6dfd566cb8a",
       "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-subprocess",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-native-managed-range",
+    "patch": "dsh-subprocess-managed-range.patch",
+    "runtimePatch": "dsh-subprocess-managed-range.patch",
+    "files": [
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "d3c79f91d4a52ca09046d1f4af48ee220d3fe8f1f2efae24f7b12cda3bd2848d",
+        "after": "eb98b244b6990df61d258cb1714089660715a6a028cd42cc2ce4b72264877df1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "2c44a3fd4e9d54380a5348e8af28277cb87dce1d7fdc12fbbea0724c445814ee",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "0ea9e95a73639f9e69b48aa48f373f34881adffa2ee2ac2acd4702728da9592b"
+        }
+      ]
     }
   }
 ]

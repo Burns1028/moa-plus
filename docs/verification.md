@@ -1,5 +1,15 @@
 # Verification
 
+## MoA+ 0.2.3 Windows Worker repair — 2026-11-11
+
+The reported Desktop failure was reproduced on DSH Next 2.0.22-next / DSH 0.2.2-rc.1: isolated workspace creation rejected native partial enforcement, and protected Workers could not start PowerShell. The previous v0.2.2 release was marked as a prerelease while preserving its tag and assets. This candidate repairs those paths through the existing native owners; its Windows sandbox remains classified as `partial`.
+
+The build and Host/Client typechecks passed. Host, Client, integration and native-contract checks passed **442 tests across 69 files**, with **23 tests and one file skipped**. The prepared rc.2 suite passed **70/70 with zero skips**. This includes actual Task and Fork creation, two isolated General-purpose Workers executing native job-backed PowerShell, written artifacts, complete result/capsule delivery, natural parent completion and owned worktree cleanup. The native range/cleanup and Windows filesystem/ACL regressions also passed **35/35 under the actual Desktop Electron runtime**. Launcher checks passed **17 tests**, with three explicit skips for the unavailable stock-runtime fixture, Windows file-symlink privileges and console-Ctrl+C simulation.
+
+A separate real-model acceptance used the actual Desktop Electron runtime, the native base profile and DeepSeek-V4.1-Flash / High, in a newly owned home and workspace. Two Workers ran actual PowerShell in shared and isolated workspaces, producing sums **110** and **20** from separate inputs. Both attempted writes to the owned Coordinator records and received actual access denials. Their complete final messages reached the parent, which read both JSON artifacts, wrote the combined result **130**, passed one independent verification and naturally completed after **124.294 seconds**. The observer's final no-argument flush call was invalid; the preserved native histories, outcomes and artifacts were independently checked without repeating the model run. A later ambient-Git removal fix has its own passing real native subprocess regression.
+
+This establishes the tested native nonpersistent command path and collaboration flow. Persistent PTY, PTC and unadapted experimental protected process owners remain explicit refusals; neither all presets nor every historical/future DSH version is claimed. Private credentials, conversations, screenshots and local acceptance artifacts are excluded from the repository.
+
 ## MoA+ 0.2.2 documentation follow-up — 2026-11-11
 
 The final README check found the default coordination policy's former English heading in the English README. Both READMEs and the current orchestration guide now use Chinese mode names, including **自适应协调**. Version 0.2.2 keeps the Host and Client runtime bundles byte-identical to the fully validated 0.2.1 tree below; only documentation and release metadata change. The previously pushed tag is preserved. Package installation and CI are checked again for the new committed version before its stable tag is published.

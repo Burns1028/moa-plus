@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-project-mode",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "license": "MIT",
   "main": "lib/index.js",
@@ -67,6 +67,7 @@
     "@deepseek-ai/dsh-api-session-controller": "^0.2.1-rc.3 || ^0.2.2-rc.1",
     "@deepseek-ai/dsh-api-remote-access": "^0.2.1-rc.3 || ^0.2.2-rc.1",
     "@deepseek-ai/dsh-sandbox-policy": "^0.2.1-rc.3 || ^0.2.2-rc.1",
+    "@deepseek-ai/dsh-subprocess": "^0.2.1-rc.3 || ^0.2.2-rc.1",
     "@deepseek-ai/dsh-agent-preset-registry": "^0.2.1-rc.3 || ^0.2.2-rc.1",
     "@deepseek-ai/cordis": "^4.0.5",
     "@deepseek-ai/schemastery": "^3.18.5",

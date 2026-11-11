@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes MoA+ v0.2.2, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes MoA+ v0.2.3, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
@@ -98,6 +98,8 @@ Orchestration expansion is a Client input contribution, not a Host scheduling pa
 Task/Fork reserve stable identities and persist descriptor/workspace facts before native activation. `WorkerOperations` prepares an assignment before accepting input, records its native receipt, and establishes capsule participation. Per-Worker mutation ordering ends after admission; it is not held for the whole model task. Fork's temporary recovery seed is removed only after confirmed native acceptance. Uncertain acceptance is reconciled against persisted native evidence before retrying.
 
 Isolated preparation snapshots the source's current tracked/staged/untracked state using an independent Git index. Git commands use the acting native sandbox policy. Owned markers identify cleanup resources; destruction never removes a shared source. For explicitly permitted nested creation, management is scoped to the project's Git resources while ordinary execution keeps the child's own cwd policy. Read-only mode remains read-only; foreign Git resources outside the permitted project boundary are rejected.
+
+Workspace management follows the native worktree permission contract: a provider may declare full or partial enforcement, and the manager retains that level without requesting broader permissions. Missing or unknown enforcement is refused. Windows ACL remains partial; fixed Git/Node operations still pass through native confinement, including its protected-path refusals, before they run.
 
 ## Messages and result return
 

@@ -15,6 +15,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve, join, dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { createTwoFilesPatch } from "diff";
 
 const root = resolve(".");
 const script = join(root, "scripts/apply-native-compat.mjs");
@@ -24,6 +25,47 @@ const packageFingerprint = (installed: Record<string, unknown>) => hash(Buffer.f
     .filter((field) => Object.hasOwn(installed, field))
     .map((field) => [field, installed[field]]),
 ))));
+
+it("backs up and audits runtime package metadata together with its implementation", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "native metadata compat "));
+  try {
+    const checkout = join(directory, "helper");
+    const profile = join(checkout, "compat/audited");
+    const modules = join(directory, "node_modules");
+    const packageRoot = join(modules, "@deepseek-ai/dsh-agent");
+    const backup = join(directory, "backup");
+    await mkdir(join(checkout, "scripts"), { recursive: true });
+    await mkdir(profile, { recursive: true });
+    await mkdir(join(packageRoot, "lib"), { recursive: true });
+    await copyFile(script, join(checkout, "scripts/apply-native-compat.mjs"));
+    const before = {
+      "package.json": JSON.stringify({ name: "@deepseek-ai/dsh-agent", version: "0.2.2-rc.1", dependencies: {} }) + "\n",
+      "lib/index.js": "export const capability = false;\n",
+    };
+    const after = {
+      "package.json": JSON.stringify({ name: "@deepseek-ai/dsh-agent", version: "0.2.2-rc.1", dependencies: { "native-owner": "0.2.2-rc.1" } }) + "\n",
+      "lib/index.js": "export const capability = true;\n",
+    };
+    let patch = "";
+    for (const file of Object.keys(before) as (keyof typeof before)[]) {
+      await writeFile(join(packageRoot, file), before[file]);
+      patch += createTwoFilesPatch(`a/${file}`, `b/${file}`, before[file], after[file]);
+    }
+    await writeFile(join(profile, "owner.patch"), patch);
+    await writeFile(join(profile, "manifest.json"), JSON.stringify([{
+      package: "@deepseek-ai/dsh-agent", version: "0.2.2-rc.1", variant: "fixture",
+      patch: "owner.patch", runtimePatch: "owner.patch",
+      files: Object.keys(before).map(file => ({ file, before: hash(Buffer.from(before[file])), after: hash(Buffer.from(after[file])) })),
+    }]));
+    const args = [join(checkout, "scripts/apply-native-compat.mjs"), "--modules", modules, "--runtime-only", "--backup", backup];
+    execFileSync(process.execPath, args, { stdio: "pipe" });
+    execFileSync(process.execPath, args, { stdio: "pipe" });
+    for (const file of Object.keys(before)) {
+      expect(await readFile(join(packageRoot, file), "utf8")).toBe(after[file]);
+      expect(await readFile(join(backup, "@deepseek-ai/dsh-agent", file), "utf8")).toBe(before[file]);
+    }
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 async function originalRuntime() {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "native compat ")));
   const modules = join(directory, "node_modules");

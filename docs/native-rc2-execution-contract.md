@@ -43,6 +43,104 @@ Persistent PowerShell's native wrapper already generates a fresh random nonce an
 
 The persistent PTY backend currently has no reviewed implementation of path-specific Worker record protection. Before obtaining or sending to a terminal, the tool resolves the actual owner's current native Session policy. Any `readOnlyPaths` contribution rejects with `ReadOnlyPathUnsupportedError` before terminal spawn, including full-access mode. This preserves the Coordinator's notes/archive boundary; an unrestricted Coordinator remains able to use persistent PowerShell. It does not claim Windows Worker shell support by routing around the restriction.
 
+## Windows process protection lifetime
+
+The narrow existing-record and native-atomic-write contract is specified in
+[Worker record ownership](native-rc2-memory-contract.md#windows-boundary).
+The current native filesystem already preserves target DACLs during
+`ReplaceFileW(flags=0)`; the filesystem/ACL owners add secure initial staging,
+owner-rights handling and active mutation guards to that boundary.
+
+The existing Windows ACL owner supplies the protection contribution for the
+Session/workspace's existing private-temp SID. `dsh-sandbox-local` acquires it
+through a declared native filesystem capability before it returns confined argv.
+The confined-command result may carry an optional owned cleanup capability.
+Acquisition requires an explicit native consumer acknowledgement of that
+cleanup/exit contract; a consumer that does not implement it refuses before
+installing ACL contributions. PTC, workspace command and terminal callers must
+not silently ignore an optional cleanup field.
+
+The declared native signature is
+`confine(argv, policy, signal?, { processLifetime: 'managed' })`. A Windows
+protected-record result carries `cleanup(): Promise<void>` and
+`bindProcessLifetime(lifetime: Promise<void>): void`. Before target admission,
+the consumer binds its single existing preparation/range/cleanup promise to the
+lease; late preparation and virtual deadline handles retain that same owner.
+The provider awaits this exact promise during teardown. Rejection remains a
+failure with protection retained, rather than becoming evidence of exit.
+An unbound/live contribution prevents capability revocation.
+
+Every cleanup-bearing execution sets the native
+`SubprocessSpawnSpec.requireManagedRange: true`. The local subprocess owner
+refuses before starting the target if its selected containment is the weaker
+fallback; ordinary executions retain their existing fallback behavior. A
+managed-shaped handle or a successful earlier probe is not sufficient proof.
+The actual Windows Job range remains the execution owner.
+
+The existing Bash/PowerShell sandbox executors retain the contribution in their
+per-process facts and release it only after the managed execution range is
+empty. The ACL runner's direct child exit, `proc.done`, `onProcessDone`, and
+kill-on-close initiation do not independently establish descendant exit;
+`ShellExecution.managed.waitForExit` must supply the native Windows job-range
+barrier. Completion hooks may begin that join but cannot release protection
+early. A
+preparation rejection, cancellation before spawn or spawn failure releases the
+untransferred contribution; after a process is admitted, only its real exit
+boundary can release it. An adopted producer/background job retains the same
+owner. No placeholder, timeout, rendered result or terminal job status alone
+counts as exit, and cleanup errors remain part of native failure/join handling.
+
+The local executor races asynchronous preparation against abort/deadline. A
+confine result arriving after that race is lost must still be released by its
+preparation owner before it can be forgotten. Once transferred to a process,
+start one uncancelled managed-exit/cleanup promise and retain it through provider
+teardown. A failed/false exit observation is not proof of an empty range and
+must not release protection. Observe early promise rejection without discarding
+the original failure; native join/teardown must await and report it.
+
+The protection does not disappear after approved permission escalation. The
+existing runner's `read-only`/`workspace-write` mode and its reported enforcement
+remain truthful; an unsupported full-access/extra-root policy must not be
+silently re-labelled, or gain unconfined execution, to bypass record protection.
+Whole-workspace read-only execution is not a substitute for required build/test
+writes. Native Windows CIM, PowerShell language-mode, pipe, alias and sandbox
+enforcement limits require actual task evidence rather than a successful trivial
+command. The persistent PTY provider remains a separate unsupported owner until
+its own lifecycle and path-protection implementation are reviewed.
+
+The expected runtime owners are `dsh-sandbox-windows-acl` (its ACL/grant internals
+and any necessary export), `dsh-sandbox-local`, `dsh-fs-local`, and the existing
+`dsh-bash-sandbox`/`dsh-pwsh-sandbox` process facts and completion hooks. Any
+optional confined-command cleanup type or filesystem service capability must be
+declared at its existing native seam. New imports require explicit package
+metadata and audited hashes; no new execution loop, plugin protection scheduler,
+global Symbol protocol or undeclared cross-package lease registry is permitted.
+
+Cordis 4 optional lifecycle dependencies use real `ctx.inject` child scopes:
+the subprocess provider's sandbox-dependent scope joins its existing managed
+processes before the sandbox capability disappears, and the sandbox's
+filesystem-dependent scope retains the actual filesystem mutation owner through
+release. Neither provider declares the unsupported `{ optional: [...] }`
+injection syntax. The bound lifetime joins asynchronous cleanup before temp-SID
+revocation, including background processes whose foreground result is unread.
+
+The inspected runtime has these process-confine consumers. Every restricted
+consumer must implement the lifecycle or refuse before acquiring protection;
+the six-owner core change alone must not imply that all callers are supported.
+
+| Consumer | Required ownership boundary |
+| --- | --- |
+| `dsh-bash-sandbox`, `dsh-pwsh-sandbox` | Retain per-process protection until the existing managed range exits, including adopted jobs and failed startup. |
+| `dsh-ptc-runtime-node` | Does not acknowledge Windows lease ownership and therefore refuses protected Windows use before acquisition. Supported non-lease backends retain protection for the persistent process; retained policy comparison includes protected paths. |
+| `dsh-terminal-bash` | Persistent PTY lifetime is separate; returning only confined argv cannot transfer cleanup ownership. Refuse protected use until that lifetime is implemented. |
+| `dsh-experimental-worktree`, `dsh-experimental-client-ui-forge` | Do not acknowledge Windows lease ownership and therefore refuse protected Windows use before acquisition. Their full-access paths still honor protected paths. |
+| MoA `workspaces.ts` Git and fixed-Node commands | Use the native managed subprocess exit boundary for any acquired protection; raw `execFile` completion is insufficient. |
+
+Any `danger-full-access` fast path must also inspect `readOnlyPaths`; standing
+mode alone never authorizes bypassing record ownership. The similarly named
+private `dsh-api-workspace-files.confine` resolves paths and is not a process
+sandbox consumer.
+
 ## Focused verification
 
 Run `tests/compat/rc2-execution.test.mjs` with `MOA_COMPAT_MODULES` pointing to a disposable prepared runtime's `node_modules`. The test runtime additionally installs the matching native AgentLoop testkit, which is not a production dependency or part of the compatibility manifest.

@@ -1,24 +1,8 @@
---- a/lib/index.js
-+++ b/lib/index.js
-@@ -267,6 +267,9 @@
- * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
- * channel.
- */
-+var ReadOnlyPathUnsupportedError = class extends HarnessError {
-+	constructor(detail) { super(`Readonly path policy is unsupported: ${detail}. Session readonly paths remain protected in every sandbox mode.`, "READ_ONLY_PATH_UNSUPPORTED"); }
-+};
- var SandboxUnavailableError = class extends HarnessError {
- 	constructor(mode, detail) {
- 		super(`sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL restricted-token runner can start (Windows) — otherwise switch the consumer to danger-full-access.` + (detail === void 0 ? "" : ` Runner failure: ${detail}`), SANDBOX_UNAVAILABLE);
-@@ -286,4 +289,4 @@
- 	}
- };
- //#endregion
--export { ESCALATION_TARGETS, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
-+export { ESCALATION_TARGETS, ReadOnlyPathUnsupportedError, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
+===================================================================
 --- a/lib/types/index.d.ts
 +++ b/lib/types/index.d.ts
-@@ -27,6 +27,8 @@
+@@ -26,8 +26,10 @@
+  */
  export interface SandboxExecutionPolicy {
      /** The file-effect mode this execution runs under. */
      mode: SandboxMode;
@@ -27,7 +11,9 @@
      /** Absolute root directory `workspace-write` may write under. */
      workspaceRoot: string;
      /**
-@@ -54,7 +56,7 @@
+      * Opaque identity of the calling session (the branded `dsh-session`
+@@ -53,9 +55,9 @@
+  * the consumer boundary; the provider treats the policy as fully specified.
   */
  export interface SandboxPolicy extends SandboxExecutionPolicy {
      /** The file-effect mode this execution runs under. */
@@ -36,7 +22,28 @@
  }
  /**
   * Evidence that identifies a sandbox runner failing before it executes the
-@@ -110,8 +112,12 @@
+  * wrapped command. A consumer first applies {@link allowedExitCodes} when
+@@ -75,9 +77,18 @@
+  * A {@link SandboxProvider.confine} result: the argv to spawn in place of
+  * the caller's own, plus the enforcement completeness the selected backend
+  * achieves for it.
+  */
++/** Caller acknowledgement for confinement-owned resources. */
++export interface SandboxConfineOptions {
++    /** Retain optional cleanup through all preparation and the complete native managed process range. */
++    readonly processLifetime?: 'managed';
++}
+ export interface ConfinedArgv {
++    /** Idempotent shared cleanup promise; call only after preparation/managed range quiescence and preserve rejection. */
++    readonly cleanup?: () => Promise<void>;
++    /** Attach the consumer's same native range-to-cleanup lifetime before target admission. */
++    readonly bindProcessLifetime?: (lifetime: Promise<void>) => void;
+     /** The wrapped argv (runner, profile, separator, then the caller's argv). */
+     argv: string[];
+     /** How completely the selected backend enforces the policy's file effects. */
+     enforcement: SandboxEnforcement;
+@@ -109,10 +120,14 @@
+  * Thrown when {@link SandboxProvider.confine} cannot enforce the requested
   * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
   * channel.
   */
@@ -50,7 +57,9 @@
  }
  declare module '@deepseek-ai/cordis' {
      interface Context {
-@@ -125,6 +131,8 @@
+         sandbox: SandboxProvider;
+@@ -124,8 +139,10 @@
+  * is forbidden. Functional probes arbitrate multi-runner chains and may be
   * skipped for a sole candidate, whose own refusal remains the fail-closed end.
   */
  export declare abstract class SandboxProvider extends Service {
@@ -59,3 +68,38 @@
      constructor(ctx: Context);
      /**
       * Wrap `argv` so it executes confined under `policy` on this host; the
+      * caller spawns the returned argv in place of its own.
+@@ -137,9 +154,9 @@
+      * @param signal - cancellation while the provider resolves the policy and runner.
+      * @returns the argv to spawn instead, plus the enforcement completeness
+      *   the selected backend achieves for it.
+      */
+-    abstract confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal): Promise<ConfinedArgv>;
++    abstract confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal, options?: SandboxConfineOptions): Promise<ConfinedArgv>;
+ }
+ export default SandboxProvider;
+ export { classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature } from './diagnostics.ts';
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -266,8 +266,11 @@
+ * Thrown when {@link SandboxProvider.confine} cannot enforce the requested
+ * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
+ * channel.
+ */
++var ReadOnlyPathUnsupportedError = class extends HarnessError {
++	constructor(detail) { super(`Readonly path policy is unsupported: ${detail}. Session readonly paths remain protected in every sandbox mode.`, "READ_ONLY_PATH_UNSUPPORTED"); }
++};
+ var SandboxUnavailableError = class extends HarnessError {
+ 	constructor(mode, detail) {
+ 		super(`sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL restricted-token runner can start (Windows) — otherwise switch the consumer to danger-full-access.` + (detail === void 0 ? "" : ` Runner failure: ${detail}`), SANDBOX_UNAVAILABLE);
+ 		this.name = "SandboxUnavailableError";
+@@ -285,5 +288,5 @@
+ 		super(ctx, "sandbox");
+ 	}
+ };
+ //#endregion
+-export { ESCALATION_TARGETS, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
++export { ESCALATION_TARGETS, ReadOnlyPathUnsupportedError, SANDBOX_UNAVAILABLE, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, writableRoots };
