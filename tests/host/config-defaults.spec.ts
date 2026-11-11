@@ -7,10 +7,13 @@ import ProjectMode from "../../packages/project-mode/src/host/index.ts";
 import { Config } from "../../packages/project-mode/src/host/config.ts";
 import { fixture, response } from "./fixture.ts";
 
-it("completes a default-config 123 input in one native turn without acceptance helpers or a gate", async () => {
-  expect(Config({}).completionVerification).toBe(false);
+it("offers on-demand verification but completes default-config 123 without activating it", async () => {
+  expect(Config({}).completionVerification).toBe("on-demand");
   expect(Config({ completionVerification: true }).completionVerification).toBe(
     true,
+  );
+  expect(Config({ completionVerification: false }).completionVerification).toBe(
+    false,
   );
   const f = await fixture();
   try {
@@ -44,7 +47,7 @@ it("completes a default-config 123 input in one native turn without acceptance h
     expect(created).toEqual([agent.id]);
     expect(f.adapter.requests).toHaveLength(1);
     const request = f.adapter.requests[0];
-    expect(request.tools?.map((tool) => tool.name)).not.toContain(
+    expect(request.tools?.map((tool) => tool.name)).toContain(
       "set_completion_criteria",
     );
     const facts = request.messages
@@ -53,8 +56,10 @@ it("completes a default-config 123 input in one native turn without acceptance h
       .filter((block) => block.type === "text")
       .map((block) => block.text)
       .join("\n");
-    expect(facts).toContain(
-      "Automatic outcome verification is not enabled in this runtime",
+    expect(facts).toMatch(/on[- ]demand/i);
+    expect(facts).toContain("set_completion_criteria");
+    expect(facts).not.toContain(
+      "Automatic outcome verification is not enabled",
     );
     expect(facts).not.toContain(
       "automatically runs an independent tool-backed Outcome Verifier",

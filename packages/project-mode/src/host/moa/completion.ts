@@ -64,6 +64,9 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       if (record?.project.mode !== "enabled") return "";
       const input = inputSchema.safeParse(record.operations[sourceKey]);
       if (!input.success || input.data.finished) return "";
+      const bound = boundSchema.safeParse(record.operations[`${key}:${record.project.coordinatorSessionId}`]);
+      if (host.config.completionVerification !== true &&
+        (!bound.success || bound.data.taskId !== input.data.taskId)) return "";
       return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeInput(input.data)}`;
     },
   });
@@ -271,12 +274,18 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     if (mounted.has(agent)) return;
     mounted.set(agent, () => {});
     const off = agent.ctx.tools.register(defineTool({
-      name: "set_completion_criteria", description: "Bind this task's completion criteria and exact completion promise to include in the final answer.",
+      name: "set_completion_criteria", description: host.record(agent.id) && host.config.completionVerification === "on-demand"
+        ? "Request independent outcome verification for the current task and bind concrete completion criteria plus an exact, natural completion statement for the final answer. Use your judgment when a separate acceptance check is valuable; ordinary chat need not activate it. The Builder derives its rubric from original human requirements, not these criteria."
+        : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
       parameters: { criteria: { type: "string", required: true, description: "Task completion criteria" }, promise: { type: "string", required: true, description: "Exact complete promise" } }, output,
       async execute(args, exec) {
         if (exec.agent !== agent || !participant(agent)) throw new Error("moa/not-participant");
         const record = recordFor(agent.id)!;
-        const taskId = host.record(agent.id) ? inputSchema.parse(record.operations[sourceKey]).taskId : agent.id;
+        const own = host.record(agent.id);
+        const input = inputSchema.safeParse(record.operations[sourceKey]);
+        if (own && (!input.success || input.data.finished))
+          throw new Error("No unfinished human task is available for independent verification.");
+        const taskId = own && input.success ? input.data.taskId : agent.id;
         const start = agent.session.snapshotEvents().filter(event => event.type === "turn/start").at(-1);
         if (!start || start.type !== "turn/start") throw new Error("Missing completion task turn");
         const value = { ...criteriaSchema.parse(args), taskId, turn: start.data.turn };
@@ -292,12 +301,19 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     mount(agent);
     if (decision.kind !== "enter") return decision;
     const human = decision.messages.filter((m) => m.source.kind === "user");
-    if (!human.length) return decision;
     const prior = inputSchema.safeParse(host.record(agent.id)?.operations[sourceKey]);
     const events = agent.session.snapshotEvents();
     const start = events.filter((event) => event.type === "turn/start").at(-1);
     if (!start || start.type !== "turn/start") throw new Error("Missing turn identity");
     const priorCompleted = prior.success && events.some(event => event.type === "turn/end" && event.data.turn === prior.data.turn && event.data.reason.kind === "completed");
+    if (!human.length) {
+      // A background handoff can continue the same task in another native
+      // turn without a new human input. Its eventual completion still owns
+      // task cleanup, so the next human task does not inherit this binding.
+      if (prior.success && !prior.data.finished && !priorCompleted && prior.data.turn !== start.data.turn)
+        await host.update(agent.id, (r) => ({ ...r, operations: { ...r.operations, [sourceKey]: z.json().parse({ ...prior.data, turn: start.data.turn }) } }));
+      return decision;
+    }
     const continuation = prior.success && !prior.data.finished && !priorCompleted;
     const base: Input = continuation ? { ...prior.data, turn: start.data.turn } : { taskId: randomUUID(), turn: start.data.turn, finished: false, requirements: [], sources: {}, sourceVersions: [], attachments: [] };
     const input = await capture(agent, base, human, signal);
@@ -305,6 +321,9 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const old = helpers.get(agent);
     helpers.delete(agent);
     if (old) retire(old);
+    const bound = boundSchema.safeParse(host.record(agent.id)?.operations[criteriaKey(agent.id)]);
+    if (host.config.completionVerification !== true &&
+      (!bound.success || bound.data.taskId !== input.taskId)) return decision;
     const pending = create(agent, input, signal);
     running.set(agent, pending);
     try { const pair = await pending; helpers.set(agent, pair); } finally { if (running.get(agent) === pending) running.delete(agent); }
@@ -323,6 +342,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     }
     // Only the direct-to-human Coordinator gets independent outcome helpers.
     if (!host.record(agent.id) || !current.success || current.data.finished) return;
+    if (host.config.completionVerification !== true && (!gate.success || !currentTask || gateCompleted)) return;
     if (agent.inbox.nextStep.length) return;
     const wake = new AbortController();
     const listener = () => { if (agent.inbox.nextStep.length) wake.abort(); };

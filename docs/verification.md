@@ -1,5 +1,13 @@
 # Verification
 
+## MoA+ 0.2.7 Agent-selected acceptance — 2026-11-12
+
+Default configuration is now `on-demand`: the Coordinator's normal inference chooses whether to request acceptance through `set_completion_criteria`. No separate task classifier or acceptance Agent runs before that request. Explicit `true` preserves automatic verification and `false` preserves complete disabling. The existing task binding owns activation; no additional registry or scheduler is introduced. Original human/spec snapshots are retained before implementation, including when activation happens later.
+
+Build and Host/Client typechecks passed. The final Host, Client, integration and native-contract run passed **491 tests across 72 files**, with **21 tests and one file skipped**. Focused on-demand/default/guidance checks passed **16/16**. They cover actual model-shaped native tool calls before helper creation, independent tool-backed Pass, no inheritance to later tasks, original specifications despite implementation edits, Stop/restart, native background handoff cleanup, refusal of stale internal-only activation, and Worker promise binding without recursive helpers. Existing automatic verification evidence/required-test/Stop regressions remain enabled. Launcher checks passed **17**, with three explicit Windows/fixture skips.
+
+The candidate does not change Client code, native compatibility patches or the background tool policy. The v0.2.6 desktop presentation evidence below keeps its original scope. Scripted integration and fresh real-model acceptance are separate evidence.
+
 ## MoA+ 0.2.6 visible inputs and opt-in acceptance — 2026-11-12
 
 The Worker opening task had been incorrectly grouped with internal process traffic. An explicit Coordinator task at native step one now remains visible in the input position, using the native control boundary; later updates and Worker reports still fold after completion. Native anchors, human interleaving and capsule ownership are retained. The Workers panel is simplified to chronological input/output/artifact sections, with all inputs together and no separate communication log or folded task cards.

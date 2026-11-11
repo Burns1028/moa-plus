@@ -1,6 +1,6 @@
 # MoA tool API
 
-This describes the MoA+ v0.2.6 runtime. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
+This describes the MoA+ v0.2.7 runtime. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
 
 The Coordinator receives `Task`, `Fork`, `SendMessage`, `QueryAgent`, and `KillAgent`. Every managed participant receives `SendMessage` and `ProjectContext`. A Worker gets the creation/query/kill controls only when its creator explicitly enabled `nested`. Alternative native delegation entries are suppressed in the participating scope; ordinary conversations are unaffected.
 
@@ -188,17 +188,17 @@ Cancel requests cancellation of that owned native job. `stopping` remains visibl
 
 ## Completion criteria
 
-Automatic completion verification is opt-in: `completionVerification` defaults to `false`. Ordinary inputs do not create a Rubric Builder or Outcome Verifier, and no automatic completion gate is installed. Set `completionVerification: true` in the plugin configuration when that independent acceptance workflow is wanted. This setting applies to all human inputs; it does not classify messages by task length or keywords.
+`completionVerification` defaults to `on-demand`: the Coordinator decides whether the task benefits from independent acceptance and requests it with `set_completion_criteria`. No helpers are created before that request, and no additional model call classifies the task. The tool is scoped to the current unfinished human task; a completed task or an unrelated internal notification cannot reactivate an old one. Original requirements and explicitly referenced source versions are captured before implementation, even if verification is requested later. Explicit `true` preserves automatic verification for every human task; `false` disables the capability.
 
-With `completionVerification` enabled, participants have:
+With verification available, participants have:
 
 ```json
 {"criteria":"All required tests pass and the documented CLI works.","promise":"The requested CLI change is implemented and verified."}
 ```
 
-This is `set_completion_criteria`. Ralph checks for the exact promise in the current task's final AI reply and requests continued work when absent. Successful delivery clears the binding; interrupted work retains it.
+This is `set_completion_criteria`. For the Coordinator, it requests independent acceptance for this task. Ralph also checks for the exact promise in the final AI reply; use a natural completion statement rather than a machine marker. Successful delivery clears the binding, while interruption/restart retains it for the unfinished task. A Worker's call binds only that Worker's promise and cannot recursively start independent helpers.
 
-The Coordinator additionally has independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots. Explicit human references to a revised specification capture another version of that path, anchored to the corresponding requirement; previous versions remain available. Unreferenced edits and internal notices do not update the requirements. Its sole tool is `submit_rubric(rubric, tests_required)`, which submits source-anchored Markdown for the Host to write to `rubrics.md`; it has no file, shell, or delegation tools. Plain text is not a submission.
+Once requested, the Coordinator gets independent native Rubric Builder and Outcome Verifier helpers. Builder sees original human requirements and source snapshots, not the Coordinator's tool criteria or implementation. Explicit human references to a revised specification capture another version of that path, anchored to the corresponding requirement; previous versions remain available. Unreferenced edits and internal notices do not update the requirements. Its sole tool is `submit_rubric(rubric, tests_required)`, which submits source-anchored Markdown for the Host to write to `rubrics.md`; it has no file, shell, or delegation tools. Plain text is not a submission.
 
 Verifier reads the applicable rubric with `read_rubric` and the complete frozen final-answer text for the current attempt with `read_candidate`. An empty candidate remains empty. This lets it inspect a deliverable supplied directly in chat without inventing a file or running Bash just to read text. File artifacts and required builds/tests still need actual native inspection or completed execution; the author's claims are not evidence. Candidate snapshots are scoped to one review attempt and released on exit or interruption. `Partial`, `Block`, missing evidence, or malformed verdicts return concrete gaps for rework. New eligible input and Stop can interrupt verification; queued later tasks cannot skip the current gate.
 
@@ -224,7 +224,7 @@ The Remote service/storage/package identifiers retain their historical `projectM
 | --- | --- | --- |
 | `backgroundStrategy` | `llm-judge` | `after-seconds`, `new-message`, or `llm-judge`. |
 | `backgroundAfterSeconds` | `10` | Nonnegative threshold before applying the chosen slow-tool policy; declared backgroundOnMessage bypasses it for eligible input. |
-| `completionVerification` | `false` | Opt in with `true` to install participant completion criteria and the Coordinator's independent outcome helpers. |
+| `completionVerification` | `on-demand` | The Coordinator requests acceptance for a task using `set_completion_criteria`; `true` always verifies human tasks, `false` disables the capability. |
 | `dataDirectory` | `.` | New workspace-root memory layout. Explicit private layouts and already saved paths remain supported. |
 | `coordinatorHiddenTools` | Native delegation/workflow entries | Scoped replaced tool names; global preferences are not rewritten. |
 | `progressTextMaxChars` | `100` | UI/activity preview length; does not clip explicit history or automatic final results. |

@@ -44,7 +44,7 @@ function policyCopies(request: GenerateOptions) {
   );
 }
 
-it.each([true, false])("describes configured automatic outcome verification in Coordinator facts only (enabled=%s)", async (completionVerification) => {
+it.each([true, false, "on-demand"] as const)("describes configured outcome verification in Coordinator facts only (mode=%s)", async (completionVerification) => {
   const f = await fixture(undefined, { completionVerification });
   try {
     const call = (name: string, args: object): StreamChunk[] => {
@@ -78,7 +78,7 @@ it.each([true, false])("describes configured automatic outcome verification in C
     const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
     const facts = runtimeText(request);
     expect(request.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
-    if (completionVerification) {
+    if (completionVerification === true) {
       expect(facts).toContain("MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots");
       expect(facts).toContain("automatically runs an independent tool-backed Outcome Verifier");
       expect(facts).toContain("actual candidate answer and artifacts");
@@ -91,9 +91,18 @@ it.each([true, false])("describes configured automatic outcome verification in C
       expect(reviewInput).toContain("Prefer native glob, grep and read for file and directory inspection");
       expect(reviewInput).toContain("only when the verification responsibility requires command execution, builds or tests");
       expect(reviewInput).toContain("Candidate factual claims still require evidence");
-    } else {
+    } else if (completionVerification === false) {
       expect(facts).toContain("Automatic outcome verification is not enabled in this runtime");
       expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
+      expect(request.tools?.map(tool => tool.name)).not.toContain("set_completion_criteria");
+      expect(f.adapter.requests.some((entry) => String(entry.sessionId).startsWith("moa-"))).toBe(false);
+    } else {
+      expect(facts).toMatch(/on[- ]demand/i);
+      expect(facts).toContain("set_completion_criteria");
+      expect(facts).not.toContain("Automatic outcome verification is not enabled");
+      expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
+      expect(request.tools?.map(tool => tool.name)).toContain("set_completion_criteria");
+      expect(verifierStep).toBe(0);
       expect(f.adapter.requests.some((entry) => String(entry.sessionId).startsWith("moa-"))).toBe(false);
     }
 

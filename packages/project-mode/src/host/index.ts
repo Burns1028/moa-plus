@@ -323,7 +323,7 @@ export default class ProjectMode extends TypertRemoteService {
       this.memoryBindings.delete(agent);
       return undefined;
     });
-    if (this.config.completionVerification) this.completionAttach = bindCompletion(this.access);
+    if (this.config.completionVerification !== false) this.completionAttach = bindCompletion(this.access);
     this.ctx.effect(
       () => async () => {
         this.available = false;
@@ -555,9 +555,11 @@ export default class ProjectMode extends TypertRemoteService {
   private roleText(agent: Agent): string {
     const own = this.record(agent.id);
     if (own?.project.mode === "enabled") {
-      const completion = this.config.completionVerification
+      const completion = this.config.completionVerification === true
         ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery."
-        : "Automatic outcome verification is not enabled in this runtime.";
+        : this.config.completionVerification === "on-demand"
+          ? "Independent outcome verification is available on demand. Decide whether the current task benefits from a separate acceptance check. When it does, call set_completion_criteria to request verification for this task, using concrete criteria and a short, natural completion statement as the exact promise. The independently authored rubric still comes only from original human requirements and source snapshots, not your criteria or implementation. No Builder or Verifier is created unless you request verification; ordinary acknowledgements and work that does not benefit from independent review can finish directly. Once requested, complete the work and include the promise only when its criteria are met; the verifier may return evidence-backed gaps for rework. A completed task does not enable verification for the next task."
+          : "Automatic outcome verification is not enabled in this runtime.";
       return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}\n${completion}`;
     }
     const parent = this.owner(agent.id);

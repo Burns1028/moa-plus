@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.7 — 2026-11-12
+
+- Let the Coordinator request independent acceptance for the current task through the existing completion-criteria tool. Default to `on-demand`, preserving explicit `true` automatic and `false` disabled configurations.
+- Keep ordinary replies free of acceptance helpers and extra classification requests. Preserve original requirements/source snapshots before delayed activation, unfinished bindings across Stop/restart, and independent evidence requirements.
+- Clear task ownership after background handoff completion so later tasks start unbound. Reject activation without an unfinished human task.
+
 ## 0.2.6 — 2026-11-12
 
 - Simplify the Workers panel to a chronological timeline with input, output and artifacts for every turn. Keep all inputs together and remove the separate communication log and folded task cards.

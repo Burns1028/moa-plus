@@ -2,7 +2,7 @@ import z from "@deepseek-ai/schemastery";
 export interface Config {
   backgroundStrategy: "after-seconds" | "new-message" | "llm-judge";
   backgroundAfterSeconds: number;
-  completionVerification: boolean;
+  completionVerification: boolean | "on-demand";
   dataDirectory: string;
   coordinatorHiddenTools: string[];
   progressTextMaxChars: number;
@@ -13,7 +13,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   backgroundStrategy: z.union(["after-seconds", "new-message", "llm-judge"]).default("llm-judge"),
   backgroundAfterSeconds: z.number().min(0).default(10),
-  completionVerification: z.boolean().default(false),
+  completionVerification: z.union([z.const("on-demand"), z.boolean()]).default("on-demand"),
   dataDirectory: z.string().default("."),
   coordinatorHiddenTools: z
     .array(z.string())
