@@ -194,7 +194,7 @@ export interface WorkerTimelineMessage {
     seq: number;
     time: number;
     text: string;
-    /** UI-only body without an exactly verified MoA transport prefix; text stays original. */
+    /** UI-only body without an exactly verified MoA transport/birth identity prefix; text stays original. */
     displayText?: string;
     attachments?: WorkerMessageAttachment[];
     actor?: "user" | "coordinator" | "agent";

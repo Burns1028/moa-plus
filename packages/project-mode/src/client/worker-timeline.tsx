@@ -131,7 +131,6 @@ function TaskCard({
     if (!latest && !manuallyToggled.current) setExpanded(false);
   }, [latest]);
   const task = turn.inputs[0];
-  const title = task && extractMarkdownPlainText(task.displayText ?? task.text);
   const outcome =
     turn.outcome === null
       ? "working"
@@ -168,7 +167,6 @@ function TaskCard({
             {t(outcome)}
           </span>
         </span>
-        {!expanded && title && <span className="pm-task-title">{title}</span>}
         <Timestamp time={turn.startedAt} />
       </summary>
       {expanded && (

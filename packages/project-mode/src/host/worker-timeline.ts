@@ -1,6 +1,7 @@
 import type {} from "@deepseek-ai/dsh-tool-present/types";
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
+import { isAbsolute } from "node:path";
 import type {
   WorkerTimelinePage,
   WorkerTimelineTurn,
@@ -8,24 +9,83 @@ import type {
 import type { HostAccess } from "./host-access.ts";
 import { abortableChange } from "./native.ts";
 import { messageContent } from "./message-content.ts";
+import { contextIndexPath } from "./project-memory.ts";
+import {
+  identityMessage,
+  workerReportingInstructions,
+} from "./prompts/identity.ts";
+import type { RecordState, Worker } from "./state.ts";
 
-/** Project only the wrapper authored by nativeMessage; dialogue text stays intact. */
-function displayText(message: UserMessage): string | undefined {
-  const source = message.source;
-  const first = message.content[0];
+/** Only the accepted birth message can carry the identity authored by spawnMoA. */
+function birthIdentity(record: RecordState, worker: Worker) {
+  const assignment = record.assignments.find(
+    (value) =>
+      value.workerId === worker.id &&
+      value.operationId === worker.creationOperationId &&
+      value.participationKind !== "send" &&
+      value.messageId,
+  );
+  if (!assignment?.messageId) return undefined;
+  const descriptor = record.operations[`moa:agent:${worker.id}`];
   if (
-    source.kind !== "moa-message" ||
-    typeof source.senderId !== "string" ||
-    first?.type !== "text"
+    !descriptor ||
+    typeof descriptor !== "object" ||
+    Array.isArray(descriptor) ||
+    descriptor.id !== worker.id ||
+    typeof descriptor.reportTo !== "string"
   )
     return undefined;
-  const prefix = `${source.requestId ? `Request ID: ${source.requestId}\n` : ""}${source.replyTo ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+  const workspace = descriptor.workspace;
+  if (
+    !workspace ||
+    typeof workspace !== "object" ||
+    Array.isArray(workspace) ||
+    workspace.ownerId !== worker.id ||
+    (workspace.mode !== "shared" && workspace.mode !== "isolated") ||
+    typeof workspace.directory !== "string" ||
+    !isAbsolute(workspace.directory)
+  )
+    return undefined;
+  const paths = record.project.paths;
+  return {
+    messageId: assignment.messageId,
+    prefix: `${identityMessage({
+      id: worker.id,
+      workdir: workspace.directory,
+      isolated: workspace.mode === "isolated",
+      reportTo: descriptor.reportTo,
+      reportingInstructions: workerReportingInstructions(
+        contextIndexPath(paths),
+        paths.notes,
+        paths.archived,
+      ),
+    })}\n\n`,
+  };
+}
+
+/** Project only exactly verified wrappers; durable dialogue text stays intact. */
+function displayText(
+  message: UserMessage,
+  birth: ReturnType<typeof birthIdentity>,
+): string | undefined {
+  const source = message.source;
+  const first = message.content[0];
+  if (first?.type !== "text") return undefined;
+  let prefix: string;
+  if (source.kind === "moa-message" && typeof source.senderId === "string")
+    prefix = `${source.requestId ? `Request ID: ${source.requestId}\n` : ""}${source.replyTo ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+  else if (
+    (source.kind === "user" || source.kind === "project-mode-assignment") &&
+    birth?.messageId === message.id
+  )
+    prefix = birth.prefix;
+  else return undefined;
   if (!first.text.startsWith(prefix)) return undefined;
   return [
     first.text.slice(prefix.length),
-    ...message.content.slice(1).flatMap((block) =>
-      block.type === "text" ? [block.text] : [],
-    ),
+    ...message.content
+      .slice(1)
+      .flatMap((block) => (block.type === "text" ? [block.text] : [])),
   ].join("");
 }
 
@@ -49,6 +109,7 @@ export async function readWorkerTimeline(
       .filter((a) => a.workerId === workerId)
       .map((a) => a.messageId),
   );
+  const birth = birthIdentity(record, worker);
   const turns: WorkerTimelineTurn[] = [];
   let current: WorkerTimelineTurn | undefined;
   for (const event of observed.events) {
@@ -75,7 +136,7 @@ export async function readWorkerTimeline(
         event.data.source.kind === "project-mode-assignment" ||
         event.data.source.kind === "moa-message")
     ) {
-      const presentation = displayText(event.data);
+      const presentation = displayText(event.data, birth);
       current.inputs.push({
         id: event.data.id,
         seq: event.seq,

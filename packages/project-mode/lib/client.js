@@ -1640,7 +1640,7 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"time": zod.z.number(),
 					"text": zod.z.string(),
-					"displayText": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("UI-only body without an exactly verified MoA transport prefix; text stays original."),
+					"displayText": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("UI-only body without an exactly verified MoA transport/birth identity prefix; text stays original."),
 					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
 						"type": zod.z.literal("file"),
 						"attachment": zod.z.object({
@@ -1682,7 +1682,7 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"time": zod.z.number(),
 					"text": zod.z.string(),
-					"displayText": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("UI-only body without an exactly verified MoA transport prefix; text stays original."),
+					"displayText": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("UI-only body without an exactly verified MoA transport/birth identity prefix; text stays original."),
 					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
 						"type": zod.z.literal("file"),
 						"attachment": zod.z.object({
@@ -5092,7 +5092,7 @@ window.__ModuleLoader__.load({
 														"text": { "type": "string" },
 														"displayText": {
 															"type": "string",
-															"description": "UI-only body without an exactly verified MoA transport prefix; text stays original."
+															"description": "UI-only body without an exactly verified MoA transport/birth identity prefix; text stays original."
 														},
 														"attachments": {
 															"type": "array",
@@ -5231,7 +5231,7 @@ window.__ModuleLoader__.load({
 														"text": { "type": "string" },
 														"displayText": {
 															"type": "string",
-															"description": "UI-only body without an exactly verified MoA transport prefix; text stays original."
+															"description": "UI-only body without an exactly verified MoA transport/birth identity prefix; text stays original."
 														},
 														"attachments": {
 															"type": "array",
@@ -6328,7 +6328,7 @@ window.__ModuleLoader__.load({
 .pm-worker-axis{overflow:auto;padding:18px 20px;min-width:0}.pm-worker-axis header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.pm-worker-axis h3{font-size:14px;margin:0;font-weight:600;overflow-wrap:anywhere}
 .pm-worker-axis button,.pm-worker-axis a{font:inherit;color:var(--dsw-alias-label-link,#80a9ee);cursor:pointer}.pm-worker-axis button{border:0;background:transparent;padding:3px 0;text-align:left}
 .pm-task-card{border:1px solid var(--dsw-alias-border-primary,#8883);border-radius:10px;margin-bottom:12px;overflow:hidden}.pm-task-toggle{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;padding:14px;cursor:pointer;list-style:none}.pm-task-toggle::-webkit-details-marker{display:none}.pm-task-toggle:after{content:"⌄";font-size:12px;color:var(--dsw-alias-label-secondary,#888);grid-column:2;grid-row:1}.pm-task-card[open]>.pm-task-toggle:after{content:"⌃"}.pm-task-meta{display:flex;align-items:center;gap:8px;min-width:0}.pm-task-meta strong{font-size:12px;font-weight:600}.pm-task-outcome{font-size:10px;line-height:1.5;border-radius:4px;padding:1px 5px;color:var(--dsw-alias-label-secondary,#777);background:var(--dsw-alias-interactive-bg-hover,#8881)}.pm-task-outcome[data-outcome=failed]{color:var(--dsw-alias-state-danger-primary,#c44)}.pm-task-outcome[data-outcome=working]{color:var(--dsw-alias-label-link,#5883c0)}
-.pm-task-toggle>time{grid-column:1 / -1;font-size:10px;color:var(--dsw-alias-label-secondary,#888)}.pm-task-title{grid-column:1 / -1;grid-row:2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.6;overflow-wrap:anywhere}.pm-task-body{padding:0 14px 14px}.pm-task-section{margin:0 0 18px}.pm-task-section h4{font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#888);margin:0 0 6px}.pm-task-result{padding-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}
+.pm-task-toggle>time{grid-column:1 / -1;font-size:10px;color:var(--dsw-alias-label-secondary,#888)}.pm-task-body{padding:0 14px 14px}.pm-task-section{margin:0 0 18px}.pm-task-section h4{font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#888);margin:0 0 6px}.pm-task-result{padding-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}
 .pm-axis-files{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:6px}.pm-axis-files li{min-width:0;max-width:100%}.pm-axis-files button,.pm-axis-files li>span{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:5px 8px;border:1px solid var(--dsw-alias-border-primary,#8883);border-radius:6px;font-size:12px}.pm-axis-files button:hover{background:var(--dsw-alias-interactive-bg-hover,#8882)}.pm-axis-files svg{flex:none}.pm-axis-files span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pm-task-messages{border-top:1px solid var(--dsw-alias-border-primary,#8882);padding-top:10px;font-size:12px}.pm-task-messages>summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#888)}.pm-task-message{padding-top:14px;overflow-wrap:anywhere}.pm-task-message+.pm-task-message{margin-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}.pm-task-message-meta{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--dsw-alias-label-secondary,#888);margin-bottom:5px}.pm-task-raw{margin-top:8px;font-size:11px}.pm-task-raw>summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#888)}
 .pm-axis-empty{color:var(--dsw-alias-label-secondary,#999);padding:4px 0;line-height:1.6}.pm-axis-more{margin:4px 0 12px}.pm-axis-error{color:var(--dsw-alias-label-secondary,#999);overflow-wrap:anywhere}
@@ -6395,7 +6395,6 @@ window.__ModuleLoader__.load({
 				if (!latest && !manuallyToggled.current) setExpanded(false);
 			}, [latest]);
 			const task = turn.inputs[0];
-			const title = task && (0, _deepseek_ai_dsh_client_ui_primitives.extractMarkdownPlainText)(task.displayText ?? task.text);
 			const outcome = turn.outcome === null ? "working" : turn.outcome === "handoff" ? "continued" : turn.outcome === "completed" ? "completed" : turn.outcome === "aborted" ? "stopped" : "failed";
 			const body = (message) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
 				message,
@@ -6412,21 +6411,14 @@ window.__ModuleLoader__.load({
 					onClick: () => {
 						manuallyToggled.current = true;
 					},
-					children: [
-						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-							className: "pm-task-meta",
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: t("timelineTurn", { turn: turn.turn }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: "pm-task-outcome",
-								"data-outcome": outcome,
-								children: t(outcome)
-							})]
-						}),
-						!expanded && title && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-							className: "pm-task-title",
-							children: title
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt })
-					]
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "pm-task-meta",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: t("timelineTurn", { turn: turn.turn }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "pm-task-outcome",
+							"data-outcome": outcome,
+							children: t(outcome)
+						})]
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt })]
 				}), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					className: "pm-task-body",
 					children: [

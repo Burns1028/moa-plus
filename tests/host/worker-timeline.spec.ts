@@ -6,6 +6,8 @@ import { defineTool } from "@deepseek-ai/dsh-tools";
 import type {} from "@deepseek-ai/dsh-tool-present/types";
 import type { HostAccess } from "../../packages/project-mode/src/host/host-access.ts";
 import { readWorkerTimeline } from "../../packages/project-mode/src/host/worker-timeline.ts";
+import type { AgentDescriptor } from "../../packages/project-mode/src/host/moa/agents.ts";
+import type { RecordState } from "../../packages/project-mode/src/host/state.ts";
 import { fixture, response } from "./fixture.ts";
 
 it("projects only the complete authored MoA prefix and preserves raw text and attachments", async () => {
@@ -151,6 +153,137 @@ it("projects only the complete authored MoA prefix and preserves raw text and at
   expect(inputs[0].actor).toBe("coordinator");
   expect(inputs[2].actor).toBe("user");
   expect(disposed).toBe(true);
+});
+
+it("removes the exact initial identity only from its accepted native birth message", async () => {
+  const f = await fixture();
+  try {
+    const { agent: parent } = await f.ctx.agents.create({
+      sessionId: SessionId("timeline-birth-parent"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(parent.id, true, 0, "enable");
+    const service = f.ctx.projectMode as any;
+    const host = service.access as HostAccess;
+    const task =
+      "## Prepare report\n\nAgent ID: this quoted user text stays.\nWorkdir: keep this too.\n";
+    const [result] = await service.moa.task(
+      parent,
+      [
+        {
+          name: "writer",
+          task,
+          role: "General-purpose",
+          workspace: "shared",
+        },
+      ],
+      "birth",
+      new AbortController().signal,
+    );
+    const workerId = SessionId(result.workerId);
+    await expect
+      .poll(() =>
+        host
+          .record(parent.id)
+          ?.completions.find((value) => value.workerId === workerId),
+      )
+      .toBeDefined();
+    await parent.whenIdle();
+    const record = host.record(parent.id)!;
+    const worker = host.worker(record, workerId);
+    const assignment = record.assignments.find(
+      (value) => value.operationId === worker.creationOperationId,
+    )!;
+    using observed = await f.ctx.sessionQuery.observeSession(workerId);
+    const birth = observed.events.find(
+      (event) =>
+        event.type === "user/message" && event.data.id === assignment.messageId,
+    )!;
+    expect(birth).toMatchObject({
+      type: "user/message",
+      data: { source: { kind: "user" } },
+    });
+    const requestsBeforeRead = f.adapter.requests.length;
+    const read = (snapshot = record) =>
+      readWorkerTimeline(
+        Object.assign(Object.create(host), {
+          record: () => snapshot,
+        }) as HostAccess,
+        parent.id,
+        workerId,
+        10,
+        new AbortController().signal,
+      );
+    const input = (await read()).turns[0].inputs[0];
+    expect(input.text).toContain(
+      `Agent ID: ${workerId}\nWorkdir: ${f.root} (Shared)\nReport to: ${parent.id}\nReporting instructions: `,
+    );
+    expect(input.text.endsWith(`\n\n${task}`)).toBe(true);
+    expect(input.displayText).toBe(task);
+    expect(input.actor).toBe("coordinator");
+    const descriptorKey = `moa:agent:${workerId}`;
+    const descriptor = record.operations[
+      descriptorKey
+    ] as unknown as AgentDescriptor;
+    const { [descriptorKey]: _removed, ...withoutDescriptor } =
+      record.operations;
+    const variants: RecordState[] = [
+      { ...record, operations: withoutDescriptor },
+      {
+        ...record,
+        assignments: record.assignments.map((value) =>
+          value === assignment
+            ? { ...value, messageId: "not-the-birth-message" }
+            : value,
+        ),
+      },
+      {
+        ...record,
+        assignments: record.assignments.map((value) =>
+          value === assignment
+            ? { ...value, operationId: "not-the-creation-operation" }
+            : value,
+        ),
+      },
+      {
+        ...record,
+        assignments: record.assignments.map((value) =>
+          value === assignment
+            ? { ...value, participationKind: "send" }
+            : value,
+        ),
+      },
+      {
+        ...record,
+        operations: {
+          ...record.operations,
+          [descriptorKey]: { ...descriptor, reportTo: "changed-reporter" },
+        },
+      },
+      {
+        ...record,
+        operations: {
+          ...record.operations,
+          [descriptorKey]: {
+            ...descriptor,
+            workspace: {
+              ...descriptor.workspace!,
+              directory: "unknown-relative-directory",
+            },
+          },
+        },
+      },
+    ] as RecordState[];
+    for (const snapshot of variants) {
+      const unchanged = (await read(snapshot)).turns[0].inputs[0];
+      expect(unchanged.text).toBe(input.text);
+      expect(unchanged.displayText).toBeUndefined();
+    }
+    expect(f.adapter.requests).toHaveLength(requestsBeforeRead);
+  } finally {
+    await f.dispose();
+  }
 });
 
 it("streams native turns newest first with visible dialogue and recorded artifacts, including empty failures", async () => {

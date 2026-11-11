@@ -4717,12 +4717,35 @@ async function readHistory(host, parentId, workerId, offset, limit, signal) {
 	}
 }
 // src/host/worker-timeline.ts
-/** Project only the wrapper authored by nativeMessage; dialogue text stays intact. */
-function displayText(message) {
+/** Only the accepted birth message can carry the identity authored by spawnMoA. */
+function birthIdentity(record, worker) {
+	const assignment = record.assignments.find((value) => value.workerId === worker.id && value.operationId === worker.creationOperationId && value.participationKind !== "send" && value.messageId);
+	if (!assignment?.messageId) return void 0;
+	const descriptor = record.operations[`moa:agent:${worker.id}`];
+	if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor) || descriptor.id !== worker.id || typeof descriptor.reportTo !== "string") return void 0;
+	const workspace = descriptor.workspace;
+	if (!workspace || typeof workspace !== "object" || Array.isArray(workspace) || workspace.ownerId !== worker.id || workspace.mode !== "shared" && workspace.mode !== "isolated" || typeof workspace.directory !== "string" || !isAbsolute(workspace.directory)) return void 0;
+	const paths = record.project.paths;
+	return {
+		messageId: assignment.messageId,
+		prefix: `${identityMessage({
+			id: worker.id,
+			workdir: workspace.directory,
+			isolated: workspace.mode === "isolated",
+			reportTo: descriptor.reportTo,
+			reportingInstructions: workerReportingInstructions(contextIndexPath(paths), paths.notes, paths.archived)
+		})}\n\n`
+	};
+}
+/** Project only exactly verified wrappers; durable dialogue text stays intact. */
+function displayText(message, birth) {
 	const source = message.source;
 	const first = message.content[0];
-	if (source.kind !== "moa-message" || typeof source.senderId !== "string" || first?.type !== "text") return void 0;
-	const prefix = `${source.requestId ? `Request ID: ${source.requestId}\n` : ""}${source.replyTo ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+	if (first?.type !== "text") return void 0;
+	let prefix;
+	if (source.kind === "moa-message" && typeof source.senderId === "string") prefix = `${source.requestId ? `Request ID: ${source.requestId}\n` : ""}${source.replyTo ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+	else if ((source.kind === "user" || source.kind === "project-mode-assignment") && birth?.messageId === message.id) prefix = birth.prefix;
+	else return void 0;
 	if (!first.text.startsWith(prefix)) return void 0;
 	return [first.text.slice(prefix.length), ...message.content.slice(1).flatMap((block) => block.type === "text" ? [block.text] : [])].join("");
 }
@@ -4735,6 +4758,7 @@ async function readWorkerTimeline(host, parentId, workerId, limit, signal) {
 		if (worker.lifecycle === "deleted") throw new Error("project-mode/worker-inactive");
 		const observed = _usingCtx$2.u(await host.ctx.sessionQuery.observeSession(workerId, { signal }));
 		const assignments = new Set(record.assignments.filter((a) => a.workerId === workerId).map((a) => a.messageId));
+		const birth = birthIdentity(record, worker);
 		const turns = [];
 		let current;
 		for (const event of observed.events) {
@@ -4756,7 +4780,7 @@ async function readWorkerTimeline(host, parentId, workerId, limit, signal) {
 				current.finishedAt = event.time;
 			}
 			if (event.type === "user/message" && (event.data.source.kind === "user" || event.data.source.kind === "project-mode-assignment" || event.data.source.kind === "moa-message")) {
-				const presentation = displayText(event.data);
+				const presentation = displayText(event.data, birth);
 				current.inputs.push({
 					id: event.data.id,
 					seq: event.seq,

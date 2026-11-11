@@ -4,7 +4,7 @@
 
 - Group the Workers panel into compact task cards, with the latest open and earlier turns folded by default. Show two-line task and four-line final-result previews, expandable original Markdown, and attachment/artifact file chips.
 - Fold communication records behind a message count, keeping every input, sender/time details, and original messages accessible. Keep Markdown links and copy controls outside disclosure summaries.
-- Hide only exactly verified MoA-authored transport prefixes in presentation text, while preserving raw dialogue, attachments, and native execution. The panel remains read-only and makes no model summary calls.
+- Hide only exactly verified MoA-authored transport and initial identity prefixes in presentation text, while preserving raw dialogue, attachments, and native execution. The panel remains read-only and makes no model summary calls.
 
 ## 0.2.4 — 2026-11-11
 

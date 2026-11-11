@@ -373,7 +373,7 @@ it("opens the latest task and keeps an older round compact until its complete re
     older = taskCard(1);
   expect(latest.open).toBe(true);
   expect(older.open).toBe(false);
-  expect(within(older).getByText("Assignment 1 Exact task 1.")).toBeDefined();
+  expect(within(older).queryByText("Assignment 1 Exact task 1.")).toBeNull();
   expect(screen.queryByText("Findings 1 Exact result 1.")).toBeNull();
   expect(
     latest.querySelector<HTMLDetailsElement>(".pm-task-messages")?.open,
