@@ -6745,7 +6745,7 @@ window.__ModuleLoader__.load({
 			}),
 			publication: (match) => match.event.type === "assistant/live-chunk" ? "animation-frame" : "immediate",
 			buildViewNode(context) {
-				const location = [context.start, ...context.matches].find((match) => match?.location.kind === "step")?.location;
+				const location = [context.start, ...context.matches].find((match) => match?.location.kind === "step" || context.state?.incoming && match?.location.kind === "turn")?.location;
 				if (!context.state || location?.kind !== "step" && !context.state.incoming) {
 					const previous = context.current.get("chat");
 					return previous ? {
@@ -6753,20 +6753,21 @@ window.__ModuleLoader__.load({
 						visibility: "hidden"
 					} : null;
 				}
+				const turn = location?.kind === "step" || location?.kind === "turn" ? location.turn : void 0;
 				return {
 					key: context.key,
 					id: context.id,
 					kind: "project-mode-workers-tail",
 					target: "chat",
 					anchorSeq: context.state.seq + .2,
-					location: location?.kind === "step" ? {
+					location: turn ? {
 						kind: "turn",
-						turn: location.turn
+						turn
 					} : context.start?.location ?? { kind: "unresolved" },
 					visibility: "visible",
-					groupTree: context.state.incoming ? "input" : "turn",
+					groupTree: context.state.incoming ? "process" : "turn",
 					data: {
-						turn: location?.kind === "step" ? location.turn.turn : 0,
+						turn: turn?.turn ?? 0,
 						step: location?.kind === "step" ? location.step.step : 0,
 						segmentStartSeq: context.state.segmentStartSeq,
 						...context.state.incoming ? { incoming: context.state.incoming } : {}
@@ -6820,10 +6821,12 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 .pm-capsules{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0}.pm-capsules>li{display:flex;min-width:0;max-width:100%}.pm-capsule{box-sizing:border-box;display:inline-flex;min-width:0;max-width:min(100%,240px);height:28px;gap:6px;align-items:center;text-align:left;border:1px solid var(--dsw-alias-border-l4);border-radius:999px;padding:4px 8px;font-size:12px;line-height:18px}.pm-capsule strong{min-width:0;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.pm-progress{min-width:0;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary)}
 .pm-worker-icon{display:block;flex:0 0 auto;width:24px;height:24px}
 .pm-capsule .pm-worker-icon{width:16px;height:16px}
-.pm-agent-message{box-sizing:border-box;width:fit-content;max-width:min(calc(var(--dsh-chat-content-width,748px) * .702),82%);margin:12px 0 12px auto;padding:10px 16px;background:var(--dsw-specific-bubble);border-radius:var(--dsw-radius-xl);color:var(--dsw-alias-label-primary);font:inherit;text-align:left;overflow-wrap:anywhere;min-width:0}
-.pm-agent-message>header{color:var(--dsw-alias-label-secondary);font-size:12px;margin-bottom:6px}
-.pm-agent-message .pm-axis-preview{margin-top:4px}.pm-agent-message .pm-axis-preview>summary{display:block;list-style:none;cursor:pointer}.pm-agent-message .pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-agent-message .pm-axis-preview>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;border-radius:3px}
-.pm-agent-message .pm-axis-preview:not([open])>summary{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--dsw-alias-label-secondary,#999)}
+.pm-agent-message{box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin:10px 0;border:1px solid var(--dsw-alias-border-l4);border-radius:10px;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;overflow-wrap:anywhere}
+.pm-agent-message>summary{list-style:none;cursor:pointer;padding:10px 12px;border-radius:10px}.pm-agent-message>summary::-webkit-details-marker{display:none}.pm-agent-message>summary:hover{background:var(--dsw-alias-interactive-bg-hover)}.pm-agent-message>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.pm-agent-message[data-settled]>summary{padding:8px 12px}
+.pm-agent-heading{display:flex;align-items:center;gap:7px;min-width:0;font-size:12px;line-height:20px}.pm-agent-heading>.pm-worker-icon{width:16px;height:16px}.pm-agent-sender{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.pm-agent-kind{flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px}.pm-agent-chevron{width:14px;height:14px;margin-left:auto;flex:none;fill:none;stroke:var(--dsw-alias-label-tertiary);stroke-width:1.5;transition:transform .15s}.pm-agent-message[open]>summary .pm-agent-chevron{transform:rotate(90deg)}
+.pm-agent-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:4px 21px 0 23px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6}
+.pm-agent-body{min-width:0;padding:12px;border-top:1px solid var(--dsw-alias-border-l4);font-size:13px;line-height:1.65}.pm-agent-body>*:first-child{margin-top:0}.pm-agent-body>*:last-child{margin-bottom:0}.pm-agent-reasoning{margin:0 0 10px;color:var(--dsw-alias-label-secondary)}.pm-agent-reasoning>summary{cursor:pointer;font-size:12px}.pm-agent-reasoning[open]>summary{margin-bottom:8px}
 .pm-agent-empty{color:var(--dsw-alias-label-tertiary)}
 `;
 		// src/client/components.tsx
@@ -7065,6 +7068,12 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			fromUser: "User",
 			messageFrom: "From {name}",
 			messageContent: "Message content",
+			agentMessage: "Message",
+			agentReport: "Report",
+			agentAssignment: "Assignment",
+			agentRequest: "Request",
+			agentReply: "Reply",
+			agentReasoning: "Thinking",
 			truncatedContent: "… {count} characters",
 			awaitingReply: "Awaiting a reply…",
 			emptyReply: "No AI reply in this turn",
@@ -7157,6 +7166,12 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			fromUser: "用户",
 			messageFrom: "来自 {name}",
 			messageContent: "消息内容",
+			agentMessage: "消息",
+			agentReport: "汇报",
+			agentAssignment: "任务",
+			agentRequest: "请求",
+			agentReply: "回复",
+			agentReasoning: "思考过程",
 			truncatedContent: "… {count} 字符",
 			awaitingReply: "等待回复…",
 			emptyReply: "本轮没有 AI 回复",
@@ -7250,8 +7265,28 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			if (source.kind === "project-mode-result" && typeof source.completionId === "string" && first.text.startsWith("Worker ") && first.text.includes(` (${source.workerId}), turn ${source.workerTurn}, outcome `) && first.text.includes(`Completion ${source.completionId}. `)) return message.content.slice(1);
 			return message.content;
 		}
-		/** The same incoming message row is used in Coordinator and Worker conversations. */
-		function AgentMessage({ message, client, t }) {
+		function Reasoning({ text, labels, t }) {
+			const [expanded, setExpanded] = react.useState(false);
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+				className: "pm-agent-reasoning",
+				onToggle: (event) => setExpanded(event.currentTarget.open),
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: t("agentReasoning") }), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
+					text,
+					labels,
+					variant: "compact"
+				})]
+			});
+		}
+		/** Internal correspondence belongs to the native process, not a user bubble. */
+		function AgentMessage({ message, client, t, settled = false }) {
+			const [expanded, setExpanded] = react.useState(false);
+			const disclosure = react.useRef(null);
+			const previewId = react.useId();
+			react.useEffect(() => {
+				if (!settled) return;
+				if (disclosure.current) disclosure.current.open = false;
+				setExpanded(false);
+			}, [settled]);
 			const source = message.source;
 			const id = [
 				source.senderSessionId,
@@ -7275,17 +7310,54 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				},
 				footnotes: t("footnotes")
 			}), [t]);
-			const content = messageBody(message);
+			const content = react.useMemo(() => messageBody(message), [message]);
+			const visibleText = content.filter((block) => block.type === "text").map((block) => block.text).join("\n\n");
+			const preview = react.useMemo(() => (0, _deepseek_ai_dsh_client_ui_primitives.extractMarkdownPlainText)(visibleText).replace(/\s+/g, " ").trim().slice(0, 240), [visibleText]);
 			const sender = t("messageFrom", { name });
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+			const kind = source.kind === "project-mode-result" ? "agentReport" : source.kind === "project-mode-assignment" ? "agentAssignment" : typeof source.replyTo === "string" ? "agentReply" : typeof source.requestId === "string" ? "agentRequest" : "agentMessage";
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+				ref: disclosure,
 				className: "pm-agent-message",
 				"data-moa-message": true,
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("header", { children: sender }),
-					content.length ? content.map((block, index) => block.type === "text" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
+				"data-settled": settled || void 0,
+				onToggle: (event) => setExpanded(event.currentTarget.open),
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", {
+					"aria-label": t(expanded ? "collapse" : "expand", { name: `${sender} · ${t(kind)}` }),
+					"aria-describedby": expanded || settled ? void 0 : previewId,
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "pm-agent-heading",
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerIcon, { workerId: id ?? name }),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "pm-agent-sender",
+								children: sender
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "pm-agent-kind",
+								children: t(kind)
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+								className: "pm-agent-chevron",
+								viewBox: "0 0 16 16",
+								"aria-hidden": "true",
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "m6 4 4 4-4 4" })
+							})
+						]
+					}), !expanded && !settled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "pm-agent-preview",
+						id: previewId,
+						children: preview || (content.length ? t("messageContent") : t("emptyReply"))
+					})]
+				}), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: "pm-agent-body",
+					children: content.length ? content.map((block, index) => block.type === "text" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
 						text: block.text,
-						labels
+						labels,
+						variant: "compact"
+					}, index) : block.type === "reasoning" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Reasoning, {
+						text: block.text,
+						labels,
+						t
 					}, index) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.JsonBlock, {
 						label: t("messageContent"),
 						payload: block,
@@ -7294,8 +7366,8 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 						className: "pm-agent-empty",
 						children: t("emptyReply")
 					})
-				]
-			});
+				})]
+			})] });
 		}
 		// src/client/index.tsx
 		const inject = [
@@ -7401,10 +7473,15 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 					historyReady
 				]);
 				const closed = p.useChat((s) => s.timeline.turns.get(p.node.data.turn)?.end !== void 0);
+				const settled = p.useChat((s) => {
+					const reason = s.timeline.turns.get(p.node.data.turn)?.end?.data.reason.kind;
+					return reason === "completed" || reason === "handoff";
+				});
 				const selected = p.useChat((s) => segmentTail(s, p.node) !== null);
 				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [p.node.data.incoming && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(AgentMessage, {
 					...p,
-					message: p.node.data.incoming
+					message: p.node.data.incoming,
+					settled
 				}), selected && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkerCapsuleList, {
 					...p,
 					turn: p.node.data.turn,

@@ -1,5 +1,15 @@
 # Verification
 
+## MoA+ 0.2.4 communication presentation — 2026-11-11
+
+Internal MoA correspondence now uses the native process group-tree position, allowing the native completion disclosure to fold it while retaining the final answer. Compact sender/type cards replace user-style bubbles, visible answer text supplies the preview, Markdown stays outside the summary control, and reasoning has a separate disclosure. Completed/handoff cards outside the native process range settle to a heading and remain manually readable. Explicit native Turn-only placement is retained; unowned Session messages are never assigned to a guessed Turn.
+
+The build and both typechecks passed. The final Host, Client, integration and native-contract run passed **468 tests across 70 files**, with **21 tests and one file skipped**. Real browser-factory tests passed **10/10 for rc.3 and 10/10 for rc.2**, covering live display, completion folding, native reopening, true human interleaving, failed/stopped work, history boundaries and Turn-only placement. Card tests additionally cover reasoning-plus-final results, Markdown/link interaction, completion/handoff settlement and manual reopening. A SlotRegistry fixture's old empty end marker was replaced with an actual native-shaped `turn/end` record; its full ownership/unload assertions remain enabled. Launcher checks passed **17 tests**, with three explicit Windows/fixture skips.
+
+Windows Desktop acceptance inspected the retained real collaboration in DSH Next using the installed 0.2.4 candidate. The default completed view retained its final answer while internal communication was folded. The handoff-range ENV report appeared as one heading; expanding it showed the complete Markdown with thinking separately collapsed, and closing it restored that heading. Opening the native process restored twelve visible process rows; closing it removed those rows again. The view was returned to the final answer with no active generation, and screenshot/control resources were released. These are actual UI observations of retained history, distinct from the native renderer tests and the earlier real-model execution evidence below.
+
+This change leaves the Host implementation and native compatibility patches unchanged from v0.2.3. That release's Windows process/security evidence retains its original scope.
+
 ## MoA+ 0.2.3 Windows Worker repair — 2026-11-11
 
 The reported Desktop failure was reproduced on DSH Next 2.0.22-next / DSH 0.2.2-rc.1: isolated workspace creation rejected native partial enforcement, and protected Workers could not start PowerShell. The previous v0.2.2 release was marked as a prerelease while preserving its tag and assets. This candidate repairs those paths through the existing native owners; its Windows sandbox remains classified as `partial`.

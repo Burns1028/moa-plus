@@ -164,7 +164,10 @@ it("registers on real native SlotRegistry without taking child owners, and unloa
             select({
               nodes: { values: () => [seat] },
               timeline: {
-                turns: new Map([[3, { end: closed ? {} : undefined }]]),
+                turns: new Map([[3, { end: closed ? {
+                  type: "turn/end", seq: 16, time: 16000,
+                  data: { turn: 3, reason: { kind: "completed" } },
+                } : undefined }]]),
               },
             }),
           useSession: (select: any) =>
