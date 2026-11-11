@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes MoA+ v0.2.1, including Worker attachments, adaptive coordination, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes MoA+ v0.2.2, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
@@ -25,7 +25,7 @@ flowchart TB
 
 Patterns are decisions made through these tools and role prompts: create a clean specialist, branch useful history, ask a peer, compare results, or continue an existing Worker. The Coordinator retains ordinary execution tools and decides task ownership. Native DSH owns execution ordering, inbox admission, resource cleanup, and permissions; the plugin composes the collaboration around those guarantees.
 
-The default Adaptive guidance prefers suitable retained context through SendMessage, useful committed history through Fork, and clean Task contexts when independence matters. Ready independent work can start in parallel; incoming results unlock dependent work. QueryAgent supplies the native interruptible wait. Simple work can remain with the Coordinator. The five optional [orchestration prompts](orchestration.md) add task-specific collaboration instructions as editable user text, while the native runtime continues to own execution.
+The default Coordinator guidance prefers suitable retained context through SendMessage, useful committed history through Fork, and clean Task contexts when independence matters. Ready independent work can start in parallel; incoming results unlock dependent work. QueryAgent supplies the native interruptible wait. Simple work can remain with the Coordinator. The five optional [orchestration prompts](orchestration.md) add task-specific collaboration instructions as editable user text, while the native runtime continues to own execution.
 
 ## Reading order
 

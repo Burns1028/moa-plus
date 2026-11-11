@@ -20,7 +20,7 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-MoA+ **v0.2.1** 支持经过审查的 **DSH 0.2.1-rc.3** 与
+MoA+ **v0.2.2** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 兼容配置。rc.3 清单扩展了
 **21 个原生包、49 个文件路径**。插件与对应兼容配置必须来自同一版本，
 原版或其他版本准备的运行时不能替代。桌面准备步骤和精确支持范围见
@@ -30,12 +30,12 @@ MoA+ **v0.2.1** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 
 受保护 Worker 的 Shell 执行需要 macOS Seatbelt 或 Linux bubblewrap。Windows 的原生文件工具仍能保护工作记录，但当前 Shell 后端无法执行同样的记录排除策略。命令不是必需时，Verifier 可以继续使用原生文件工具取证；必须执行命令时，会明确报告能力缺失并停止，不移除保护或申请更高权限。详见[后端要求][compatibility]。
 
-下方命令使用 v0.2.1 checkout。跟进开发版本时，将克隆分支改为 `main`。
+下方命令使用 v0.2.2 checkout。跟进开发版本时，将克隆分支改为 `main`。
 
 克隆项目，准备独立的 Web 运行环境：
 
 ```sh
-git clone --branch v0.2.1 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.2 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
