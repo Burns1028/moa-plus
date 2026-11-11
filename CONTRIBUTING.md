@@ -4,7 +4,7 @@ Start with [MOA responsibilities](docs/moa-architecture.md), the [code architect
 
 ## Local setup
 
-Use Node 24.9+, npm and Git. MoA+ v0.2.4 supports the explicit DSH 0.2.1-rc.3 profile in this checkout (22 native packages across 50 file paths) and the separately audited DSH 0.2.2-rc.1 / Desktop Next profile. See docs/native-compatibility.md for exact runtime and platform requirements. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
+Use Node 24.9+, npm and Git. MoA+ v0.2.5 supports the explicit DSH 0.2.1-rc.3 profile in this checkout (22 native packages across 50 file paths) and the separately audited DSH 0.2.2-rc.1 / Desktop Next profile. See docs/native-compatibility.md for exact runtime and platform requirements. The published v0.2.0 runtime used 19 packages / 43 paths; v0.1.23 used three earlier extensions. Do not mix a plugin branch with an older runtime.
 
 ```sh
 npm ci
@@ -54,7 +54,7 @@ The single-worker command is useful on a busy machine because several native int
 | Dialogue windows and final output | `tests/host/history-window.spec.ts`, `worker-timeline.spec.ts` |
 | Shared progressive context and role prompts | `tests/host/project-memory.spec.ts`, `coordinator-guidance.spec.ts` |
 | Mode lock, archival and parent retention | `tests/host/mode-lock.spec.ts`, `project-archive.spec.ts`, `tests/client/worker-parent.spec.ts` |
-| Native right-side tabs and Markdown expansion | `tests/client/panels.spec.tsx` |
+| Native right-side task cards, communication disclosures, attachments and Markdown expansion | `tests/client/panels.spec.tsx`, `tests/host/worker-timeline.spec.ts` |
 | Browser factory and native Remote discovery | `tests/client/boot.spec.ts`, `bundle.spec.ts`, `tests/integration/native-discovery.spec.ts` |
 | Installation into fresh consumers | `scripts/verify-package.mjs` |
 | Isolated runtime preparation, ownership, retry and verification | `tests/launcher/project-mode.test.mjs` |

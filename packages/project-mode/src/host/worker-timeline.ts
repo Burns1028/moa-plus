@@ -1,5 +1,6 @@
 import type {} from "@deepseek-ai/dsh-tool-present/types";
 import type { SessionId } from "@deepseek-ai/dsh-session";
+import type { UserMessage } from "@deepseek-ai/dsh-llm";
 import type {
   WorkerTimelinePage,
   WorkerTimelineTurn,
@@ -7,6 +8,26 @@ import type {
 import type { HostAccess } from "./host-access.ts";
 import { abortableChange } from "./native.ts";
 import { messageContent } from "./message-content.ts";
+
+/** Project only the wrapper authored by nativeMessage; dialogue text stays intact. */
+function displayText(message: UserMessage): string | undefined {
+  const source = message.source;
+  const first = message.content[0];
+  if (
+    source.kind !== "moa-message" ||
+    typeof source.senderId !== "string" ||
+    first?.type !== "text"
+  )
+    return undefined;
+  const prefix = `${source.requestId ? `Request ID: ${source.requestId}\n` : ""}${source.replyTo ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+  if (!first.text.startsWith(prefix)) return undefined;
+  return [
+    first.text.slice(prefix.length),
+    ...message.content.slice(1).flatMap((block) =>
+      block.type === "text" ? [block.text] : [],
+    ),
+  ].join("");
+}
 
 export async function readWorkerTimeline(
   host: HostAccess,
@@ -54,11 +75,13 @@ export async function readWorkerTimeline(
         event.data.source.kind === "project-mode-assignment" ||
         event.data.source.kind === "moa-message")
     ) {
+      const presentation = displayText(event.data);
       current.inputs.push({
         id: event.data.id,
         seq: event.seq,
         time: event.time,
         ...messageContent(host.ctx, event.data.content),
+        ...(presentation === undefined ? {} : { displayText: presentation }),
         actor:
           event.data.source.kind === "moa-message"
             ? event.data.source.senderId === record.project.coordinatorSessionId

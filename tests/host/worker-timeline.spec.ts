@@ -1,8 +1,157 @@
 import { expect, it } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import { AttachmentId } from "@deepseek-ai/dsh-attachment";
+import { createUserMessage, type ContentBlock } from "@deepseek-ai/dsh-llm";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import type {} from "@deepseek-ai/dsh-tool-present/types";
+import type { HostAccess } from "../../packages/project-mode/src/host/host-access.ts";
+import { readWorkerTimeline } from "../../packages/project-mode/src/host/worker-timeline.ts";
 import { fixture, response } from "./fixture.ts";
+
+it("projects only the complete authored MoA prefix and preserves raw text and attachments", async () => {
+  const parentId = SessionId("timeline-presentation-parent");
+  const workerId = SessionId("timeline-presentation-worker");
+  const source = {
+    kind: "moa-message" as const,
+    form: "relay" as const,
+    rootId: parentId,
+    senderId: parentId,
+    operationId: "message",
+    requestId: "request-1",
+    replyTo: "request-0",
+  };
+  const prefix = `Request ID: request-1\nReply to: request-0\nFrom: ${parentId}\n`;
+  const body =
+    "## Task\n\nFrom: a quoted user message\nRequest ID: keep this\n";
+  const file: ContentBlock = {
+    type: "file",
+    attachment: {
+      attachmentId: AttachmentId("f".repeat(64)),
+      name: "original notes.md",
+      bytes: 17,
+    },
+  };
+  const messages = [
+    createUserMessage({
+      source,
+      content: [
+        { type: "text", text: prefix + body },
+        file,
+        { type: "text", text: "\nTail stays exact.  " },
+      ],
+    }),
+    createUserMessage({
+      source: { ...source, requestId: undefined, replyTo: undefined },
+      content: [{ type: "text", text: `From: ${parentId}\n${body}` }],
+    }),
+    createUserMessage({
+      source: { kind: "user" },
+      content: [{ type: "text", text: prefix + body }],
+    }),
+    createUserMessage({
+      source: {
+        kind: "project-mode-assignment",
+        form: "relay",
+        operationId: "assignment",
+        coordinatorSessionId: parentId,
+      },
+      content: [{ type: "text", text: prefix + body }],
+    }),
+    createUserMessage({
+      source: { ...source, senderId: "another-agent" },
+      content: [{ type: "text", text: prefix + body }],
+    }),
+    createUserMessage({
+      source: { ...source, requestId: "different-request" },
+      content: [{ type: "text", text: prefix + body }],
+    }),
+    createUserMessage({
+      source,
+      content: [file, { type: "text", text: prefix + body }],
+    }),
+    createUserMessage({
+      source,
+      content: [
+        { type: "text", text: "Request ID: request-1\n" },
+        {
+          type: "text",
+          text: `Reply to: request-0\nFrom: ${parentId}\n${body}`,
+        },
+      ],
+    }),
+    createUserMessage({ source, content: [{ type: "text", text: prefix }] }),
+  ];
+  let disposed = false;
+  const host = {
+    record: () => ({
+      project: { coordinatorSessionId: parentId },
+      assignments: [],
+    }),
+    worker: () => ({ lifecycle: "active" }),
+    view: async () => ({ status: "idle" }),
+    ctx: {
+      get: () => undefined,
+      sessionQuery: {
+        observeSession: async () => ({
+          inheritedEventCount: 0,
+          header: { cwd: "/workspace" },
+          cursor: messages.length + 2,
+          events: [
+            { type: "turn/start", seq: 0, time: 10, data: { turn: 1 } },
+            ...messages.map((data, index) => ({
+              type: "user/message",
+              seq: index + 1,
+              time: 11 + index,
+              data,
+            })),
+            {
+              type: "turn/end",
+              seq: messages.length + 1,
+              time: 30,
+              data: { turn: 1, reason: { kind: "completed" } },
+            },
+          ],
+          [Symbol.dispose]() {
+            disposed = true;
+          },
+        }),
+      },
+    },
+  } as unknown as HostAccess;
+  const page = await readWorkerTimeline(
+    host,
+    parentId,
+    workerId,
+    10,
+    new AbortController().signal,
+  );
+  const inputs = page.turns[0].inputs;
+  expect(inputs.map((message) => message.text)).toEqual(
+    messages.map((message) =>
+      message.content
+        .flatMap((block) => (block.type === "text" ? [block.text] : []))
+        .join(""),
+    ),
+  );
+  expect(inputs.map((message) => message.displayText)).toEqual([
+    body + "\nTail stays exact.  ",
+    body,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    "",
+  ]);
+  expect(inputs[0].attachments).toEqual([
+    { type: "file", attachment: file.attachment },
+  ]);
+  expect(inputs[6].attachments).toEqual(inputs[0].attachments);
+  expect(inputs[0].actor).toBe("coordinator");
+  expect(inputs[2].actor).toBe("user");
+  expect(disposed).toBe(true);
+});
 
 it("streams native turns newest first with visible dialogue and recorded artifacts, including empty failures", async () => {
   const f = await fixture();

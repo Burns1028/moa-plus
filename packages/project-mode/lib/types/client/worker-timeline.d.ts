@@ -6,5 +6,7 @@ import type { SharedProps } from "./components.tsx";
 export type WorkersPanelProps = PropsRuntime<"sidebar.right.pane.tab"> & PropsLocale<"project-mode"> & SharedProps & {
     timeline: TypertClientRemote["projectMode"]["timeline"];
 };
-export declare function MessagePreview({ text, labels, }: Pick<React.ComponentProps<typeof MarkdownText>, "text" | "labels">): React.JSX.Element;
+export declare function MessagePreview({ text, labels, collapseLabel, }: Pick<React.ComponentProps<typeof MarkdownText>, "text" | "labels"> & {
+    collapseLabel: string;
+}): React.JSX.Element;
 export declare function WorkersPanel({ client, open, timeline, sessionId, useTabInfo, t, }: WorkersPanelProps): React.JSX.Element;

@@ -4717,6 +4717,15 @@ async function readHistory(host, parentId, workerId, offset, limit, signal) {
 	}
 }
 // src/host/worker-timeline.ts
+/** Project only the wrapper authored by nativeMessage; dialogue text stays intact. */
+function displayText(message) {
+	const source = message.source;
+	const first = message.content[0];
+	if (source.kind !== "moa-message" || typeof source.senderId !== "string" || first?.type !== "text") return void 0;
+	const prefix = `${source.requestId ? `Request ID: ${source.requestId}\n` : ""}${source.replyTo ? `Reply to: ${source.replyTo}\n` : ""}From: ${source.senderId}\n`;
+	if (!first.text.startsWith(prefix)) return void 0;
+	return [first.text.slice(prefix.length), ...message.content.slice(1).flatMap((block) => block.type === "text" ? [block.text] : [])].join("");
+}
 async function readWorkerTimeline(host, parentId, workerId, limit, signal) {
 	try {
 		var _usingCtx$2 = _usingCtx();
@@ -4746,13 +4755,17 @@ async function readWorkerTimeline(host, parentId, workerId, limit, signal) {
 				current.outcome = event.data.reason.kind;
 				current.finishedAt = event.time;
 			}
-			if (event.type === "user/message" && (event.data.source.kind === "user" || event.data.source.kind === "project-mode-assignment" || event.data.source.kind === "moa-message")) current.inputs.push({
-				id: event.data.id,
-				seq: event.seq,
-				time: event.time,
-				...messageContent(host.ctx, event.data.content),
-				actor: event.data.source.kind === "moa-message" ? event.data.source.senderId === record.project.coordinatorSessionId ? "coordinator" : "agent" : assignments.has(event.data.id) || event.data.source.kind === "project-mode-assignment" ? "coordinator" : "user"
-			});
+			if (event.type === "user/message" && (event.data.source.kind === "user" || event.data.source.kind === "project-mode-assignment" || event.data.source.kind === "moa-message")) {
+				const presentation = displayText(event.data);
+				current.inputs.push({
+					id: event.data.id,
+					seq: event.seq,
+					time: event.time,
+					...messageContent(host.ctx, event.data.content),
+					...presentation === void 0 ? {} : { displayText: presentation },
+					actor: event.data.source.kind === "moa-message" ? event.data.source.senderId === record.project.coordinatorSessionId ? "coordinator" : "agent" : assignments.has(event.data.id) || event.data.source.kind === "project-mode-assignment" ? "coordinator" : "user"
+				});
+			}
 			if (event.type === "assistant/message" && event.data.turn === current.turn) {
 				const content = messageContent(host.ctx, event.data.message.content);
 				current.outputs = content.text || content.attachments?.length ? [{

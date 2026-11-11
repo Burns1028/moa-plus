@@ -1640,6 +1640,7 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"time": zod.z.number(),
 					"text": zod.z.string(),
+					"displayText": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("UI-only body without an exactly verified MoA transport prefix; text stays original."),
 					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
 						"type": zod.z.literal("file"),
 						"attachment": zod.z.object({
@@ -1681,6 +1682,7 @@ window.__ModuleLoader__.load({
 					"seq": zod.z.number(),
 					"time": zod.z.number(),
 					"text": zod.z.string(),
+					"displayText": zod.z.union([zod.z.undefined(), zod.z.string()]).optional().describe("UI-only body without an exactly verified MoA transport prefix; text stays original."),
 					"attachments": zod.z.union([zod.z.undefined(), zod.z.array(zod.z.union([zod.z.object({
 						"type": zod.z.literal("file"),
 						"attachment": zod.z.object({
@@ -5088,6 +5090,10 @@ window.__ModuleLoader__.load({
 														"seq": { "type": "number" },
 														"time": { "type": "number" },
 														"text": { "type": "string" },
+														"displayText": {
+															"type": "string",
+															"description": "UI-only body without an exactly verified MoA transport prefix; text stays original."
+														},
 														"attachments": {
 															"type": "array",
 															"items": { "oneOf": [{
@@ -5223,6 +5229,10 @@ window.__ModuleLoader__.load({
 														"seq": { "type": "number" },
 														"time": { "type": "number" },
 														"text": { "type": "string" },
+														"displayText": {
+															"type": "string",
+															"description": "UI-only body without an exactly verified MoA transport prefix; text stays original."
+														},
 														"attachments": {
 															"type": "array",
 															"items": { "oneOf": [{
@@ -6306,20 +6316,22 @@ window.__ModuleLoader__.load({
 .pm-workers-panel{display:grid;grid-template-columns:minmax(128px,29%) minmax(0,1fr);height:100%;min-height:0;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}
 .pm-workers-panel *{box-sizing:border-box}
 .pm-workers-panel-empty{display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}.pm-workers-panel-empty p{margin:0;max-width:28ch}
-.pm-axis-preview{margin-top:4px}.pm-axis-preview>summary{display:block;list-style:none;cursor:pointer}.pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-axis-preview>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;border-radius:3px}
-.pm-axis-preview:not([open])>summary{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--dsw-alias-label-secondary,#999)}
+.pm-axis-preview{margin:0;overflow-wrap:anywhere;line-height:1.6}.pm-axis-preview>summary{display:flex;align-items:flex-start;gap:6px;list-style:none;cursor:pointer}.pm-axis-preview>summary::-webkit-details-marker{display:none}.pm-axis-preview>summary:after{content:"⌄";flex:none;font-size:12px;color:var(--dsw-alias-label-secondary,#888)}
+.pm-axis-preview>summary>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.pm-task-result .pm-axis-preview>summary>span{-webkit-line-clamp:4}.pm-axis-preview[open]>summary{font-size:11px;color:var(--dsw-alias-label-secondary,#888);margin-bottom:10px}.pm-axis-preview[open]>summary:after{content:"⌃"}.pm-axis-preview p:first-child{margin-top:0}.pm-axis-preview p:last-child{margin-bottom:0}
+.pm-workers-panel summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:3px;border-radius:3px}
 .pm-workers-list{padding:12px 7px;border-right:1px solid var(--dsw-alias-border-primary,#8883);overflow:auto;min-width:0}
 .pm-workers-list button{display:flex;align-items:center;gap:8px;width:100%;padding:9px 8px;border:0;border-radius:8px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
 .pm-workers-list button:hover,.pm-workers-list button[aria-pressed=true]{background:var(--dsw-alias-interactive-bg-hover,#8882)}
 .pm-panel-worker-icon{position:relative;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none}.pm-panel-worker-icon .pm-panel-running{position:absolute;left:-3px;top:-3px;pointer-events:none}
-.pm-panel-worker-icon>.pm-worker-icon{width:16px;height:16px}.pm-axis-files time{display:block;font-size:11px;color:var(--dsw-alias-label-secondary,#999)}
+.pm-panel-worker-icon>.pm-worker-icon{width:16px;height:16px}
 .pm-worker-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pm-worker-copy{min-width:0;flex:1}.pm-worker-phase{font-size:11px;color:var(--dsw-alias-label-secondary,#999);display:block;margin-top:2px}
 .pm-worker-axis{overflow:auto;padding:18px 20px;min-width:0}.pm-worker-axis header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.pm-worker-axis h3{font-size:14px;margin:0;font-weight:600;overflow-wrap:anywhere}
 .pm-worker-axis button,.pm-worker-axis a{font:inherit;color:var(--dsw-alias-label-link,#80a9ee);cursor:pointer}.pm-worker-axis button{border:0;background:transparent;padding:3px 0;text-align:left}
-.pm-axis-turn{position:relative;border-left:1px solid var(--dsw-alias-border-primary,#8884);padding:0 0 24px 18px;margin-left:4px}.pm-axis-turn:before{content:"";position:absolute;left:-4px;top:5px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-label-secondary,#999)}
-.pm-axis-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px}.pm-axis-head strong{font-weight:600}.pm-axis-head time,.pm-axis-message time{font-size:11px;color:var(--dsw-alias-label-secondary,#999)}.pm-axis-outcome{margin-left:auto;font-size:11px;color:var(--dsw-alias-label-secondary,#999)}
-.pm-axis-section{margin-top:14px}.pm-axis-section h4{font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#999);margin:0 0 6px}.pm-axis-message{overflow-wrap:anywhere;margin:5px 0 12px;line-height:1.65}.pm-axis-message p:first-child{margin-top:4px}.pm-axis-files{list-style:none;padding:0;margin:0}.pm-axis-files li{margin:5px 0}.pm-axis-files small{display:block;color:var(--dsw-alias-label-secondary,#999);margin-top:3px;overflow-wrap:anywhere}
-.pm-axis-empty{color:var(--dsw-alias-label-secondary,#999);padding:4px 0;line-height:1.6}.pm-axis-more{margin-left:22px}.pm-axis-error{color:var(--dsw-alias-label-secondary,#999);overflow-wrap:anywhere}
+.pm-task-card{border:1px solid var(--dsw-alias-border-primary,#8883);border-radius:10px;margin-bottom:12px;overflow:hidden}.pm-task-toggle{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;padding:14px;cursor:pointer;list-style:none}.pm-task-toggle::-webkit-details-marker{display:none}.pm-task-toggle:after{content:"⌄";font-size:12px;color:var(--dsw-alias-label-secondary,#888);grid-column:2;grid-row:1}.pm-task-card[open]>.pm-task-toggle:after{content:"⌃"}.pm-task-meta{display:flex;align-items:center;gap:8px;min-width:0}.pm-task-meta strong{font-size:12px;font-weight:600}.pm-task-outcome{font-size:10px;line-height:1.5;border-radius:4px;padding:1px 5px;color:var(--dsw-alias-label-secondary,#777);background:var(--dsw-alias-interactive-bg-hover,#8881)}.pm-task-outcome[data-outcome=failed]{color:var(--dsw-alias-state-danger-primary,#c44)}.pm-task-outcome[data-outcome=working]{color:var(--dsw-alias-label-link,#5883c0)}
+.pm-task-toggle>time{grid-column:1 / -1;font-size:10px;color:var(--dsw-alias-label-secondary,#888)}.pm-task-title{grid-column:1 / -1;grid-row:2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.6;overflow-wrap:anywhere}.pm-task-body{padding:0 14px 14px}.pm-task-section{margin:0 0 18px}.pm-task-section h4{font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#888);margin:0 0 6px}.pm-task-result{padding-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}
+.pm-axis-files{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:6px}.pm-axis-files li{min-width:0;max-width:100%}.pm-axis-files button,.pm-axis-files li>span{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:5px 8px;border:1px solid var(--dsw-alias-border-primary,#8883);border-radius:6px;font-size:12px}.pm-axis-files button:hover{background:var(--dsw-alias-interactive-bg-hover,#8882)}.pm-axis-files svg{flex:none}.pm-axis-files span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm-task-messages{border-top:1px solid var(--dsw-alias-border-primary,#8882);padding-top:10px;font-size:12px}.pm-task-messages>summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#888)}.pm-task-message{padding-top:14px;overflow-wrap:anywhere}.pm-task-message+.pm-task-message{margin-top:14px;border-top:1px solid var(--dsw-alias-border-primary,#8882)}.pm-task-message-meta{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--dsw-alias-label-secondary,#888);margin-bottom:5px}.pm-task-raw{margin-top:8px;font-size:11px}.pm-task-raw>summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#888)}
+.pm-axis-empty{color:var(--dsw-alias-label-secondary,#999);padding:4px 0;line-height:1.6}.pm-axis-more{margin:4px 0 12px}.pm-axis-error{color:var(--dsw-alias-label-secondary,#999);overflow-wrap:anywhere}
 `;
 		// src/client/worker-timeline.tsx
 		function Timestamp({ time }) {
@@ -6333,23 +6345,24 @@ window.__ModuleLoader__.load({
 				})
 			});
 		}
-		function MessagePreview({ text, labels }) {
+		function MessagePreview({ text, labels, collapseLabel }) {
 			const [expanded, setExpanded] = react.useState(false);
 			const preview = react.useMemo(() => (0, _deepseek_ai_dsh_client_ui_primitives.extractMarkdownPlainText)(text), [text]);
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("details", {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
 				className: "pm-axis-preview",
 				onToggle: (event) => setExpanded(event.currentTarget.open),
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: expanded ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: expanded ? collapseLabel : preview }) }), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
 					text,
 					labels,
 					variant: "compact"
-				}) : preview })
+				})]
 			});
 		}
-		function MessageBody({ message, labels, open }) {
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [message.text && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
-				text: message.text,
-				labels
+		function MessageBody({ message, labels, open, collapseLabel }) {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(message.displayText ?? message.text) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessagePreview, {
+				text: message.displayText ?? message.text,
+				labels,
+				collapseLabel
 			}), !!message.attachments?.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
 				className: "pm-axis-files",
 				children: message.attachments.map(({ type, attachment, path }, index) => {
@@ -6373,6 +6386,108 @@ window.__ModuleLoader__.load({
 					}) }, `${type}:${attachment.attachmentId}:${index}`);
 				})
 			})] });
+		}
+		function TaskCard({ turn, latest, t, labels, open }) {
+			const [expanded, setExpanded] = react.useState(latest);
+			const [showMessages, setShowMessages] = react.useState(false);
+			const manuallyToggled = react.useRef(false);
+			react.useEffect(() => {
+				if (!latest && !manuallyToggled.current) setExpanded(false);
+			}, [latest]);
+			const task = turn.inputs[0];
+			const title = task && (0, _deepseek_ai_dsh_client_ui_primitives.extractMarkdownPlainText)(task.displayText ?? task.text);
+			const outcome = turn.outcome === null ? "working" : turn.outcome === "handoff" ? "continued" : turn.outcome === "completed" ? "completed" : turn.outcome === "aborted" ? "stopped" : "failed";
+			const body = (message) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
+				message,
+				labels,
+				collapseLabel: t("collapseText"),
+				open
+			});
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+				className: "pm-task-card",
+				open: expanded,
+				onToggle: (event) => setExpanded(event.currentTarget.open),
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", {
+					className: "pm-task-toggle",
+					onClick: () => {
+						manuallyToggled.current = true;
+					},
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+							className: "pm-task-meta",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: t("timelineTurn", { turn: turn.turn }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "pm-task-outcome",
+								"data-outcome": outcome,
+								children: t(outcome)
+							})]
+						}),
+						!expanded && title && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "pm-task-title",
+							children: title
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt })
+					]
+				}), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "pm-task-body",
+					children: [
+						task && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+							className: "pm-task-section",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineInputs") }), body(task)]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+							className: "pm-task-section pm-task-result",
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineOutputs") }),
+								turn.outputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: body(message) }, message.id)),
+								!turn.outputs.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+									className: "pm-axis-empty",
+									children: t(turn.outcome === null ? "awaitingReply" : "emptyReply")
+								})
+							]
+						}),
+						!!turn.artifacts.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+							className: "pm-task-section",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineArtifacts") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
+								className: "pm-axis-files pm-task-artifacts",
+								children: turn.artifacts.map((file) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+									type: "button",
+									title: file.description ? `${file.path}\n${file.description}` : file.path,
+									onClick: () => open(file.path),
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FileTypeIcon, {
+										path: file.path,
+										size: 16
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: file.path.split(/[\\/]/).at(-1) })]
+								}) }, file.path))
+							})]
+						}),
+						!!turn.inputs.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+							className: "pm-task-messages",
+							onToggle: (event) => setShowMessages(event.currentTarget.open),
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: t("timelineMessages", { count: turn.inputs.length }) }), showMessages && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: "pm-task-message-list",
+								children: turn.inputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: "pm-task-message",
+									children: [
+										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+											className: "pm-task-message-meta",
+											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t(message.actor === "coordinator" ? "fromCoordinator" : message.actor === "agent" ? "fromAgent" : "fromUser") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time })]
+										}),
+										body(message),
+										message.displayText !== void 0 && message.displayText !== message.text && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+											className: "pm-task-raw",
+											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: t("originalMessage") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MarkdownText, {
+												text: message.text,
+												labels,
+												variant: "compact"
+											})]
+										})
+									]
+								}, message.id))
+							})]
+						})
+					]
+				})]
+			});
 		}
 		function WorkersPanel({ client, open, timeline, sessionId, useTabInfo, t }) {
 			const project = useSelected(client.store.subscribe, () => projectForSession(client, sessionId));
@@ -6507,86 +6622,12 @@ window.__ModuleLoader__.load({
 									})
 								]
 							}),
-							page?.turns.map((turn) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("article", {
-								className: "pm-axis-turn",
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										className: "pm-axis-head",
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: t("timelineTurn", { turn: turn.turn }) }),
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: turn.startedAt }),
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-												className: "pm-axis-outcome",
-												children: t(turn.outcome === null ? "working" : turn.outcome === "handoff" ? "continued" : turn.outcome === "completed" ? "completed" : turn.outcome === "aborted" ? "stopped" : "failed")
-											})
-										]
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-										className: "pm-axis-section",
-										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineInputs") }), turn.inputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: "pm-axis-message",
-											children: [
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time }),
-												" ·",
-												" ",
-												t(message.actor === "coordinator" ? "fromCoordinator" : message.actor === "agent" ? "fromAgent" : "fromUser"),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
-													message,
-													labels,
-													open: (path) => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, path))
-												})
-											]
-										}, message.id))]
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-										className: "pm-axis-section",
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineOutputs") }),
-											turn.outputs.map((message) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-												className: "pm-axis-message",
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: message.time }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MessageBody, {
-													message,
-													labels,
-													open: (path) => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, path))
-												})]
-											}, message.id)),
-											!turn.outputs.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-												className: "pm-axis-empty",
-												children: t(turn.outcome === null ? "awaitingReply" : "emptyReply")
-											})
-										]
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-										className: "pm-axis-section",
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: t("timelineArtifacts") }),
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
-												className: "pm-axis-files",
-												children: turn.artifacts.map((file) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", { children: [
-													/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-														type: "button",
-														title: file.path,
-														onClick: () => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, file.path)),
-														children: [
-															/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FileTypeIcon, {
-																path: file.path,
-																size: 16
-															}),
-															" ",
-															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: file.path.split(/[\\/]/).at(-1) })
-														]
-													}),
-													file.description && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("small", { children: file.description }),
-													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Timestamp, { time: file.time })
-												] }, file.path))
-											}),
-											!turn.artifacts.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-												className: "pm-axis-empty",
-												children: t("noArtifacts")
-											})
-										]
-									})
-								]
+							page?.turns.map((turn, index) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(TaskCard, {
+								turn,
+								latest: index === 0,
+								t,
+								labels,
+								open: (path) => tab.actions.openResource(fileAddressFor(worker.workerId, page.cwd, path))
 							}, `${worker.workerId}:${turn.turn}`)),
 							page && !page.turns.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								className: "pm-axis-empty",
@@ -7059,10 +7100,13 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			selectWorker: "Select a worker to view its work.",
 			openConversation: "Open conversation ↗",
 			loadingTimeline: "Loading timeline…",
-			timelineTurn: "Turn {turn}",
-			timelineInputs: "Input",
-			timelineOutputs: "Output",
-			timelineArtifacts: "Artifacts",
+			timelineTurn: "Task {turn}",
+			timelineInputs: "Task",
+			timelineOutputs: "Result",
+			timelineArtifacts: "Files",
+			timelineMessages: "Messages · {count}",
+			originalMessage: "Original message",
+			collapseText: "Collapse full text",
 			fromCoordinator: "Coordinator",
 			fromAgent: "Agent",
 			fromUser: "User",
@@ -7157,12 +7201,15 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			selectWorker: "选择一个 Worker 查看工作记录。",
 			openConversation: "打开对话 ↗",
 			loadingTimeline: "正在加载工作轴…",
-			timelineTurn: "第 {turn} 轮",
-			timelineInputs: "输入",
-			timelineOutputs: "输出",
-			timelineArtifacts: "产物",
-			fromCoordinator: "Coordinator",
-			fromAgent: "Agent",
+			timelineTurn: "任务 {turn}",
+			timelineInputs: "任务",
+			timelineOutputs: "结果",
+			timelineArtifacts: "文件",
+			timelineMessages: "沟通记录 · {count}",
+			originalMessage: "原始消息",
+			collapseText: "收起全文",
+			fromCoordinator: "主代理",
+			fromAgent: "子代理",
 			fromUser: "用户",
 			messageFrom: "来自 {name}",
 			messageContent: "消息内容",
