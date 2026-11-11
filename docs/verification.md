@@ -1,5 +1,19 @@
 # Verification
 
+## MoA+ 0.2.1 validation — 2026-11-11
+
+The release candidate combines the completion repair merged in `f0fd485` with five Chinese orchestration shortcuts: **并行攻坚**, **多方会审**, **协同探索**, **迭代精修**, and **统筹推进**. Candidate names, descriptions, search, lexicon and expanded instructions use the Chinese names. Native tool names, role presets, reporting ownership and execution boundaries retain their existing contracts.
+
+The production build and both Host/Client typechecks passed. The final combined Host, Client, integration and native-contract regression passed **434 tests across 68 files**, with **21 tests and one file skipped**. The native composer contract passed all seven cases, including click/Enter/Tab selection, file references, attachment receipts and queue/steer delivery. An initial run exposed three test inputs still using the retired English shortcuts; those inputs were updated while preserving their full assertions, and the final full run passed.
+
+The prepared DSH 0.2.2-rc.1 compatibility suite passed **34/34**. Its complete completion flow passed **12/12** under both Node and the installed Electron runtime. Launcher checks passed **17 tests**, with three explicit skips for an unavailable stock-runtime fixture, Windows symlink privileges and unsupported console-Ctrl+C simulation. No skipped case is counted as a pass.
+
+Real Windows Desktop acceptance used DSH Next 2.0.22-next / DSH 0.2.2-rc.1. All five Chinese shortcuts were searched and expanded in a new owned draft through the native composer, including mouse, Enter and Tab selection. Expanded text contained no former English pattern names. No template was sent to the model during this UI check. Screenshot/control resources were released afterwards.
+
+The release Host bundle is byte-identical to the completion repair accepted in a separate fresh real-model conversation with DeepSeek-V4.1-Flash / High. Sending only `123` ended naturally after **13.765 seconds**: the Coordinator, Builder and Verifier all recorded completed turns; the Verifier read the rubric, candidate and files and submitted Pass. There was no shell, blocking question, approval, rework or manual Stop. This establishes that observed completion path, not every model workflow or pattern's performance.
+
+The supported baselines and Windows protected Worker shell limitation remain explicit in [native compatibility](native-compatibility.md). Earlier revision-specific evidence below is retained at its original scope. Private profiles, transcripts, screenshots and local artifact paths are excluded from the release.
+
 ## Current branch: orchestration prompts — 2026-11-11
 
 This branch adds the default Adaptive policy and five optional local prompt packs, using DSH's native input-trigger source and existing Agent tools. These changes are unreleased. The native compatibility manifest remains **21 packages / 49 paths**.

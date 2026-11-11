@@ -1,10 +1,12 @@
 # Adaptive coordination and optional patterns
 
-This guide covers unreleased changes in the current branch. The published v0.2.0 release is unchanged. MoA+ uses one default Adaptive Coordinator policy and five optional bundled prompt texts, all over the existing [native collaboration tools](tool-api.md).
+This guide covers **MoA+ v0.2.1**. MoA+ uses one default Adaptive Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
 
 ## Default Adaptive coordination
 
 The Coordinator keeps simple work direct. When delegation helps, it first considers reusing a suitable Worker's retained context with `SendMessage`, then `Fork` when committed history is useful to a new branch, then a clean `Task` when the history is irrelevant or an independent judgment matters. These choices depend on the responsibility and available context.
+
+When no actionable goal or unfinished concrete work exists, a brief acknowledgement or an ordinary chat clarification is a complete response. Tools, memory changes, worker checks, and structured user questions should advance an actual goal rather than become a ritual for every message. A necessary decision within a concrete task can still use the native question tool. Independent acceptance continues to judge the actual requested deliverable.
 
 The Coordinator starts independent ready branches within native capacity, keeps work with unmet dependencies pending, and updates the plan as results or questions arrive. It can advance another useful responsibility while Workers run. When waiting is the useful next step, it uses `QueryAgent` rather than repeatedly querying unchanged state. A timeout prompts a progress assessment; it is not by itself evidence that a Worker has failed. A substantially overdue or unclear run can be asked for its blocker and ETA through `SendMessage` in request mode before deciding whether it must be stopped.
 
@@ -16,7 +18,7 @@ Only an enabled MoA+ Coordinator offers the five packs. Workers and ordinary con
 2. The pack expands into editable composer text. Add the task, constraints, and relevant references; review or edit the text as needed.
 3. Send through the native composer as usual.
 
-For example, type `@fan-out`, select its candidate, then add: “Review these independent adapters, report findings for each, and check the combined coverage.”
+For example, type `@`, select **并行攻坚**, then add: “Review these independent adapters, report findings for each, and check the combined coverage.”
 
 Selecting or expanding a pack does not create a team. It inserts instructions for the Coordinator to act on after sending. Native Send is not intercepted. Ordinary file references, uploads, queue, and steer keep their native behavior.
 
@@ -24,23 +26,23 @@ Selecting or expanding a pack does not create a team. It inserts instructions fo
 
 | Prompt | Use it for | Collaboration contract |
 | --- | --- | --- |
-| `@fan-out` | Work that can be divided into genuinely independent slices. | Scout actual boundaries, give each Worker a disjoint slice, gather every result, integrate strictly, and independently verify judgments or results without an objective gate. |
-| `@panel-team` | A disputed decision with several defensible perspectives. | A Lead hosts 3–5 independent Panelists assessing the same question through different lenses, resolves information gaps, and preserves genuine value conflicts. |
-| `@blackboard-team` | Exploration whose findings keep changing the useful next steps. | A Builder establishes a shared charter and team, 3–6 Specialists choose their own routes, and a Keeper synthesizes a factual board without steering them. |
-| `@critique-loop` | An artifact that needs judgment and iterative improvement. | One retained Actor works against fixed criteria; every round uses a fresh blind Critic. Relay revision issues verbatim and stop on approval or after at most three critique rounds. |
-| `@auto-orchestration` | A compound task needing different collaboration forms across phases. | Diagnose the structure, keep a living phase plan with completion criteria, assemble the smallest useful form for each phase, and revise downstream work when evidence changes. |
+| **并行攻坚** | Work that can be divided into genuinely independent slices. | Scout actual boundaries, give each Worker a disjoint slice, gather every result, integrate strictly, and independently verify judgments or results without an objective gate. |
+| **多方会审** | A disputed decision with several defensible perspectives. | A Lead hosts 3–5 independent Panelists assessing the same question through different lenses, resolves information gaps, and preserves genuine value conflicts. |
+| **协同探索** | Exploration whose findings keep changing the useful next steps. | A Builder establishes a shared charter and team, 3–6 Specialists choose their own routes, and a Keeper synthesizes a factual board without steering them. |
+| **迭代精修** | An artifact that needs judgment and iterative improvement. | One retained Actor works against fixed criteria; every round uses a fresh blind Critic. Relay revision issues verbatim and stop on approval or after at most three critique rounds. |
+| **统筹推进** | A compound task needing different collaboration forms across phases. | Diagnose the structure, keep a living phase plan with completion criteria, assemble the smallest useful form for each phase, and revise downstream work when evidence changes. |
 
 ### Independent slices and reviews
 
-Fan-out requires slices whose changes do not invalidate one another. Confirm this from real files and state, cover the whole responsibility without gaps, and keep mutable slice work separate. Gather actual artifacts and evidence before integrating. Give an independent verifier the integrated artifact and claims to check, without the Coordinator's reasoning or expected answer. Return concrete failures to the original Worker through `SendMessage` so it can refine its retained work.
+并行攻坚 requires slices whose changes do not invalidate one another. Confirm this from real files and state, cover the whole responsibility without gaps, and keep mutable slice work separate. Gather actual artifacts and evidence before integrating. Give an independent verifier the integrated artifact and claims to check, without the Coordinator's reasoning or expected answer. Return concrete failures to the original Worker through `SendMessage` so it can refine its retained work.
 
-In a critique loop, each fresh Critic receives only the full current artifact and fixed acceptance criteria. It returns `APPROVED` or `NEEDS_REVISION` with locatable issues. Reuse the Actor, pass issues unchanged, and create a new Critic for the next version. Ordinary objective checks remain appropriate when they settle the task without a critique cycle. After the third failed review, report the unresolved issues; a fundamental direction error or contradictory requirement ends the loop earlier.
+In 迭代精修, each fresh Critic receives only the full current artifact and fixed acceptance criteria. It returns `APPROVED` or `NEEDS_REVISION` with locatable issues. Reuse the Actor, pass issues unchanged, and create a new Critic for the next version. Ordinary objective checks remain appropriate when they settle the task without a critique cycle. After the third failed review, report the unresolved issues; a fundamental direction error or contradictory requirement ends the loop earlier.
 
-### A panel preserves real disagreement
+### 多方会审 preserves real disagreement
 
 Each Panelist judges the whole decision through its own lens, using the same minimal evidence and no preferred answer from the Coordinator. Panelists do not communicate with each other. Each returns a judgment or ranking, key evidence, and the strongest counterargument to its own position. The Lead uses `SendMessage` to resolve missing information with the relevant Panelists, then returns conditional recommendations, consensus, retained disagreements, and important risks. The Lead does not choose the user's values.
 
-### A blackboard keeps findings visible
+### 协同探索 keeps findings visible
 
 Use a shared task directory that all members can access under their actual permissions, outside private isolated worktrees. The Builder writes `charter.md` once with the goal, evidence standard, stall criteria, and initial candidate directions. Each Specialist writes only its own `findings/<peer>/`; only the Keeper writes `board.md`.
 
@@ -48,7 +50,7 @@ Specialists read the board and peer findings, record visible `CLAIM`s before cos
 
 ### Compose phases from evidence
 
-Auto orchestration first asks whether work can be decomposed, how its parts relate, and whether the result is an artifact or a judgment. Each phase records its goal, collaboration form, and completion criterion. The selected prompt makes the Coordinator responsible for diagnosis, assembly, handoffs, and acceptance, with execution and substantive assessments assigned to Workers. That boundary belongs to this selected pattern; the default Coordinator can still do simple work directly.
+统筹推进 first asks whether work can be decomposed, how its parts relate, and whether the result is an artifact or a judgment. Each phase records its goal, collaboration form, and completion criterion. The selected prompt makes the Coordinator responsible for diagnosis, assembly, handoffs, and acceptance, with execution and substantive assessments assigned to Workers. That boundary belongs to this selected pattern; the default Coordinator can still do simple work directly.
 
 ## Use the actual tool contracts
 

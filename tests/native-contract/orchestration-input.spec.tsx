@@ -135,9 +135,9 @@ it.each([
     b.controller.pick("reference", await b.ready("reference", "report.md"));
     const file = b.shell.draftSnapshot.references[0];
     expect(file).toMatchObject({ source: "reference", ref: "@report.md" });
-    b.shell.paste("\n@fan-out");
+    b.shell.paste("\n@并行攻坚");
     b.shell.addAttachments(["image-draft", "file-receipt-draft"]);
-    const packIndex = await b.ready("MoA+", "fan-out");
+    const packIndex = await b.ready("MoA+", "并行攻坚");
     if (selection !== "click") {
       b.controller.hover("MoA+", packIndex);
       expect(b.shell.arbitrate(selection, false)).toBe("pick-highlighted");
@@ -166,8 +166,8 @@ it.each([
 );
 
 it.each([
-  ["@fan-out", " task"],
-  ['@"fan-out', ' report.md"'],
+  ["@并行攻坚", " task"],
+  ['@"并行攻坚', ' report.md"'],
 ])(
   "keeps Space as ordinary text after %s through the native shell",
   async (prefix, suffix) => {
