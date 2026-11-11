@@ -83,6 +83,10 @@ async function fixture(mode, testsRequired, selectedEffort, shellAvailable = tes
       await ctx.plugin((await load('dsh-sandbox-local')).default);
     }
     if (mode === 'ptc') await ctx.plugin((await load('dsh-ptc-runtime-node')).default);
+    if (shellAvailable && !testsRequired) {
+      await ctx.plugin(await load('dsh-tool-fs'));
+      await writeFile(join(directory, 'verification-artifact.txt'), 'ACTUAL NATIVE FILE INSPECTION');
+    }
     if (shellAvailable) {
       if (persistent) {
         await ctx.plugin((await load('dsh-terminal')).default);
@@ -150,17 +154,19 @@ scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: undefined
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true });
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true, persistent: true });
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true, defaultPwshJobs: true });
+scenarios.push({ mode: 'native', testsRequired: true, selectedEffort: 'high', attemptShell: true, defaultPwshJobs: true });
 scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: false, completePreset: true });
 for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, completePreset, defaultPwshJobs } of scenarios) {
   test(`rc2 full plugin first turn converges and persists JSON cache (parent=${mode}, tests=${testsRequired}, effort=${selectedEffort ?? 'default'}, shell=${persistent ? 'persistent' : defaultPwshJobs ? 'default-jobs' : attemptShell}, completePreset=${!!completePreset})`, {
     skip: !modules || (attemptShell && process.platform !== 'win32'), timeout: 20000,
   }, async () => {
     const f = await fixture(mode, testsRequired, selectedEffort, attemptShell, { persistent, completePreset, defaultPwshJobs });
-    const errors = [], shellResults = [], jobEvents = [], approvalEvents = [];
+    const errors = [], shellResults = [], jobEvents = [], approvalEvents = [], inspections = [];
     let main = 0, builder = 0, verifier = 0, retry = '', shellOwner;
     f.ctx.on('agent/error', ({ error }) => errors.push(error));
     f.ctx.on('tools/result', (exec, result) => {
       if (exec.name === 'pwsh') { shellResults.push(result); shellOwner = exec.agent; }
+      if (exec.name === 'read') inspections.push(result);
     });
     f.ctx.on('session/event', (_session, event) => {
       if ((event.type === 'job/registered' || event.type === 'job/settled') && event.data.kind === 'pwsh') jobEvents.push(event);
@@ -185,12 +191,12 @@ for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, comp
               ...(persistent ? {} : { description: 'Run required tests', timeoutMs: 1000 }) })
             : call('read_candidate');
           if (attemptShell) {
-            // A model that treats this backend error as a retryable command
-            // failure would next seek wider access, then keep retrying. The
-            // native capability boundary must prevent this model step itself.
-            if (verifier > 3) f.agent.cancel({ kind: 'user' });
-            return call('pwsh', { command: "Write-Output 'retry must not run'", description: 'Retry with wider access',
-              timeoutMs: 1000, sandbox_permissions: 'danger-full-access', justification: 'Retry the failed verification command' });
+            assert.ok(!names.includes('pwsh'), 'the native scope must remove the unavailable shell before the next request');
+            const notices = request.messages.filter(message => message.source.kind === 'moa-completion' &&
+              message.content.some(block => block.type === 'text' && block.text.startsWith('The native shell backend cannot enforce')));
+            assert.equal(notices.length, 1);
+            if (verifier === 3) return call('read', { file_path: join(f.directory, 'verification-artifact.txt') });
+            if (verifier === 4) return call('read_candidate');
           }
           return call('submit_verdict', { status: 'Pass', issues: [] });
         }
@@ -210,12 +216,12 @@ for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, comp
         assert.ok(jobEvents.some(event => event.type === 'job/registered'), 'the real jobs controller must admit the PowerShell producer');
         assert.ok(jobEvents.some(event => event.type === 'job/settled'), 'the real jobs controller must settle the PowerShell producer');
       }
-      assert.equal(verifier, attemptShell ? 2 : 3, JSON.stringify({ main, builder, retry, errors: errors.map(String),
+      assert.equal(verifier, attemptShell ? testsRequired ? 2 : 5 : 3, JSON.stringify({ main, builder, retry, errors: errors.map(String),
         jobs: jobEvents.map(event => ({ type: event.type, data: event.data })),
         shellResults: shellResults.map(result => ({ isError: result.isError, code: result.error?.info?.code ?? null, error: result.error })),
         requests: f.adapter.requests.map(request => ({ id: request.sessionId, tools: request.tools.map(tool => tool.name) })) }));
       assert.equal(main, 1);
-      if (attemptShell) {
+      if (testsRequired) {
         assert.equal(errors.length, 1);
         assert.match(String(errors[0]), /MoA\+ Outcome Verifier cannot run pwsh:.*Readonly path policy is unsupported/);
       } else assert.deepEqual(errors, []);
@@ -249,12 +255,19 @@ for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, comp
         assert.equal(allText.split('You are the MoA+ coordinator').length - 1, 1);
       }
       const completed = f.agent.session.snapshotEvents().some(event => event.type === 'turn/end' && event.data.reason.kind === 'completed');
-      assert.equal(completed, !attemptShell);
+      assert.equal(completed, !testsRequired);
       if (attemptShell) {
         assert.equal(retry, '');
         const end = f.agent.session.snapshotEvents().findLast(event => event.type === 'turn/end');
-        assert.equal(end.data.reason.kind, 'error');
-        assert.match(end.data.reason.error.message, /Readonly path policy is unsupported/);
+        if (testsRequired) {
+          assert.equal(end.data.reason.kind, 'error');
+          assert.match(end.data.reason.error.message, /Readonly path policy is unsupported/);
+        } else {
+          assert.equal(end.data.reason.kind, 'completed');
+          assert.equal(inspections.length, 1);
+          assert.notEqual(inspections[0].isError, true, JSON.stringify(inspections[0]));
+          assert.match(JSON.stringify(inspections[0].content), /ACTUAL NATIVE FILE INSPECTION/);
+        }
         assert.equal(shellResults.length, 1);
         assert.equal(shellResults[0].error?.info?.code, 'READ_ONLY_PATH_UNSUPPORTED');
         assert.equal(shellResults[0].error?.info?.name, 'ReadOnlyPathUnsupportedError');

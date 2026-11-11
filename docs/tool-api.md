@@ -202,6 +202,8 @@ Verifier reads the applicable rubric with `read_rubric` and the complete frozen 
 
 The hidden Verifier finishes with its private `submit_verdict(status, issues)` tool. `status` is `Pass`, `Partial`, or `Block`; `issues` is an array of strings. Submission ends that review without another model response. It belongs to the current candidate only, and does not count as inspection or replace a required successful Bash execution. The existing plain/fenced JSON verdict forms remain compatible. This tool is absent from Coordinator and Worker inventories.
 
+Its optional `runtime_blocked` boolean defaults to false; together with an observed native capability failure, true reports that the remaining tools cannot independently verify the task, while ordinary `Partial` and `Block` issues remain eligible for rework.
+
 Coordinator facts state whether automatic outcome verification is configured. When enabled, they identify the host-managed rubric and final verification flow; when disabled, they explicitly say so. A leftover rubric file or a retained helper does not determine the current setting.
 
 ## UI and backend compatibility

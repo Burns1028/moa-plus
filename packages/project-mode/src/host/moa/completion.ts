@@ -18,7 +18,7 @@ declare module "@deepseek-ai/dsh-llm" {
 
 const criteriaSchema = z.object({ criteria: z.string().min(1), promise: z.string().min(1) });
 const rubricSchema = z.object({ rubric: z.string().min(1), tests_required: z.boolean() });
-const verdictSchema = z.object({ status: z.enum(["Pass", "Partial", "Block"]), issues: z.array(z.string()) });
+const verdictSchema = z.object({ status: z.enum(["Pass", "Partial", "Block"]), issues: z.array(z.string()), runtime_blocked: z.boolean().optional() });
 type Verdict = z.infer<typeof verdictSchema>;
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
@@ -225,6 +225,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
             parameters: {
               status: { type: "string", required: true, enum: ["Pass", "Partial", "Block"] },
               issues: { type: "array", required: true, items: { type: "string" }, description: "Concrete remaining gaps; empty when no issues remain" },
+              runtime_blocked: { type: "boolean", description: "True when an unavailable runtime capability prevents independent verification with the remaining tools; false or omitted for ordinary deliverable gaps" },
             },
             output,
             async execute(args, exec) {
@@ -329,6 +330,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     const control = AbortSignal.any([signal, host.closing.signal, wake.signal]);
     let active: Helpers | undefined;
     let stopEvidence: (() => void) | undefined;
+    const capabilitySuppressions: Array<() => void> = [];
     let candidateReview: ReturnType<Helpers["freezeCandidate"]> | undefined;
     try {
       listener();
@@ -352,17 +354,28 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const successfulShell = new Set<number>();
       let capabilityFailure: CompletionHelperFailure | undefined;
       let capabilityJoin: Promise<void> | undefined;
+      const unavailableTools = new Set<string>();
+      let capabilityNotice = false;
       stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-        if (exec.agent !== pair.verifier.agent || !shellKind(exec.name)) return;
+        if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || control.aborted) return;
         if (result.isError) {
-          if (!capabilityFailure && result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
-            // This native backend cannot honor the review's record protection.
-            // Stop before another model step can retry or seek wider access.
-            capabilityFailure = new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
-            capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
-            // Observe an early rejection while whenIdle is still joining. The
-            // original promise is awaited below and its failure is propagated.
-            void capabilityJoin.catch(error => host.ctx.logger.warn(`moa: verifier capability-stop cleanup: ${String(error)}`));
+          if (result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
+            capabilityFailure ??= new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
+            if (testsRequired) {
+              // Required execution cannot be replaced with file inspection.
+              if (!capabilityJoin) {
+                capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
+                // The original promise is awaited below; observe early rejection.
+                void capabilityJoin.catch(error => host.ctx.logger.warn(`moa: verifier capability-stop cleanup: ${String(error)}`));
+              }
+            } else if (!unavailableTools.has(exec.name)) {
+              unavailableTools.add(exec.name);
+              capabilitySuppressions.push(pair.verifier.agent.ctx.tools.suppress({ deny: [exec.name] }));
+              if (!capabilityNotice) {
+                capabilityNotice = true;
+                pair.verifier.agent.inject(msg("The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and read_candidate. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag."));
+              }
+            }
           }
           return;
         }
@@ -388,7 +401,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
           throw new CompletionHelperFailure(`${capabilityFailure!.message}; native cleanup failed`, { cause: error });
         }
       }
-      if (capabilityFailure) throw capabilityFailure;
+      if (capabilityFailure && testsRequired) throw capabilityFailure;
       checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
       await pair.read(control);
       control.throwIfAborted();
@@ -397,7 +410,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
       const successfulCalls = calls.filter((e) => e.type === "tool/call" && results.some((result) => result.type === "tool/result" && result.data.step === e.data.step && result.data.message.toolCallId === e.data.callId));
       const passedShell = successfulCalls.some(call => successfulShell.has(call.seq)) || events.some(event => event.type === "job/settled" && shellKind(event.data.kind) && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.type === "tool/call" && call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId));
-      let verdict: { status?: string; issues?: unknown };
+      let verdict: { status?: string; issues?: unknown; runtime_blocked?: unknown };
       try {
         const submittedVerdict = candidateReview.readVerdict();
         if (submittedVerdict) verdict = submittedVerdict;
@@ -411,10 +424,15 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
           if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
         }
       } catch {
+        if (capabilityFailure) throw capabilityFailure;
         agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
         return;
       }
-      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || (testsRequired && !passedShell)) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+      if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || verdict.runtime_blocked === true)) throw capabilityFailure;
+      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || (testsRequired && !passedShell)) {
+        if (capabilityFailure && verdict.status === "Pass") throw capabilityFailure;
+        agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+      }
     } catch (error) {
       signal.throwIfAborted();
       if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -428,6 +446,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     } finally {
       candidateReview?.dispose();
       stopEvidence?.();
+      for (const remove of capabilitySuppressions) remove();
       host.listeners.delete(listener);
       if (control.aborted && active?.verifier.agent.status === "running") active.verifier.agent.cancel({ kind: "parent" });
     }

@@ -63,12 +63,16 @@ reached the Coordinator's committed model history. It is existing task context,
 not a new human message; notes remain progress records. Completed tasks no longer
 supply that context to a later task.
 
-The Verifier also treats the native structured `READ_ONLY_PATH_UNSUPPORTED`
-failure as a runtime capability error. It cancels and joins the native helper,
-then reports the error to the parent turn, instead of retrying tools, requesting
-broader permissions or asking the Coordinator to rework the deliverable. The
-rule applies even when no tests were required. Ordinary failed tests remain
-eligible for re-verification; console text does not establish this error code.
+The Verifier treats native structured `READ_ONLY_PATH_UNSUPPORTED` as an
+unavailable capability. Required execution cancels and joins the native helper,
+then reports the error to the parent turn. When execution is not required, the
+failed tool is suppressed only for this review and one native notice directs the
+Verifier to available file tools and `read_candidate`; actual inspection remains
+mandatory. If those tools cannot establish the requirements, the Verifier can
+submit `runtime_blocked: true`, which ends the parent with the observed capability
+error. Ordinary `Partial` and `Block` verdicts retain their concrete rework issues.
+Suppression is released when the review exits. Console text does not establish
+the error code, and no permission escalation removes the record protection.
 
 Coordinator, Builder and Verifier guidance keeps effort proportional to the
 actual request. With no actionable goal or ongoing work, an appropriate short

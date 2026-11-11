@@ -1168,7 +1168,7 @@ This is a pre-end review: the parent turn is still open, and your passing verdic
 
 Judge only actual requested deliverables. If there is no actionable goal and no earlier unfinished concrete requirement, an appropriate brief acknowledgement or ordinary chat clarification can pass; it does not require a further human reply, workspace exploration or shell execution. Read_rubric and read_candidate inspect the actual chat artifact. Do not infer missing specifications from an empty sources map or add requirements absent from the original human inputs. Report genuine requirement ambiguities through your verdict rather than blocking this review on a question to the human.
 
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Inspect file artifacts with available native tools and personally run relevant shell/build/tests with the available native shell (Bash or PowerShell) where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
+Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Prefer native glob, grep and read for file and directory inspection. Use the native shell (Bash or PowerShell) only when the verification responsibility requires command execution, builds or tests, and personally perform required execution. Candidate factual claims still require evidence; claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1205,7 +1205,8 @@ const verdictSchema = z.object({
 		"Partial",
 		"Block"
 	]),
-	issues: z.array(z.string())
+	issues: z.array(z.string()),
+	runtime_blocked: z.boolean().optional()
 });
 const key = "moa:completion-criteria";
 const sourceKey = "moa:completion-input";
@@ -1515,6 +1516,10 @@ function bindCompletion(host) {
 								required: true,
 								items: { type: "string" },
 								description: "Concrete remaining gaps; empty when no issues remain"
+							},
+							runtime_blocked: {
+								type: "boolean",
+								description: "True when an unavailable runtime capability prevents independent verification with the remaining tools; false or omitted for ordinary deliverable gaps"
 							}
 						},
 						output: output$1,
@@ -1685,6 +1690,7 @@ function bindCompletion(host) {
 		]);
 		let active;
 		let stopEvidence;
+		const capabilitySuppressions = [];
 		let candidateReview;
 		try {
 			listener();
@@ -1712,13 +1718,26 @@ function bindCompletion(host) {
 			const successfulShell = /* @__PURE__ */ new Set();
 			let capabilityFailure;
 			let capabilityJoin;
+			const unavailableTools = /* @__PURE__ */ new Set();
+			let capabilityNotice = false;
 			stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name)) return;
+				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || control.aborted) return;
 				if (result.isError) {
-					if (!capabilityFailure && result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
-						capabilityFailure = new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
-						capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
-						capabilityJoin.catch((error) => host.ctx.logger.warn(`moa: verifier capability-stop cleanup: ${String(error)}`));
+					if (result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
+						capabilityFailure ??= new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
+						if (testsRequired) {
+							if (!capabilityJoin) {
+								capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
+								capabilityJoin.catch((error) => host.ctx.logger.warn(`moa: verifier capability-stop cleanup: ${String(error)}`));
+							}
+						} else if (!unavailableTools.has(exec.name)) {
+							unavailableTools.add(exec.name);
+							capabilitySuppressions.push(pair.verifier.agent.ctx.tools.suppress({ deny: [exec.name] }));
+							if (!capabilityNotice) {
+								capabilityNotice = true;
+								pair.verifier.agent.inject(msg("The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and read_candidate. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag."));
+							}
+						}
 					}
 					return;
 				}
@@ -1740,7 +1759,7 @@ function bindCompletion(host) {
 				control.throwIfAborted();
 				throw new CompletionHelperFailure(`${capabilityFailure.message}; native cleanup failed`, { cause: error });
 			}
-			if (capabilityFailure) throw capabilityFailure;
+			if (capabilityFailure && testsRequired) throw capabilityFailure;
 			checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
 			await pair.read(control);
 			control.throwIfAborted();
@@ -1765,10 +1784,15 @@ function bindCompletion(host) {
 					if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
 				}
 			} catch {
+				if (capabilityFailure) throw capabilityFailure;
 				agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
 				return;
 			}
-			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedShell) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+			if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || verdict.runtime_blocked === true)) throw capabilityFailure;
+			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedShell) {
+				if (capabilityFailure && verdict.status === "Pass") throw capabilityFailure;
+				agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+			}
 		} catch (error) {
 			signal.throwIfAborted();
 			if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -1782,6 +1806,7 @@ function bindCompletion(host) {
 		} finally {
 			candidateReview?.dispose();
 			stopEvidence?.();
+			for (const remove of capabilitySuppressions) remove();
 			host.listeners.delete(listener);
 			if (control.aborted && active?.verifier.agent.status === "running") active.verifier.agent.cancel({ kind: "parent" });
 		}
@@ -4838,7 +4863,7 @@ const coordinatorPrompt = `You are the MoA+ coordinator (orchestrator) for a per
 Your responsibility
 You own the overall goal, task decomposition, direction, review and final delivery. Choose whether existing workers should continue, a fresh specialist should investigate, or independent approaches should run in parallel. Delegate a coherent responsibility, with a goal, constraints, context references and expected deliverables, so the worker can carry it through. Clarification, coordination, synthesis, work records and small self-contained actions are natural coordinator work. Decide ownership for the whole task; a sequence of simple steps can still be a substantial assignment. Use your judgment rather than a fixed command count or task category.
 Give each workstream a clear owner. Pass existing findings and artifact references into an assignment so the worker can advance the remaining responsibility. While it runs, advance another part of the goal. An independent review should answer an unresolved question or check a concrete risk with a fresh perspective.
-Match effort to the actual human goal. When there is no actionable request and no ongoing task or team needing attention, a brief acknowledgement or a short clarification in the normal chat reply is a complete response. Do not inspect the workspace, run commands, update project files or delegate merely to acknowledge or clarify that input. Reserve ask_user_question for necessary structured decisions in concrete work; ordinary chat clarification should not block a turn on a question card.
+Match effort to the actual human goal. When there is no actionable request and no ongoing task or team needing attention, a brief acknowledgement or a short clarification in the normal chat reply is a complete response. Respond only to that input; do not add unverified claims about workspace, system or runtime state. Do not inspect the workspace, run commands, update project files or delegate merely to acknowledge or clarify that input. Reserve ask_user_question for necessary structured decisions in concrete work; ordinary chat clarification should not block a turn on a question card.
 
 Memory
 You alone maintain notes.md and archived.md. notes.md records the current stage, todos, assignments, progress, blockers and links to key artifacts. Its full content is refreshed before each coordinator inference. If it grows beyond the soft character budget, archive concluded work and its results in archived.md, and move detailed reusable background into context. Preserve the result before removing its active entry.
