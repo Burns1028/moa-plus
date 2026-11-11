@@ -5,13 +5,26 @@ permissions and Client slots. Installing a package and providing its required
 native capabilities are separate operations. A permissive package version range
 alone cannot provide missing native behavior.
 
-The supported dependency families are DSH 0.2.1-rc.3 and 0.2.2-rc.1. The latter
-is used by DSH Next 2.0.22-next. Compatibility profiles live under `compat/`;
-`scripts/apply-native-compat.mjs` selects the profile from the installed Agent
-version, then checks every required package version and every affected file
-before making changes. npm and Desktop distributions can have different bytes.
-An unknown distribution requires an audited variant, even within a version
-family. New profiles do not require another version switch inside the installer.
+The tested dependency baselines are DSH 0.2.1-rc.3 and 0.2.2-rc.1. The latter
+is used by DSH Next 2.0.22-next. Compatibility profiles live under `compat/`.
+`scripts/apply-native-compat.mjs` prefers a matching version profile, then checks
+every affected file before making changes. A different version label can reuse
+one complete audited profile when all its runtime bytes and package export
+contracts match. Packages from different profiles cannot be combined to pass.
+
+Each such entry has a `runtimeFingerprint`: a digest of `type`, `main`, `exports`,
+`imports` and `dsh` metadata, preserving conditional-export ordering, plus any
+additional runtime anchors. A package with declaration-only changes must have
+an actual JavaScript anchor. Anchors are checked without changing or backing up
+those files. The older rc.3 Desktop variant has not been fingerprinted here and
+retains its existing version-bound support. npm and Desktop artifacts can differ.
+
+Plugin peers accept the candidate ranges `^0.2.1-rc.3 || ^0.2.2-rc.1`; development
+dependencies and the isolated Web runtime remain locked to their tested baseline.
+The peer ranges permit installation candidates, not a claim that every candidate
+already supplies the required native APIs. Runtime activation checks capabilities
+and reports missing interfaces. A native runtime supplying the contracts directly
+does not need a patch merely because its version label is new.
 
 The legacy rc.3 profile is retained. The rc.2 profile preserves the newer native
 pipeline, ToolSet admission, file-upload receipts and UI controls, extending the
@@ -57,7 +70,9 @@ Shared capabilities should be detected through native APIs. Missing required
 capabilities must be reported by name; unrelated optional capabilities should not
 be inferred from a package version. A future native release that incorporates
 these contracts can remove its corresponding patch rather than carry an older
-implementation forward. Unknown versions are not modified with an older diff.
+implementation forward. An unrecognized implementation is never changed with
+an older diff. Broad compatibility requires shared API and lifecycle contracts;
+matching a version string or a method name alone does not establish those facts.
 
 Worker shell record protection currently requires macOS Seatbelt or Linux
 bubblewrap. Windows ACL cannot express the same path restriction while the

@@ -23,7 +23,6 @@ export const en = {
   copied: "Copied",
   footnotes: "Footnotes",
   project: "MoA+",
-  enabling: "Updating MoA+…",
   loading: "Loading MoA+…",
   parent: "Back",
   readonlyDeleted:
@@ -119,7 +118,6 @@ export const zh: Record<ProjectKey, string> = {
   copied: "已复制",
   footnotes: "脚注",
   project: "MoA+",
-  enabling: "正在更新 MoA+…",
   loading: "正在加载 MoA+…",
   parent: "Back",
   readonlyDeleted: "此 worker 已删除，对话历史仍然保留。",

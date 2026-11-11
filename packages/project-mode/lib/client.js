@@ -6708,31 +6708,24 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 				className: "pm-toggle",
 				"aria-busy": state.busy,
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: "pm-mode-button",
-						"aria-label": t("project"),
-						"aria-pressed": state.value?.enabled ?? false,
-						title: reason ? t(`blocked.${reason}`) : state.value?.paths?.root,
-						disabled: state.busy || !state.value?.canToggle,
-						onClick: () => {
-							client.toggle(sessionId, !state.value?.enabled);
-						},
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-							className: "pm-wordmark",
-							"aria-hidden": "true"
-						})
-					}),
-					state.busy && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						role: "status",
-						children: t("enabling")
-					}),
-					state.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						role: "alert",
-						children: t("error", { message: state.error })
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "pm-mode-button",
+					"aria-label": t("project"),
+					"aria-pressed": state.value?.enabled ?? false,
+					title: reason ? t(`blocked.${reason}`) : state.value?.paths?.root,
+					disabled: state.busy || !state.value?.canToggle,
+					onClick: () => {
+						client.toggle(sessionId, !state.value?.enabled);
+					},
+					children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "pm-wordmark",
+						"aria-hidden": "true"
 					})
-				]
+				}), state.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					role: "alert",
+					children: t("error", { message: state.error })
+				})]
 			});
 		}
 		// src/client/branch.tsx
@@ -6896,7 +6889,6 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			copied: "Copied",
 			footnotes: "Footnotes",
 			project: "MoA+",
-			enabling: "Updating MoA+…",
 			loading: "Loading MoA+…",
 			parent: "Back",
 			readonlyDeleted: "This worker was deleted. Its conversation history is retained.",
@@ -6989,7 +6981,6 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			copied: "已复制",
 			footnotes: "脚注",
 			project: "MoA+",
-			enabling: "正在更新 MoA+…",
 			loading: "正在加载 MoA+…",
 			parent: "Back",
 			readonlyDeleted: "此 worker 已删除，对话历史仍然保留。",

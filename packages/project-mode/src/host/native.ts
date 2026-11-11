@@ -1,18 +1,81 @@
-import { TOOL_RUNTIME_SCHEDULER } from "@deepseek-ai/dsh-tools";
+import * as NativeTools from "@deepseek-ai/dsh-tools";
 import type {} from "@deepseek-ai/dsh-jobs";
 import type {} from "@deepseek-ai/dsh-shell";
 import type { SessionController } from "@deepseek-ai/dsh-api-session-controller";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import { SubagentError } from "@deepseek-ai/dsh-subagent";
-// The only version-sensitive host-message compatibility boundary; public npm subpath.
-export {
-  queueHostSubagentPrompt,
-  steerHostSubagentPrompt,
-} from "@deepseek-ai/dsh-subagent/internal";
 import type { Context } from "@deepseek-ai/cordis";
 import type { Session } from "@deepseek-ai/dsh-session";
 import { projection, type Projection } from "./state.ts";
+
+type HostPromptAdapters = Pick<
+  typeof import("@deepseek-ai/dsh-subagent/internal"),
+  "queueHostSubagentPrompt" | "steerHostSubagentPrompt"
+>;
+type HostPromptAdmission = HostPromptAdapters["queueHostSubagentPrompt"];
+const hostPromptSubpath = "@deepseek-ai/dsh-subagent/internal";
+let hostPromptAdapters: HostPromptAdapters | undefined;
+let hostPromptLoading: Promise<HostPromptAdapters> | undefined;
+
+function missingHostPromptAdmission(api: string, cause?: unknown): Error {
+  return new Error(
+    `project-mode/native-host-prompt-admission-incompatible: missing ${api}`,
+    cause === undefined ? undefined : { cause },
+  );
+}
+
+/** Classify only failure to resolve this adapter, never its own dependencies. */
+function missingHostPromptSubpath(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const { code, url } = error as Error & { code?: string; url?: string };
+  if (code === "ERR_PACKAGE_PATH_NOT_EXPORTED") {
+    const message = error.message.replaceAll("\\", "/");
+    return (
+      message.includes("Package subpath './internal'") &&
+      /\/@deepseek-ai\/dsh-subagent\/package\.json(?:[\s"']|$)/.test(message)
+    );
+  }
+  if (code !== "ERR_MODULE_NOT_FOUND") return false;
+  try {
+    return url === import.meta.resolve(hostPromptSubpath);
+  } catch {
+    return false;
+  }
+}
+
+function loadHostPromptAdapters(): Promise<HostPromptAdapters> {
+  return (hostPromptLoading ??= import("@deepseek-ai/dsh-subagent/internal")
+    .catch((error: unknown) => {
+      if (missingHostPromptSubpath(error))
+        throw missingHostPromptAdmission(hostPromptSubpath, error);
+      throw error;
+    })
+    .then((adapters) => (hostPromptAdapters = adapters)));
+}
+
+function admitHostPrompt(
+  name: keyof HostPromptAdapters,
+  args: Parameters<HostPromptAdmission>,
+): ReturnType<HostPromptAdmission> {
+  const invoke = (adapters: HostPromptAdapters) => {
+    const admit = adapters[name];
+    if (typeof admit !== "function")
+      throw missingHostPromptAdmission(`${hostPromptSubpath}.${name}`);
+    return admit(...args);
+  };
+  // Once loaded, preserve the native callback's return and synchronous failures.
+  return hostPromptAdapters
+    ? invoke(hostPromptAdapters)
+    : loadHostPromptAdapters().then(invoke);
+}
+
+/** Lazy Host-only admission; unsupported runtimes fail at the requested call. */
+export const queueHostSubagentPrompt: HostPromptAdmission = (...args) =>
+  admitHostPrompt("queueHostSubagentPrompt", args);
+export const steerHostSubagentPrompt: HostPromptAdapters["steerHostSubagentPrompt"] =
+  (...args) => admitHostPrompt("steerHostSubagentPrompt", args);
+
 export async function registerProjection(ctx: Context): Promise<void> {
   await ctx.sessionProjections.register(projection);
 }
@@ -148,13 +211,34 @@ export async function resolveOrdinaryAgent(
   return result.agent;
 }
 
-/** Refuse a partial rc.3 installation before installing MOA execution policy. */
+/** Name missing native capabilities before installing MOA execution policy. */
 export function requireNativeBackground(ctx: Context, agent: Agent) {
   const jobs = agent.ctx.get("jobs");
-  if (!jobs?.supportsProducerNotices || typeof ctx.tools[TOOL_RUNTIME_SCHEDULER]?.start !== "function" || typeof agent.enableToolBackground !== "function" || typeof agent.cancelAndJoin !== "function" || typeof agent.moaAborting !== "boolean" || typeof agent.moaHasPendingBackground !== "boolean")
-    throw new Error("project-mode/native-moa-background-incompatible: patched native tools, loop and jobs provider required");
+  const missing: string[] = [];
+  const scheduler = Reflect.get(NativeTools, "TOOL_RUNTIME_SCHEDULER") as
+    | typeof NativeTools.TOOL_RUNTIME_SCHEDULER
+    | undefined;
+  if (!jobs?.supportsProducerNotices) missing.push("jobs.supportsProducerNotices");
+  if (typeof scheduler !== "symbol")
+    missing.push("@deepseek-ai/dsh-tools.TOOL_RUNTIME_SCHEDULER");
+  else if (typeof ctx.tools[scheduler]?.start !== "function")
+    missing.push("tools[TOOL_RUNTIME_SCHEDULER].start");
+  if (typeof agent.enableToolBackground !== "function")
+    missing.push("agent.enableToolBackground");
+  if (typeof agent.cancelAndJoin !== "function") missing.push("agent.cancelAndJoin");
+  if (typeof agent.moaAborting !== "boolean") missing.push("agent.moaAborting");
+  if (typeof agent.moaHasPendingBackground !== "boolean")
+    missing.push("agent.moaHasPendingBackground");
+  if (missing.length)
+    throw new Error(`project-mode/native-moa-background-incompatible: missing ${missing.join(", ")}`);
   const bash = ctx.tools.get("bash", agent);
-  if (bash && (!bash.supportsBackgroundProducer || !agent.ctx.get("shell")?.supportsManagedExecution))
-    throw new Error("project-mode/native-moa-background-incompatible: patched Bash producer and managed shell provider required");
-  return jobs;
+  if (bash) {
+    if (!bash.supportsBackgroundProducer) missing.push("bash.supportsBackgroundProducer");
+    if (!agent.ctx.get("shell")?.supportsManagedExecution)
+      missing.push("shell.supportsManagedExecution");
+    if (missing.length)
+      throw new Error(`project-mode/native-moa-background-incompatible: missing ${missing.join(", ")}`);
+  }
+  // A missing jobs service was included in the rejected capability list above.
+  return jobs!;
 }

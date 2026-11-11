@@ -24,26 +24,35 @@ const profiles = readdirSync(profilesRoot, { withFileTypes: true })
     manifest: JSON.parse(readFileSync(join(directory, "manifest.json"), "utf8")),
   }));
 const agentVersion = JSON.parse(readFileSync(join(modules, "@deepseek-ai/dsh-agent/package.json"), "utf8")).version;
-const profile = profiles.find(({ manifest }) => manifest.some((entry) =>
-  entry.package === "@deepseek-ai/dsh-agent" && entry.version === agentVersion,
-));
-if (!profile) {
-  const supported = [...new Set(profiles.flatMap(({ manifest }) =>
-    manifest.filter((entry) => entry.package === "@deepseek-ai/dsh-agent").map((entry) => entry.version),
-  ))];
-  throw new Error(`Unsupported DSH runtime ${agentVersion}; available compatibility profiles: ${supported.join(", ")}; no files changed`);
-}
-const { directory: compat, manifest } = profile;
+const digest = (value) => createHash("sha256").update(value).digest("hex");
 const hash = (path) =>
-  createHash("sha256").update(readFileSync(path)).digest("hex");
-const plans = [];
+  digest(readFileSync(path));
+const packageFingerprint = (installed) => digest(JSON.stringify(Object.fromEntries(
+  ["type", "main", "exports", "imports", "dsh"]
+    .filter((field) => Object.hasOwn(installed, field))
+    .map((field) => [field, installed[field]]),
+)));
 
-for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
+function fingerprintMatches(entry, root, installed) {
+  const fingerprint = entry.runtimeFingerprint;
+  if (!fingerprint || !Array.isArray(fingerprint.files) || fingerprint.package !== packageFingerprint(installed)) return false;
+  // An empty declaration-only patch is not evidence about its runtime ABI.
+  if (!entry.files.some((file) => file.file.endsWith(".js")) && !fingerprint.files.some((file) => file.file.endsWith(".js"))) return false;
+  return fingerprint.files.every((file) => hash(join(root, file.file)) === file.sha256);
+}
+
+// Build the complete plan without writing. A cross-version candidate must
+// prove every package against one profile; packages from different profiles
+// cannot be assembled into a synthetic compatible runtime.
+function preflight({ directory: compat, manifest }, crossVersion = false) {
+ const plans = [];
+ const compatible = [];
+ for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
   const root = realpathSync(join(modules, name));
   const installed = JSON.parse(
     readFileSync(join(root, "package.json"), "utf8"),
   );
-  const variants = manifest.filter((entry) => entry.package === name && entry.version === installed.version);
+  const variants = manifest.filter((entry) => entry.package === name && (crossVersion || entry.version === installed.version));
   if (!variants.length)
     throw new Error(
       `Unsupported ${name} version ${installed.version}; no files changed`,
@@ -56,7 +65,7 @@ for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
       ),
     }))
     .find((entry) =>
-      entry.files.every((file) =>
+      (!crossVersion || fingerprintMatches(entry, root, installed)) && entry.files.every((file) =>
         [file.before, file.after].includes(hash(join(root, file.file))),
       ),
     );
@@ -65,7 +74,7 @@ for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
   if (
     selected.files.every((file) => hash(join(root, file.file)) === file.after)
   ) {
-    console.log(`${name}: compatible (${selected.variant})`);
+    compatible.push(`${name}: compatible (${selected.variant})`);
     continue;
   }
   if (
@@ -87,7 +96,32 @@ for (const name of [...new Set(manifest.map((entry) => entry.package))]) {
     { cwd: parse(root).root, input: patch, stdio: "pipe" },
   );
   plans.push({ ...selected, root, patch });
+ }
+ return { plans, compatible };
 }
+
+const exact = profiles.find(({ manifest }) => manifest.some((entry) =>
+  entry.package === "@deepseek-ai/dsh-agent" && entry.version === agentVersion,
+));
+let selected;
+let exactFailure;
+if (exact) {
+  try { selected = preflight(exact); }
+  catch (error) { exactFailure = error; }
+}
+if (!selected) for (const profile of profiles) {
+  try { selected = preflight(profile, true); break; }
+  catch { /* Try another complete audited profile; no candidate has written. */ }
+}
+if (!selected) {
+  if (exactFailure) throw exactFailure;
+  const supported = [...new Set(profiles.flatMap(({ manifest }) =>
+    manifest.filter((entry) => entry.package === "@deepseek-ai/dsh-agent").map((entry) => entry.version),
+  ))];
+  throw new Error(`Unsupported DSH runtime ${agentVersion}; no complete audited runtime fingerprint matched; available compatibility profiles: ${supported.join(", ")}; no files changed`);
+}
+const { plans, compatible } = selected;
+for (const message of compatible) console.log(message);
 if (dryRun) {
   console.log(
     `Preflight passed for ${plans.length} native package patches; no files changed.`,

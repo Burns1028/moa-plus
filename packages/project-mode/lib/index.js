@@ -1,8 +1,8 @@
 import { SessionId, SessionSeq, appendPluginRecord, buildForkSeed, pluginRecordOf, snapshotSessionEvent } from "@deepseek-ai/dsh-session";
 import { MessageId, createUserMessage, freezeMessage } from "@deepseek-ai/dsh-llm";
-import { TOOL_RUNTIME_SCHEDULER, defineTool } from "@deepseek-ai/dsh-tools";
+import * as NativeTools from "@deepseek-ai/dsh-tools";
+import { defineTool } from "@deepseek-ai/dsh-tools";
 import { SubagentError } from "@deepseek-ai/dsh-subagent";
-import { queueHostSubagentPrompt, steerHostSubagentPrompt } from "@deepseek-ai/dsh-subagent/internal";
 import { z } from "zod";
 import { defineDomain, domainTable } from "@deepseek-ai/dsh-storage-domain";
 import { FsVersion } from "@deepseek-ai/dsh-fs";
@@ -311,6 +311,44 @@ function normalizeReason(kind) {
 	return kind === "completed" || kind === "max-tokens" || kind === "error" ? kind : kind === "blocked" ? "refusal" : "aborted";
 }
 // src/host/native.ts
+const hostPromptSubpath = "@deepseek-ai/dsh-subagent/internal";
+let hostPromptAdapters;
+let hostPromptLoading;
+function missingHostPromptAdmission(api, cause) {
+	return new Error(`project-mode/native-host-prompt-admission-incompatible: missing ${api}`, cause === void 0 ? void 0 : { cause });
+}
+/** Classify only failure to resolve this adapter, never its own dependencies. */
+function missingHostPromptSubpath(error) {
+	if (!(error instanceof Error)) return false;
+	const { code, url } = error;
+	if (code === "ERR_PACKAGE_PATH_NOT_EXPORTED") {
+		const message = error.message.replaceAll("\\", "/");
+		return message.includes("Package subpath './internal'") && /\/@deepseek-ai\/dsh-subagent\/package\.json(?:[\s"']|$)/.test(message);
+	}
+	if (code !== "ERR_MODULE_NOT_FOUND") return false;
+	try {
+		return url === import.meta.resolve(hostPromptSubpath);
+	} catch {
+		return false;
+	}
+}
+function loadHostPromptAdapters() {
+	return hostPromptLoading ??= import("@deepseek-ai/dsh-subagent/internal").catch((error) => {
+		if (missingHostPromptSubpath(error)) throw missingHostPromptAdmission(hostPromptSubpath, error);
+		throw error;
+	}).then((adapters) => hostPromptAdapters = adapters);
+}
+function admitHostPrompt(name, args) {
+	const invoke = (adapters) => {
+		const admit = adapters[name];
+		if (typeof admit !== "function") throw missingHostPromptAdmission(`${hostPromptSubpath}.${name}`);
+		return admit(...args);
+	};
+	return hostPromptAdapters ? invoke(hostPromptAdapters) : loadHostPromptAdapters().then(invoke);
+}
+/** Lazy Host-only admission; unsupported runtimes fail at the requested call. */
+const queueHostSubagentPrompt = (...args) => admitHostPrompt("queueHostSubagentPrompt", args);
+const steerHostSubagentPrompt = (...args) => admitHostPrompt("steerHostSubagentPrompt", args);
 async function registerProjection(ctx) {
 	await ctx.sessionProjections.register(projection);
 }
@@ -415,12 +453,25 @@ async function resolveOrdinaryAgent(ctx, sessionId) {
 	if ("error" in result) throw result.error;
 	return result.agent;
 }
-/** Refuse a partial rc.3 installation before installing MOA execution policy. */
+/** Name missing native capabilities before installing MOA execution policy. */
 function requireNativeBackground(ctx, agent) {
 	const jobs = agent.ctx.get("jobs");
-	if (!jobs?.supportsProducerNotices || typeof ctx.tools[TOOL_RUNTIME_SCHEDULER]?.start !== "function" || typeof agent.enableToolBackground !== "function" || typeof agent.cancelAndJoin !== "function" || typeof agent.moaAborting !== "boolean" || typeof agent.moaHasPendingBackground !== "boolean") throw new Error("project-mode/native-moa-background-incompatible: patched native tools, loop and jobs provider required");
+	const missing = [];
+	const scheduler = Reflect.get(NativeTools, "TOOL_RUNTIME_SCHEDULER");
+	if (!jobs?.supportsProducerNotices) missing.push("jobs.supportsProducerNotices");
+	if (typeof scheduler !== "symbol") missing.push("@deepseek-ai/dsh-tools.TOOL_RUNTIME_SCHEDULER");
+	else if (typeof ctx.tools[scheduler]?.start !== "function") missing.push("tools[TOOL_RUNTIME_SCHEDULER].start");
+	if (typeof agent.enableToolBackground !== "function") missing.push("agent.enableToolBackground");
+	if (typeof agent.cancelAndJoin !== "function") missing.push("agent.cancelAndJoin");
+	if (typeof agent.moaAborting !== "boolean") missing.push("agent.moaAborting");
+	if (typeof agent.moaHasPendingBackground !== "boolean") missing.push("agent.moaHasPendingBackground");
+	if (missing.length) throw new Error(`project-mode/native-moa-background-incompatible: missing ${missing.join(", ")}`);
 	const bash = ctx.tools.get("bash", agent);
-	if (bash && (!bash.supportsBackgroundProducer || !agent.ctx.get("shell")?.supportsManagedExecution)) throw new Error("project-mode/native-moa-background-incompatible: patched Bash producer and managed shell provider required");
+	if (bash) {
+		if (!bash.supportsBackgroundProducer) missing.push("bash.supportsBackgroundProducer");
+		if (!agent.ctx.get("shell")?.supportsManagedExecution) missing.push("shell.supportsManagedExecution");
+		if (missing.length) throw new Error(`project-mode/native-moa-background-incompatible: missing ${missing.join(", ")}`);
+	}
 	return jobs;
 }
 // src/host/project-memory.ts
@@ -5071,7 +5122,7 @@ let ProjectMode = (() => {
 			this.config = config;
 		}
 		async [Service.init]() {
-			if (typeof this.ctx.tools.suppress !== "function") throw new Error("project-mode/native-compatibility-required: install the rc.3 Project Mode tool-suppression compatibility patch");
+			if (typeof this.ctx.tools.suppress !== "function") throw new Error("project-mode/native-compatibility-required: missing tools.suppress; provide the native scoped tool-suppression capability");
 			this.domain = await this.ctx.storage.domain.open(domainSpec);
 			const archives = bindProjectArchives(this.ctx, this.domain, (id, fn) => this.update(id, fn));
 			this.outbox = new CompletionOutbox(this.access);

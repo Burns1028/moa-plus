@@ -67,8 +67,9 @@ it("membership alone makes mounted tail visible and native closure avoids live h
   );
   client.dispose();
 });
-it("wordmark stays off during request, exposes busy and localized Host error", async () => {
+it("wordmark stays stable during request, exposes busy without adjacent text and retains Host errors", async () => {
   let finish: (v: unknown) => void = () => {};
+  const setEnabled = vi.fn(() => new Promise((r) => (finish = r)));
   const client = new ProjectClient({
     mode: async () => ({
       ok: true,
@@ -80,7 +81,7 @@ it("wordmark stays off during request, exposes busy and localized Host error", a
         canToggle: true,
       },
     }),
-    setEnabled: () => new Promise((r) => (finish = r)),
+    setEnabled,
   } as any);
   render(
     <ProjectToggle
@@ -96,10 +97,17 @@ it("wordmark stays off during request, exposes busy and localized Host error", a
   fireEvent.click(check);
   expect(check.getAttribute("aria-pressed")).toBe("false");
   expect(check.disabled).toBe(true);
+  expect(check.parentElement?.getAttribute("aria-busy")).toBe("true");
+  expect(check.parentElement?.textContent).toBe("");
+  expect(screen.queryByRole("status")).toBeNull();
+  fireEvent.click(check);
+  expect(setEnabled).toHaveBeenCalledOnce();
   await act(async () =>
     finish({ ok: false, error: { message: "Workers active" } }),
   );
   expect(screen.getByRole("alert").textContent).toContain("Workers active");
+  expect(check.disabled).toBe(false);
+  expect(check.parentElement?.getAttribute("aria-busy")).toBe("false");
   client.dispose();
 });
 
