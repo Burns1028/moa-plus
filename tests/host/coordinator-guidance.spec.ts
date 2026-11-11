@@ -86,6 +86,11 @@ it.each([true, false])("describes configured automatic outcome verification in C
       expect(facts).toContain("return to you for continued work");
       expect(facts).not.toContain("Automatic outcome verification is not enabled");
       expect(verifierStep).toBe(3);
+      const review = f.adapter.requests.find(entry => String(entry.sessionId).startsWith("moa-verifier-"))!;
+      const reviewInput = JSON.stringify(review.messages);
+      expect(reviewInput).toContain("Prefer native glob, grep and read for file and directory inspection");
+      expect(reviewInput).toContain("only when the verification responsibility requires command execution, builds or tests");
+      expect(reviewInput).toContain("Candidate factual claims still require evidence");
     } else {
       expect(facts).toContain("Automatic outcome verification is not enabled in this runtime");
       expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
@@ -124,6 +129,9 @@ it("describes distinct work ownership and selective knowledge contributions in a
     const coordinator = f.adapter.requests.find((request) => request.sessionId === agent.id)!;
     const policy = `${systemText(coordinator)}\n${runtimeText(coordinator)}`;
     expect(policy).toContain("Give each workstream a clear owner");
+    expect(policy).toContain("a brief acknowledgement or a short clarification in the normal chat reply is a complete response");
+    expect(policy).toContain("Respond only to that input; do not add unverified claims about workspace, system or runtime state");
+    expect(policy).toContain("ordinary chat clarification should not block a turn on a question card");
     expect(policy).toContain("Reuse completed results and existing checks");
     expect(policy).toContain("unresolved question");
 

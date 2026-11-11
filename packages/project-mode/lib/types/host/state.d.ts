@@ -63,8 +63,8 @@ export declare const assignmentSchema: z.ZodObject<{
     }>;
     messageId: z.ZodOptional<z.ZodString>;
     admission: z.ZodEnum<{
-        unknown: "unknown";
         rejected: "rejected";
+        unknown: "unknown";
         prepared: "prepared";
         accepted: "accepted";
     }>;
@@ -217,8 +217,8 @@ export declare const recordSchema: z.ZodObject<{
         }>;
         messageId: z.ZodOptional<z.ZodString>;
         admission: z.ZodEnum<{
-            unknown: "unknown";
             rejected: "rejected";
+            unknown: "unknown";
             prepared: "prepared";
             accepted: "accepted";
         }>;
@@ -351,7 +351,7 @@ export declare const domainSpec: {
                 workerId: string;
                 coordinatorTurn: number;
                 delivery: "steer" | "queue";
-                admission: "unknown" | "rejected" | "prepared" | "accepted";
+                admission: "rejected" | "unknown" | "prepared" | "accepted";
                 segmentStartSeq?: number | undefined;
                 participationSeq?: number | undefined;
                 participationKind?: "spawn" | "send" | undefined;

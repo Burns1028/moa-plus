@@ -20,7 +20,8 @@ const call = (name, args = {}) => [
   { type: 'finish', reason: { kind: 'tool-calls' } },
 ];
 
-async function fixture(mode, testsRequired, selectedEffort) {
+const completePrompt = 'A preset-owned complete SYSTEM prompt.';
+async function fixture(mode, testsRequired, selectedEffort, shellAvailable = testsRequired, { persistent = false, completePreset = false, defaultPwshJobs = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'moa-rc2-first-turn-'));
   const home = join(directory, 'home');
   const profileDirectory = join(home, 'profiles', 'fixture');
@@ -77,15 +78,44 @@ async function fixture(mode, testsRequired, selectedEffort) {
     await ctx.plugin(Subagents);
     await ctx.plugin(Spawn, { providerName: 'spawn' });
     await ctx.plugin(Cache, { writeEveryEvents: 100, writeIntervalMs: 60000 });
-    if (mode === 'ptc' || testsRequired) {
+    if (mode === 'ptc' || shellAvailable) {
       await ctx.plugin((await load('dsh-subprocess-local')).default);
       await ctx.plugin((await load('dsh-sandbox-local')).default);
     }
     if (mode === 'ptc') await ctx.plugin((await load('dsh-ptc-runtime-node')).default);
-    if (testsRequired) {
-      await ctx.plugin((await load('dsh-pwsh-sandbox')).default);
-      await ctx.plugin(await load('dsh-shell-env'));
-      await ctx.plugin(await load('dsh-tool-pwsh'), { promoteOnTimeout: false });
+    if (shellAvailable && !testsRequired) {
+      await ctx.plugin(await load('dsh-tool-fs'));
+      await writeFile(join(directory, 'verification-artifact.txt'), 'ACTUAL NATIVE FILE INSPECTION');
+    }
+    if (shellAvailable) {
+      if (persistent) {
+        await ctx.plugin((await load('dsh-terminal')).default);
+        await ctx.plugin(await load('dsh-terminal-bash'), { backendType: 'shell', shellDialect: 'pwsh' });
+        await ctx.plugin(await load('dsh-tool-pwsh-persistent'));
+        assert.deepEqual(ctx.terminals.listBackends(), ['shell']);
+      } else {
+        await ctx.plugin((await load('dsh-pwsh-sandbox')).default);
+        await ctx.plugin(await load('dsh-shell-env'));
+        if (defaultPwshJobs) {
+          await ctx.plugin((await load('dsh-user-approval')).default, { policy: 'ask' });
+          await ctx.plugin(await load('dsh-tool-jobs'));
+          await ctx.plugin(await load('dsh-tool-pwsh'));
+        }
+        else await ctx.plugin(await load('dsh-tool-pwsh'), { promoteOnTimeout: false });
+      }
+    }
+    if (completePreset) {
+      ctx.baseUrl = pathToFileURL(profileDirectory + '/').href;
+      await ctx.plugin((await load('cordis-plugin-loader')).default);
+      ctx.loader.builtins['completion-complete-prompt'] = {
+        inject: ['systemPrompt'],
+        apply(scope) {
+          scope.systemPrompt.section({ name: 'preset:complete-system', order: 0, complete: true, text: completePrompt });
+          scope.systemPrompt.suppressRuntimeContext();
+        },
+      };
+      await ctx.plugin((await load('dsh-agent-preset-registry')).default, { default: 'completion-complete' });
+      await ctx.agentPresets.register({ id: 'completion-complete', plugins: [{ name: 'cordis:completion-complete-prompt' }] });
     }
     class ScriptedModel extends LlmAdapter {
       requests = [];
@@ -104,6 +134,7 @@ async function fixture(mode, testsRequired, selectedEffort) {
       sessionId: 'rc2-first-turn', meta: { cwd: directory },
       agentOptions: { provider: 'test', model: 'initial', reasoningEffort: 'high' },
       async setup(scope) {
+        if (completePreset) await ctx.agentPresets.mount(scope);
         if (mode === 'ptc') await scope.plugin(await load('dsh-tool-executor-ptc'));
       },
     });
@@ -118,17 +149,29 @@ async function fixture(mode, testsRequired, selectedEffort) {
   } catch (error) { await ctx.fiber.dispose(); await rm(directory, { recursive: true, force: true }); throw error; }
 }
 
-const scenarios = ['native', 'ptc'].flatMap(mode => [false, true].map(testsRequired => ({ mode, testsRequired, selectedEffort: 'high' })));
-scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: undefined });
-for (const { mode, testsRequired, selectedEffort } of scenarios) {
-  test(`rc2 full plugin first turn completes helpers and persists JSON cache (parent=${mode}, tests=${testsRequired}, effort=${selectedEffort ?? 'default'})`, {
-    skip: !modules || (testsRequired && process.platform !== 'win32'), timeout: 20000,
+const scenarios = ['native', 'ptc'].flatMap(mode => [false, true].map(testsRequired => ({ mode, testsRequired, selectedEffort: 'high', attemptShell: testsRequired })));
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: undefined, attemptShell: false });
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true });
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true, persistent: true });
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: true, defaultPwshJobs: true });
+scenarios.push({ mode: 'native', testsRequired: true, selectedEffort: 'high', attemptShell: true, defaultPwshJobs: true });
+scenarios.push({ mode: 'native', testsRequired: false, selectedEffort: 'high', attemptShell: false, completePreset: true });
+for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, completePreset, defaultPwshJobs } of scenarios) {
+  test(`rc2 full plugin first turn converges and persists JSON cache (parent=${mode}, tests=${testsRequired}, effort=${selectedEffort ?? 'default'}, shell=${persistent ? 'persistent' : defaultPwshJobs ? 'default-jobs' : attemptShell}, completePreset=${!!completePreset})`, {
+    skip: !modules || (attemptShell && process.platform !== 'win32'), timeout: 20000,
   }, async () => {
-    const f = await fixture(mode, testsRequired, selectedEffort);
-    const errors = [], shellResults = [];
-    let main = 0, builder = 0, verifier = 0, retry = '';
+    const f = await fixture(mode, testsRequired, selectedEffort, attemptShell, { persistent, completePreset, defaultPwshJobs });
+    const errors = [], shellResults = [], jobEvents = [], approvalEvents = [], inspections = [];
+    let main = 0, builder = 0, verifier = 0, retry = '', shellOwner;
     f.ctx.on('agent/error', ({ error }) => errors.push(error));
-    f.ctx.on('tools/result', (exec, result) => { if (exec.name === 'pwsh') shellResults.push(result); });
+    f.ctx.on('tools/result', (exec, result) => {
+      if (exec.name === 'pwsh') { shellResults.push(result); shellOwner = exec.agent; }
+      if (exec.name === 'read') inspections.push(result);
+    });
+    f.ctx.on('session/event', (_session, event) => {
+      if ((event.type === 'job/registered' || event.type === 'job/settled') && event.data.kind === 'pwsh') jobEvents.push(event);
+      if (event.type === 'approval/asked') approvalEvents.push(event);
+    });
     try {
       f.adapter.handler = request => {
         const id = String(request.sessionId);
@@ -143,9 +186,18 @@ for (const { mode, testsRequired, selectedEffort } of scenarios) {
           assert.ok(names.includes('read_rubric') && names.includes('read_candidate') && names.includes('submit_verdict'));
           assert.ok(!names.includes('run_code'));
           if (verifier === 1) return call('read_rubric');
-          if (verifier === 2) return testsRequired
-            ? call('pwsh', { command: "Write-Output 'should not run without record protection'", description: 'Run required tests', timeoutMs: 1000 })
+          if (verifier === 2) return attemptShell
+            ? call('pwsh', { command: "Write-Output 'should not run without record protection'",
+              ...(persistent ? {} : { description: 'Run required tests', timeoutMs: 1000 }) })
             : call('read_candidate');
+          if (attemptShell) {
+            assert.ok(!names.includes('pwsh'), 'the native scope must remove the unavailable shell before the next request');
+            const notices = request.messages.filter(message => message.source.kind === 'moa-completion' &&
+              message.content.some(block => block.type === 'text' && block.text.startsWith('The native shell backend cannot enforce')));
+            assert.equal(notices.length, 1);
+            if (verifier === 3) return call('read', { file_path: join(f.directory, 'verification-artifact.txt') });
+            if (verifier === 4) return call('read_candidate');
+          }
           return call('submit_verdict', { status: 'Pass', issues: [] });
         }
         main++;
@@ -160,19 +212,72 @@ for (const { mode, testsRequired, selectedEffort } of scenarios) {
       f.agent.followup(f.createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'Deliver a report' }] }));
       await f.agent.whenIdle();
       assert.equal(builder, 1);
-      assert.equal(verifier, 3, JSON.stringify({ main, builder, retry, errors: errors.map(String), requests: f.adapter.requests.map(request => ({ id: request.sessionId, tools: request.tools.map(tool => tool.name) })) }));
-      assert.equal(main, testsRequired ? 2 : 1);
-      assert.deepEqual(errors, []);
+      if (defaultPwshJobs) {
+        assert.ok(jobEvents.some(event => event.type === 'job/registered'), 'the real jobs controller must admit the PowerShell producer');
+        assert.ok(jobEvents.some(event => event.type === 'job/settled'), 'the real jobs controller must settle the PowerShell producer');
+      }
+      assert.equal(verifier, attemptShell ? testsRequired ? 2 : 5 : 3, JSON.stringify({ main, builder, retry, errors: errors.map(String),
+        jobs: jobEvents.map(event => ({ type: event.type, data: event.data })),
+        shellResults: shellResults.map(result => ({ isError: result.isError, code: result.error?.info?.code ?? null, error: result.error })),
+        requests: f.adapter.requests.map(request => ({ id: request.sessionId, tools: request.tools.map(tool => tool.name) })) }));
+      assert.equal(main, 1);
+      if (testsRequired) {
+        assert.equal(errors.length, 1);
+        assert.match(String(errors[0]), /MoA\+ Outcome Verifier cannot run pwsh:.*Readonly path policy is unsupported/);
+      } else assert.deepEqual(errors, []);
       for (const request of f.adapter.requests) {
         assert.equal(request.model, 'selected');
         assert.equal(request.reasoningEffort, String(request.sessionId).startsWith('moa-builder-') ? 'off' : selectedEffort ?? 'low');
       }
+      const builderRequest = f.adapter.requests.find(request => String(request.sessionId).startsWith('moa-builder-'));
+      const builderText = builderRequest.messages.filter(message => message.source.kind === 'user').at(-1).content
+        .filter(block => block.type === 'text').map(block => block.text).join('\n');
+      const builderInput = JSON.parse(builderText.slice(builderText.lastIndexOf('\n') + 1));
+      const parentRequest = f.adapter.requests.find(request => request.sessionId === f.agent.id);
+      const context = parentRequest.messages.filter(message => message.source.kind === 'runtime-context').at(-1)?.source;
+      const task = context?.sections?.find(section => section.name === 'project-mode:task');
+      assert.ok(task, 'the actual native runtime context must retain the original human task');
+      assert.match(task.text, /^Existing unfinished task:/);
+      assert.match(task.text, /not a new human message/);
+      const taskInput = JSON.parse(task.text.slice(task.text.lastIndexOf('\n') + 1));
+      assert.deepEqual(taskInput, builderInput);
+      assert.deepEqual(taskInput.requirements, ['Deliver a report']);
+      assert.deepEqual(taskInput.sources, {});
+      assert.deepEqual(taskInput.sourceVersions, []);
+      if (completePreset) {
+        const system = parentRequest.messages.filter(message => message.role === 'system').flatMap(message => message.content)
+          .filter(block => block.type === 'text').map(block => block.text).join('\n');
+        assert.equal(system, completePrompt);
+        const role = context.sections.find(section => section.name === 'project-mode:role');
+        assert.match(role?.text ?? '', /You are the MoA\+ coordinator/);
+        const allText = parentRequest.messages.flatMap(message => message.content).filter(block => block.type === 'text')
+          .map(block => block.text).join('\n');
+        assert.equal(allText.split('You are the MoA+ coordinator').length - 1, 1);
+      }
       const completed = f.agent.session.snapshotEvents().some(event => event.type === 'turn/end' && event.data.reason.kind === 'completed');
       assert.equal(completed, !testsRequired);
-      if (testsRequired) {
-        assert.match(retry, /Outcome verification did not pass/);
+      if (attemptShell) {
+        assert.equal(retry, '');
+        const end = f.agent.session.snapshotEvents().findLast(event => event.type === 'turn/end');
+        if (testsRequired) {
+          assert.equal(end.data.reason.kind, 'error');
+          assert.match(end.data.reason.error.message, /Readonly path policy is unsupported/);
+        } else {
+          assert.equal(end.data.reason.kind, 'completed');
+          assert.equal(inspections.length, 1);
+          assert.notEqual(inspections[0].isError, true, JSON.stringify(inspections[0]));
+          assert.match(JSON.stringify(inspections[0].content), /ACTUAL NATIVE FILE INSPECTION/);
+        }
         assert.equal(shellResults.length, 1);
         assert.equal(shellResults[0].error?.info?.code, 'READ_ONLY_PATH_UNSUPPORTED');
+        assert.equal(shellResults[0].error?.info?.name, 'ReadOnlyPathUnsupportedError');
+        if (persistent) assert.deepEqual(f.ctx.terminals.list(shellOwner), []);
+        if (defaultPwshJobs) {
+          assert.equal(jobEvents.filter(event => event.type === 'job/registered').length, 1);
+          assert.equal(jobEvents.filter(event => event.type === 'job/settled' && event.data.status === 'failed').length, 1);
+          assert.deepEqual(f.ctx.jobs.list(shellOwner.id), []);
+          assert.deepEqual(approvalEvents, []);
+        }
       }
       // Explicit cache writes propagate serialization failures. This covers the
       // real first-turn path that an import/toggle-only smoke test cannot see.

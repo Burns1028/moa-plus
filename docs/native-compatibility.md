@@ -56,6 +56,31 @@ error path. It must not instruct the Coordinator to repair the plugin or repeat
 the user's work. An ordinary review verdict or superseded rubric still uses the
 existing re-verification flow.
 
+The Coordinator and Builder read the same saved original requirements and source
+snapshots. A required native task-context section restores that material after a
+failed first admission or cold restart, even when the original inbox input never
+reached the Coordinator's committed model history. It is existing task context,
+not a new human message; notes remain progress records. Completed tasks no longer
+supply that context to a later task.
+
+The Verifier treats native structured `READ_ONLY_PATH_UNSUPPORTED` as an
+unavailable capability. Required execution cancels and joins the native helper,
+then reports the error to the parent turn. When execution is not required, the
+failed tool is suppressed only for this review and one native notice directs the
+Verifier to available file tools and `read_candidate`; actual inspection remains
+mandatory. If those tools cannot establish the requirements, the Verifier can
+submit `runtime_blocked: true`, which ends the parent with the observed capability
+error. Ordinary `Partial` and `Block` verdicts retain their concrete rework issues.
+Suppression is released when the review exits. Console text does not establish
+the error code, and no permission escalation removes the record protection.
+
+Coordinator, Builder and Verifier guidance keeps effort proportional to the
+actual request. With no actionable goal or ongoing work, an appropriate short
+acknowledgement or ordinary chat clarification can complete the turn. It does
+not need a blocking question card, workspace exploration or invented missing
+specifications. The same independent review still runs; there is no input-length
+classifier or bypass of the completion gate.
+
 The `project-mode-results` projection uses `stateVersion: 5`. Starting a turn
 removes the prior optional `lastAssistant` field, keeping checkpoints plain JSON
 even when that turn ends before an AI reply. The native projection registry
