@@ -1,5 +1,9 @@
 # Compatibility
 
+For the current development branch's rc.3 and DSH 0.2.2-rc.1 / Desktop Next
+profiles, read [native compatibility profiles](native-compatibility.md).
+The historical rc.3 contract and published release instructions follow below.
+
 Target: **DSH 0.2.1-rc.3, Node 24.9+**. Every checkout requires its matching explicit native extensions. Stock rc.3 is incompatible. These are local compatibility extensions, not claims of upstream acceptance.
 
 This checkout adds Worker file attachments with **21 packages / 49 file paths**. The published **v0.2.0** tag uses its earlier **19-package / 43-path** manifest and does not include Worker ordinary-file uploads or attachment-aware query views. Do not combine the new plugin with that older prepared runtime.

@@ -1,0 +1,27 @@
+diff --git a/lib/index.js b/lib/index.js
+index 870a1e4..a7ce117 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -102,6 +102,7 @@ async function isPathUnder(path, root, caseSensitive = process.platform !== "win
+ */
+ var SandboxedFileSystem = class extends LocalFileSystem {
+ 	static inject = ["sandboxPolicy"];
++	supportsReadOnlyPaths = true;
+ 	defaultMode;
+ 	constructor(ctx, config) {
+ 		super(ctx, config);
+@@ -176,6 +177,14 @@ var SandboxedFileSystem = class extends LocalFileSystem {
+ 	async checkedTarget(target, sandboxPolicy) {
+ 		const policy = sandboxPolicy ?? this.ctx.sandboxPolicy.resolve();
+ 		const { mode } = policy;
++    if (policy.readOnlyPaths?.length) {
++      const fresh = await this.resolve(target.displayPath);
++      for (const path of policy.readOnlyPaths) {
++        const restricted = await this.resolve(path);
++        if (await isPathUnder(this.processPath(fresh), this.processPath(restricted)) || await isPathUnder(this.processPath(restricted), this.processPath(fresh))) throw new FsError(`cannot write "${target.displayPath}": Coordinator-owned record is read-only for this session; changing sandbox mode does not override ownership`, "FS_READ_ONLY_PATH");
++      }
++      target = fresh;
++    }
+ 		if (mode === "danger-full-access") return target;
+ 		if (mode === "read-only") throw new FsError(`cannot write "${target.displayPath}": file access denied under read-only mode`, "FS_SANDBOX_DENIED");
+ 		const fresh = await this.resolve(target.displayPath);

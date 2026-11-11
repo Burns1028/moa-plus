@@ -1,0 +1,10 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -363,6 +363,7 @@ function apply(ctx, config) {
+ 			return;
+ 		}
+ 		if (event.type !== "settled") return;
++		if (event.job.completionNotice === "producer") return;
+ 		if (killedByModel.delete(event.job.id) || event.awaited) return;
+ 		if (releasedReads.has(event.job.id)) {
+ 			suppressedSettlements.set(event.job.id, event);

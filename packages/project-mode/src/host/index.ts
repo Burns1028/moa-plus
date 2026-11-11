@@ -191,7 +191,7 @@ export default class ProjectMode extends TypertRemoteService {
   protected async [Service.init]() {
     if (typeof this.ctx.tools.suppress !== "function")
       throw new Error(
-        "project-mode/native-compatibility-required: install the rc.3 Project Mode tool-suppression compatibility patch",
+        "project-mode/native-compatibility-required: missing tools.suppress; provide the native scoped tool-suppression capability",
       );
     this.domain = await this.ctx.storage.domain.open(domainSpec);
     const archives = bindProjectArchives(this.ctx, this.domain, (id, fn) =>

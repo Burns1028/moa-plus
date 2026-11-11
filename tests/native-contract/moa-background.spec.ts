@@ -14,6 +14,9 @@ import * as Persistence from "@deepseek-ai/dsh-session-persistence-jsonl";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+
+const hasBash = spawnSync("bash", ["-c", "exit 0"], { stdio: "ignore", timeout: 2000 }).status === 0;
 
 const user = (text: string) => createUserMessage({ source: { kind: "user" }, content: [{type:"text",text}] });
 function calls(...names: string[]): StreamChunk[] {
@@ -221,7 +224,7 @@ function bashCall(command:string,timeoutMs=30,explicit=false):StreamChunk[] {
  const args=JSON.stringify({command,description:"Run native Bash contract test",timeoutMs,...explicit?{run_in_background:true}:{}});
  return [{type:"block-start",index:0,blockType:"tool-call"},{type:"tool-call-delta",index:0,id:"bash-call",name:"bash",argumentsDelta:args},{type:"block-end",index:0,block:{type:"tool-call",id:"bash-call",name:"bash",arguments:args}},{type:"finish",reason:{kind:"tool-calls"}}];
 }
-it("adopts the actual locked Bash producer at native promotion and publishes its final output",async()=>{
+it.skipIf(!hasBash)("adopts the actual locked Bash producer at native promotion and publishes its final output",async()=>{
  const f=await setup("after-seconds",60);
  try{
   await shell(f);
@@ -236,7 +239,7 @@ it("adopts the actual locked Bash producer at native promotion and publishes its
   expect(f.ctx.jobs.get(r.jobId,f.agent.id).completionNotice).toBe("producer");
  }finally{await f.dispose();}
 });
-it("joins real Bash termination cleanup beyond its ordinary promotion wait",async()=>{
+it.skipIf(!hasBash)("joins real Bash termination cleanup beyond its ordinary promotion wait",async()=>{
  const f=await setup("after-seconds",60);
  try{
   await shell(f);
@@ -248,7 +251,7 @@ it("joins real Bash termination cleanup beyond its ordinary promotion wait",asyn
   expect(Date.now()-started).toBeGreaterThan(100);expect(f.adapter.requests).toHaveLength(2);
  }finally{await f.dispose();}
 });
-it("leaves explicit native background jobs independently controlled",async()=>{
+it.skipIf(!hasBash)("leaves explicit native background jobs independently controlled",async()=>{
  const f=await setup("after-seconds",60);
  try{
   await shell(f);
@@ -449,7 +452,7 @@ it.each([false,true])("selects the PTC trace envelope after async shaping (trans
  }finally{gate.resolve();await f.dispose();await rm(root,{recursive:true,force:true});}
 });
 
-it("queries the settled native PTC job after real nested Bash cancellation without changing the canonical result",async()=>{
+it.skipIf(!hasBash)("queries the settled native PTC job after real nested Bash cancellation without changing the canonical result",async()=>{
  const f=await setup();
  try{
   await shell(f,true);
@@ -479,7 +482,7 @@ it("queries the settled native PTC job after real nested Bash cancellation witho
  }finally{await f.dispose();}
 });
 
-it("transfers real foreground-only Bash without changing its native timeout policy",async()=>{
+it.skipIf(!hasBash)("transfers real foreground-only Bash without changing its native timeout policy",async()=>{
  const f=await setup("after-seconds",0.01);
  try{
   await shell(f,false);
@@ -540,7 +543,7 @@ it("retains a stopped result for deliberate resume and rejects a copied owner's 
  }finally{gate.resolve();await f.dispose();}
 });
 
-it("joins surviving native children after the Bash root exits",async()=>{
+it.skipIf(!hasBash)("joins surviving native children after the Bash root exits",async()=>{
  const f=await setup("after-seconds",0.01);
  try{
   await shell(f,false);

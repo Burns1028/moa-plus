@@ -1,0 +1,102 @@
+diff --git a/lib/index.js b/lib/index.js
+index 1a90d66..f22a2a3 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -602,7 +602,7 @@ function createRunCodeTool(ctx, executor, maxParallel) {
+ 					return outcome.value;
+ 				};
+ 				const functions = Object.create(null);
+-				for (const schema of tools.schemas(exec.agent, exec.toolSet)) Object.defineProperty(functions, schema.name, {
++				for (const schema of tools.schemas(exec.agent, exec.toolSet).filter(schema => tools.executable(schema.name, exec.agent, exec.toolSet)?.nativeOnly !== true)) Object.defineProperty(functions, schema.name, {
+ 					enumerable: true,
+ 					value: binding(deepFreeze(schema))
+ 				});
+@@ -1701,7 +1701,7 @@ function renderToolsSdkPy(schemas) {
+ const Config = z.object({ maxParallelSubCalls: z.natural().min(1).default(10) });
+ //#endregion
+ //#region lib/types/index.js
+-const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`;
++const PTC_ONLY_INSTRUCTION = `Use \`${RUN_CODE_NAME}\` for tools declared in the SDK below. Tools supplied as separate schemas are called directly and have no SDK binding.`;
+ const SDK_RENDERERS = {
+ 	typescript: renderToolsSdk,
+ 	python: renderToolsSdkPy
+@@ -1732,19 +1732,19 @@ var PtcExecutor = class {
+ 		}];
+ 		this.pipeline = new ToolExecutionPipeline(ctx, {
+ 			get: (name, scope, toolSet) => name === RUN_CODE_NAME ? this.requirePtcTransport() : tools.executable(name, scope, toolSet),
+-			reject: (name, nested) => !nested && name !== RUN_CODE_NAME ? new ToolNotFoundError(name, `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`) : void 0
++			reject: (name, nested, definition) => definition?.nativeOnly === true
++                ? (nested ? new ToolNotFoundError(name, `\`${name}\` must be called directly; it has no run_code binding`) : undefined)
++                : (!nested && name !== RUN_CODE_NAME ? new ToolNotFoundError(name, `call \`${name}\` inside \`${RUN_CODE_NAME}\``) : undefined)
+ 		});
+ 	}
+-	describe(_tools) {
+-		return {
+-			schemas: [projectToolSchema(this.requirePtcTransport(), false)],
+-			knownNames: [RUN_CODE_NAME]
+-		};
+-	}
++	describe(tools) {
++        const direct = tools.filter(definition => definition.nativeOnly === true);
++        return { schemas: [projectToolSchema(this.requirePtcTransport(), false), ...direct.map(definition => projectToolSchema(definition, false))], knownNames: [RUN_CODE_NAME, ...direct.map(definition => definition.name)] };
++    }
+ 	renderSdk(tools) {
+ 		const runtime = requirePtcRuntime(this.ctx);
+ 		const render = SDK_RENDERERS[runtime.language];
+-		return render(tools.map((definition) => ({
++		return render(tools.filter(definition => definition.nativeOnly !== true).map((definition) => ({
+ 			...projectToolSchema(definition, false),
+ 			output: definition.output.schema
+ 		})), runtime.programFormat);
+diff --git a/lib/types/index.js b/lib/types/index.js
+index be85048..a92bfda 100644
+--- a/lib/types/index.js
++++ b/lib/types/index.js
+@@ -4,7 +4,7 @@ import { createRunCodeTool, requirePtcRuntime } from "./ptc.js";
+ import { renderToolsSdk } from "./ts-types.js";
+ import { renderToolsSdkPy } from "./py-types.js";
+ import { Config } from "./config.js";
+-const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`;
++const PTC_ONLY_INSTRUCTION = `Use \`${RUN_CODE_NAME}\` for tools declared in the SDK below. Tools supplied as separate schemas are called directly and have no SDK binding.`;
+ const SDK_RENDERERS = {
+     typescript: renderToolsSdk,
+     python: renderToolsSdkPy,
+@@ -28,18 +28,19 @@ export class PtcExecutor {
+         ];
+         this.pipeline = new ToolExecutionPipeline(ctx, {
+             get: (name, scope, toolSet) => name === RUN_CODE_NAME ? this.requirePtcTransport() : tools.executable(name, scope, toolSet),
+-            reject: (name, nested) => !nested && name !== RUN_CODE_NAME
+-                ? new ToolNotFoundError(name, `only \`${RUN_CODE_NAME}\` is callable directly — call \`${name}\` from inside a \`${RUN_CODE_NAME}\` program instead`)
+-                : undefined,
++            reject: (name, nested, definition) => definition?.nativeOnly === true
++                ? (nested ? new ToolNotFoundError(name, `\`${name}\` must be called directly; it has no run_code binding`) : undefined)
++                : (!nested && name !== RUN_CODE_NAME ? new ToolNotFoundError(name, `call \`${name}\` inside \`${RUN_CODE_NAME}\``) : undefined),
+         });
+     }
+-    describe(_tools) {
+-        return { schemas: [projectToolSchema(this.requirePtcTransport(), false)], knownNames: [RUN_CODE_NAME] };
++    describe(tools) {
++        const direct = tools.filter(definition => definition.nativeOnly === true);
++        return { schemas: [projectToolSchema(this.requirePtcTransport(), false), ...direct.map(definition => projectToolSchema(definition, false))], knownNames: [RUN_CODE_NAME, ...direct.map(definition => definition.name)] };
+     }
+     renderSdk(tools) {
+         const runtime = requirePtcRuntime(this.ctx);
+         const render = SDK_RENDERERS[runtime.language];
+-        return render(tools.map(definition => ({
++        return render(tools.filter(definition => definition.nativeOnly !== true).map(definition => ({
+             ...projectToolSchema(definition, false),
+             output: definition.output.schema,
+         })), runtime.programFormat);
+diff --git a/lib/types/ptc.js b/lib/types/ptc.js
+index 60b1190..87c7c42 100644
+--- a/lib/types/ptc.js
++++ b/lib/types/ptc.js
+@@ -569,7 +569,7 @@ export function createRunCodeTool(ctx, executor, maxParallel) {
+                 // restricted globals vanish) — the same view the SDK section declared,
+                 // so a program can bind exactly what its prompt promised; sub-dispatch
+                 // re-resolves per call through the same view (exec.agent threads down).
+-                for (const schema of tools.schemas(exec.agent, exec.toolSet)) {
++                for (const schema of tools.schemas(exec.agent, exec.toolSet).filter(schema => tools.executable(schema.name, exec.agent, exec.toolSet)?.nativeOnly !== true)) {
+                     Object.defineProperty(functions, schema.name, { enumerable: true, value: binding(deepFreeze(schema)) });
+                 }
+                 try {

@@ -66,8 +66,11 @@ function safeDirectory(path) {
     "/bin",
     "/sbin",
     "/etc",
+    ...(process.platform === "win32"
+      ? [process.env.WINDIR, process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean)
+      : []),
     repository,
-  ];
+  ].map((path) => resolve(path));
   if (
     protectedPaths.some(
       (protectedPath) =>
@@ -507,7 +510,7 @@ function setup(paths) {
     run("npm", ["ci", "--no-audit", "--no-fund"], paths);
     stage = "plugin";
     const packDirectory = mkdtempSync(join(paths.artifacts, "pack-"));
-    const packed = JSON.parse(
+    const packed = Object.values(JSON.parse(
       run(
         "npm",
         [
@@ -521,7 +524,7 @@ function setup(paths) {
         paths,
         { cwd: repository, capture: true },
       ),
-    );
+    ));
     const pluginVersion = json(join(repository, "package.json")).version;
     const filename = packed[0]?.filename;
     if (

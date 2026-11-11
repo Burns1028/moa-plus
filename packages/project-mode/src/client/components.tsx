@@ -147,7 +147,6 @@ export function ProjectToggle({
       >
         <span className="pm-wordmark" aria-hidden="true" />
       </button>
-      {state.busy && <span role="status">{t("enabling")}</span>}
       {state.error && (
         <span role="alert">{t("error", { message: state.error })}</span>
       )}

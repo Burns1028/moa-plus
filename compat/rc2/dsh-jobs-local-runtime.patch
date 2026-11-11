@@ -1,0 +1,26 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -354,6 +354,7 @@ function isTerminal(status) {
+ * semantics this implementation honors.
+ */
+ var LocalJobRegistry = class extends JobRegistry {
++	supportsProducerNotices = true;
+ 	static Config = z.object({
+ 		maxConcurrentJobsPerOwner: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_CONCURRENT_JOBS_PER_OWNER),
+ 		retainBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_RETAIN_BYTES),
+@@ -445,6 +446,7 @@ var LocalJobRegistry = class extends JobRegistry {
+ 			id,
+ 			toolCall,
+ 			kind: spec.kind,
++			completionNotice: spec.completionNotice,
+ 			label: spec.label,
+ 			outputLimitBytes: spec.outputLimitBytes,
+ 			owner,
+@@ -581,6 +583,7 @@ var LocalJobRegistry = class extends JobRegistry {
+ 		const spillPaths = [...new Set(job.spillPaths.filter((path) => path !== void 0))];
+ 		return {
+ 			id: job.id,
++			completionNotice: job.completionNotice,
+ 			kind: job.kind,
+ 			label: job.label,
+ 			...owner !== void 0 ? { owner } : {},

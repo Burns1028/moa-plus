@@ -20,6 +20,12 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
+The current development branch also provides a compatibility profile for
+**DSH 0.2.2-rc.1 / DSH Next 2.0.22-next**, while retaining the rc.3 profile.
+See [native compatibility profiles](docs/native-compatibility.md) for Desktop
+preparation, tested capabilities and Windows Worker shell limits. The tagged
+v0.2.0 instructions below remain specific to that release.
+
 Requires **Node 24.9+**, npm, and Git. MoA+ **v0.2.0** needs the matching **DSH 0.2.1-rc.3 compatibility runtime**: its explicit manifest extends **19 native packages across 43 file paths**. Stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
 Worker Bash record protection uses macOS Seatbelt or Linux bubblewrap. See [backend requirements][compatibility] before setup on Linux or Windows.

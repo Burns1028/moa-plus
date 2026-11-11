@@ -61,7 +61,8 @@ describe.each([
         confine: async (argv: readonly string[]) => {
           if (
             failIndexRemoval &&
-            argv[0] === "rm" &&
+            argv[0] === process.execPath &&
+            argv[2]?.includes(".rm(") &&
             argv.some((arg) => arg.includes("moa-index-"))
           ) {
             failIndexRemoval = false;
@@ -309,4 +310,64 @@ describe.each([
       await rm(root, { recursive: true, force: true });
     }
   });
+});
+
+it("runs single-file cleanup with literal argv and retains native sandbox denials", async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "moa cleanup spaces ")));
+  const path = join(root, "index $literal 'quote'.tmp");
+  const fs = new LocalFileSystem(new Context(), { cwd: root, diffBasisMaxBytes: 1048576 });
+  const commands: readonly string[][] = [];
+  let enforcement: "full" | "partial" = "full";
+  const manager = new MoAWorkspaceManager({ fs,
+    policy: () => ({ mode: "workspace-write", workspaceRoot: root }),
+    sandbox: { confine: async (argv) => {
+      (commands as string[][]).push([...argv]);
+      return { argv: [...argv], enforcement, denialSignatures: [], runnerFailureRules: [] };
+    } },
+  });
+  const remove = (manager as unknown as { runRemove(cwd: string, path: string): Promise<void> }).runRemove.bind(manager);
+  try {
+    await writeFile(path, "owned index");
+    await remove(root, path);
+    expect(commands[0][0]).toBe(process.execPath);
+    expect(commands[0].slice(3)).toEqual(["--", path]);
+    expect(commands[0][2]).not.toContain(path);
+    await expect(stat(path)).rejects.toThrow();
+    await remove(root, path);
+    await writeFile(path, "preserve after denied confinement");
+    enforcement = "partial";
+    await expect(remove(root, path)).rejects.toThrow("workspace-sandbox-partial");
+    expect(await readFile(path, "utf8")).toBe("preserve after denied confinement");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it("retains the owned recovery record when portable index cleanup fails", async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "moa recovery spaces ")));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
+  let rejectCleanup = true;
+  const manager = new MoAWorkspaceManager({
+    fs: new LocalFileSystem(new Context(), { cwd: root, diffBasisMaxBytes: 1048576 }),
+    policy: () => ({ mode: "workspace-write", workspaceRoot: root }),
+    sandbox: { confine: async (argv) => {
+      if (rejectCleanup && argv[0] === process.execPath && argv[2]?.includes(".rm(") && argv.at(-1)?.includes("moa-index-"))
+        throw new Error("native index cleanup denied");
+      return { argv: [...argv], enforcement: "full", denialSignatures: [], runnerFailureRules: [] };
+    } },
+  });
+  const signal = new AbortController().signal;
+  try {
+    git("init"); git("config", "user.name", "Test"); git("config", "user.email", "test@example.org");
+    await writeFile(join(root, "source"), "preserve source"); git("add", "."); git("commit", "-m", "initial");
+    let failure: unknown;
+    try { await manager.prepare({ ownerId: "recover", sourceDirectory: root, mode: "isolated", signal }); }
+    catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(MoAWorkspacePrepareError);
+    expect((failure as MoAWorkspacePrepareError).cleanupError).toHaveProperty("message", "native index cleanup denied");
+    const records = await manager.discoverOwned(root, "recover", signal);
+    expect(records).toEqual([(failure as MoAWorkspacePrepareError).record]);
+    rejectCleanup = false;
+    await manager.destroy(records[0], signal);
+    expect(await manager.discoverOwned(root, "recover", signal)).toEqual([]);
+    expect(await readFile(join(root, "source"), "utf8")).toBe("preserve source");
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

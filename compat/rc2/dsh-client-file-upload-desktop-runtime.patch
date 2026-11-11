@@ -1,0 +1,27 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -322,7 +322,7 @@ let FileUploads = (() => {
+ 		}
+ 		/** Store one upload for an ordinary Agent; storage failures become Remote failures. */
+ 		async store(agent, save) {
+-			this.assertOrdinaryAgent(agent);
++			this.assertUploadAgent(agent);
+ 			try {
+ 				return await save();
+ 			} catch (error) {
+@@ -350,8 +350,13 @@ let FileUploads = (() => {
+ 			if (resolver === void 0) throw new RemoteError("session/not-found", `session "${sessionId}" is not attached`, { sessionId });
+ 			return resolver(sessionId);
+ 		}
+-		assertOrdinaryAgent(agent) {
+-			if (agent.session.header.origin === "subagent") throw new RemoteError("subagent/attachment-invalid", "subagent conversations do not accept file uploads", { reason: "SUBAGENT_FILE_UNSUPPORTED" });
++		assertUploadAgent(agent) {
++			if (agent.session.header.origin !== "subagent") return;
++			const parentId = agent.session.header.parentSession;
++			const parent = parentId === void 0 ? void 0 : this.ctx.agents.get(parentId);
++			const identity = this.ctx.get("sessionProjections")?.snapshot(agent.session, ["subagent"]).values.subagent;
++			if (this.ctx.agents.get(agent.id) === agent && parent !== void 0 && this.ctx.agents.isOwnedBy(agent.id, parent) && identity?.mode === "continuable" && identity.seq >= agent.session.inheritedEventCount) return;
++			throw new RemoteError("subagent/attachment-invalid", "file uploads require a live continuable child and its actual parent", { reason: "SUBAGENT_FILE_UNSUPPORTED" });
+ 		}
+ 		observeSessionEvent(session, event) {
+ 			if (event.type !== "user/message" || event.data.source.kind !== "user" || !("rpcId" in event.data.source)) return;

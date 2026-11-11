@@ -121,8 +121,8 @@ it("composes session restrictions without changing mode or leaking disposers", a
     const rendered = assembly.contexts.find(
       (item) => item.name === "sandbox:policy",
     )!.text;
-    expect(rendered).toContain(f.notes);
-    expect(rendered).toContain(f.archived);
+    expect(rendered).toContain(JSON.stringify(f.notes));
+    expect(rendered).toContain(JSON.stringify(f.archived));
     expect(rendered).toContain("read-only");
     expect(rendered).not.toContain("does not restrict file modifications");
     expect(
@@ -188,9 +188,6 @@ it.each(["workspace-write", "danger-full-access"] as const)(
           }),
         ).toMatchObject({ isError: true });
       }
-      const alias = join(f.root, "notes-alias.md");
-      await symlink(f.notes, alias);
-      expect((await f.write(alias, "bad")).isError).toBe(true);
       const missing = join(f.root, "absent-record.md");
       const absentOff = f.ctx.sandboxPolicy.restrictReadOnly(f.worker.id, [
         missing,
@@ -212,6 +209,33 @@ it.each(["workspace-write", "danger-full-access"] as const)(
       expect((await f.write(f.notes, "ordinary after release")).isError).toBe(
         false,
       );
+    } finally {
+      await f.dispose();
+    }
+  },
+);
+
+it.for(["workspace-write", "danger-full-access"] as const)(
+  "stock filesystem rejects symlink aliases of protected records under %s",
+  async (mode, context) => {
+    const f = await setup(mode);
+    try {
+      const alias = join(f.root, "notes-alias.md");
+      try {
+        await symlink(f.notes, alias);
+      } catch (error) {
+        if (process.platform === "win32" && (error as NodeJS.ErrnoException).code === "EPERM") {
+          context.skip();
+          return;
+        }
+        throw error;
+      }
+      const off = f.protect();
+      expect((await f.write(alias, "bad")).isError).toBe(true);
+      expect(await readFile(f.notes, "utf8")).toBe("NOTES");
+      off();
+      expect((await f.write(alias, "ordinary after release")).isError).toBe(false);
+      expect(await readFile(f.notes, "utf8")).toBe("ordinary after release");
     } finally {
       await f.dispose();
     }

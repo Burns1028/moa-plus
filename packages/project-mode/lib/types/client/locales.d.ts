@@ -23,7 +23,6 @@ export declare const en: {
     readonly copied: "Copied";
     readonly footnotes: "Footnotes";
     readonly project: "MoA+";
-    readonly enabling: "Updating MoA+…";
     readonly loading: "Loading MoA+…";
     readonly parent: "Back";
     readonly readonlyDeleted: "This worker was deleted. Its conversation history is retained.";

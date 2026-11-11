@@ -217,7 +217,7 @@ export const projection: ProjectionDefinition<
   Projection
 > = {
   key: "project-mode-results",
-  stateVersion: 4,
+  stateVersion: 5,
   stateSchema: projectionSchema,
   init: (_header, inheritedEventCount) => ({
     turn: 0,
@@ -233,15 +233,18 @@ export const projection: ProjectionDefinition<
   apply(state, event) {
     if (event.seq < state.inheritedEventCount) return state;
     switch (event.type) {
-      case "turn/start":
+      case "turn/start": {
+        // Optional projection fields must be absent, not explicitly undefined,
+        // so every checkpoint remains losslessly representable as plain JSON.
+        const { lastAssistant: _previousAssistant, ...current } = state;
         return {
-          ...state,
+          ...current,
           lastSeq: event.seq,
           turn: event.data.turn,
           segmentStartSeq: event.seq,
           messageIds: state.handoffMessageIds,
-          lastAssistant: undefined,
         };
+      }
       case "user/message":
         return {
           ...state,

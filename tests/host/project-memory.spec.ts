@@ -37,8 +37,12 @@ it("bootstraps an index for new projects and legacy context before either role's
       expect(text).toContain("README.md");
       expect(text).toContain("findings.md");
       expect(text).not.toContain("DOCUMENT_BODY");
-      const prompt = JSON.stringify(request.messages);
-      expect(prompt).toContain(index);
+      const prompt = request.messages
+        .flatMap((message) => message.content)
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+      expect(prompt).toContain(JSON.stringify(index));
       expect(prompt).toContain("Read");
       expect(prompt).not.toContain("DEFERRED_CONTEXT_BODY");
       if (request.sessionId !== agent.id) {

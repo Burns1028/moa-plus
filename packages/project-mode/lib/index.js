@@ -1,8 +1,8 @@
 import { SessionId, SessionSeq, appendPluginRecord, buildForkSeed, pluginRecordOf, snapshotSessionEvent } from "@deepseek-ai/dsh-session";
 import { MessageId, createUserMessage, freezeMessage } from "@deepseek-ai/dsh-llm";
-import { TOOL_RUNTIME_SCHEDULER, defineTool } from "@deepseek-ai/dsh-tools";
+import * as NativeTools from "@deepseek-ai/dsh-tools";
+import { defineTool } from "@deepseek-ai/dsh-tools";
 import { SubagentError } from "@deepseek-ai/dsh-subagent";
-import { queueHostSubagentPrompt, steerHostSubagentPrompt } from "@deepseek-ai/dsh-subagent/internal";
 import { z } from "zod";
 import { defineDomain, domainTable } from "@deepseek-ai/dsh-storage-domain";
 import { FsVersion } from "@deepseek-ai/dsh-fs";
@@ -215,7 +215,7 @@ const finishedSchema = z.object({
 });
 const projection = {
 	key: "project-mode-results",
-	stateVersion: 4,
+	stateVersion: 5,
 	stateSchema: z.object({
 		turn: z.number().int(),
 		inheritedEventCount: z.number().int().nonnegative().default(0),
@@ -246,14 +246,16 @@ const projection = {
 	apply(state, event) {
 		if (event.seq < state.inheritedEventCount) return state;
 		switch (event.type) {
-			case "turn/start": return {
-				...state,
-				lastSeq: event.seq,
-				turn: event.data.turn,
-				segmentStartSeq: event.seq,
-				messageIds: state.handoffMessageIds,
-				lastAssistant: void 0
-			};
+			case "turn/start": {
+				const { lastAssistant: _previousAssistant, ...current } = state;
+				return {
+					...current,
+					lastSeq: event.seq,
+					turn: event.data.turn,
+					segmentStartSeq: event.seq,
+					messageIds: state.handoffMessageIds
+				};
+			}
 			case "user/message": return {
 				...state,
 				lastSeq: event.seq,
@@ -311,6 +313,62 @@ function normalizeReason(kind) {
 	return kind === "completed" || kind === "max-tokens" || kind === "error" ? kind : kind === "blocked" ? "refusal" : "aborted";
 }
 // src/host/native.ts
+/** Give a helper its own native executor without changing its parent's mode. */
+async function presentNativeTools(ctx) {
+	if (typeof ctx.tools.presentAs === "function") {
+		ctx.tools.presentAs("native");
+		return;
+	}
+	if (typeof Reflect.get(ctx.tools, "setExecutor") !== "function") throw new Error("project-mode/native-tool-executor-incompatible: missing scoped native tool executor API");
+	const nativeExecutorPackage = "@deepseek-ai/dsh-tool-executor-native";
+	let moduleUrl;
+	try {
+		moduleUrl = import.meta.resolve(nativeExecutorPackage);
+	} catch (error) {
+		if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+		throw new Error(`project-mode/native-tool-executor-incompatible: missing ${nativeExecutorPackage}`, { cause: error });
+	}
+	const nativeExecutor = await import(moduleUrl);
+	await ctx.plugin(nativeExecutor);
+}
+const hostPromptSubpath = "@deepseek-ai/dsh-subagent/internal";
+let hostPromptAdapters;
+let hostPromptLoading;
+function missingHostPromptAdmission(api, cause) {
+	return new Error(`project-mode/native-host-prompt-admission-incompatible: missing ${api}`, cause === void 0 ? void 0 : { cause });
+}
+/** Classify only failure to resolve this adapter, never its own dependencies. */
+function missingHostPromptSubpath(error) {
+	if (!(error instanceof Error)) return false;
+	const { code, url } = error;
+	if (code === "ERR_PACKAGE_PATH_NOT_EXPORTED") {
+		const message = error.message.replaceAll("\\", "/");
+		return message.includes("Package subpath './internal'") && /\/@deepseek-ai\/dsh-subagent\/package\.json(?:[\s"']|$)/.test(message);
+	}
+	if (code !== "ERR_MODULE_NOT_FOUND") return false;
+	try {
+		return url === import.meta.resolve(hostPromptSubpath);
+	} catch {
+		return false;
+	}
+}
+function loadHostPromptAdapters() {
+	return hostPromptLoading ??= import("@deepseek-ai/dsh-subagent/internal").catch((error) => {
+		if (missingHostPromptSubpath(error)) throw missingHostPromptAdmission(hostPromptSubpath, error);
+		throw error;
+	}).then((adapters) => hostPromptAdapters = adapters);
+}
+function admitHostPrompt(name, args) {
+	const invoke = (adapters) => {
+		const admit = adapters[name];
+		if (typeof admit !== "function") throw missingHostPromptAdmission(`${hostPromptSubpath}.${name}`);
+		return admit(...args);
+	};
+	return hostPromptAdapters ? invoke(hostPromptAdapters) : loadHostPromptAdapters().then(invoke);
+}
+/** Lazy Host-only admission; unsupported runtimes fail at the requested call. */
+const queueHostSubagentPrompt = (...args) => admitHostPrompt("queueHostSubagentPrompt", args);
+const steerHostSubagentPrompt = (...args) => admitHostPrompt("steerHostSubagentPrompt", args);
 async function registerProjection(ctx) {
 	await ctx.sessionProjections.register(projection);
 }
@@ -415,12 +473,25 @@ async function resolveOrdinaryAgent(ctx, sessionId) {
 	if ("error" in result) throw result.error;
 	return result.agent;
 }
-/** Refuse a partial rc.3 installation before installing MOA execution policy. */
+/** Name missing native capabilities before installing MOA execution policy. */
 function requireNativeBackground(ctx, agent) {
 	const jobs = agent.ctx.get("jobs");
-	if (!jobs?.supportsProducerNotices || typeof ctx.tools[TOOL_RUNTIME_SCHEDULER]?.start !== "function" || typeof agent.enableToolBackground !== "function" || typeof agent.cancelAndJoin !== "function" || typeof agent.moaAborting !== "boolean" || typeof agent.moaHasPendingBackground !== "boolean") throw new Error("project-mode/native-moa-background-incompatible: patched native tools, loop and jobs provider required");
+	const missing = [];
+	const scheduler = Reflect.get(NativeTools, "TOOL_RUNTIME_SCHEDULER");
+	if (!jobs?.supportsProducerNotices) missing.push("jobs.supportsProducerNotices");
+	if (typeof scheduler !== "symbol") missing.push("@deepseek-ai/dsh-tools.TOOL_RUNTIME_SCHEDULER");
+	else if (typeof ctx.tools[scheduler]?.start !== "function") missing.push("tools[TOOL_RUNTIME_SCHEDULER].start");
+	if (typeof agent.enableToolBackground !== "function") missing.push("agent.enableToolBackground");
+	if (typeof agent.cancelAndJoin !== "function") missing.push("agent.cancelAndJoin");
+	if (typeof agent.moaAborting !== "boolean") missing.push("agent.moaAborting");
+	if (typeof agent.moaHasPendingBackground !== "boolean") missing.push("agent.moaHasPendingBackground");
+	if (missing.length) throw new Error(`project-mode/native-moa-background-incompatible: missing ${missing.join(", ")}`);
 	const bash = ctx.tools.get("bash", agent);
-	if (bash && (!bash.supportsBackgroundProducer || !agent.ctx.get("shell")?.supportsManagedExecution)) throw new Error("project-mode/native-moa-background-incompatible: patched Bash producer and managed shell provider required");
+	if (bash) {
+		if (!bash.supportsBackgroundProducer) missing.push("bash.supportsBackgroundProducer");
+		if (!agent.ctx.get("shell")?.supportsManagedExecution) missing.push("shell.supportsManagedExecution");
+		if (missing.length) throw new Error(`project-mode/native-moa-background-incompatible: missing ${missing.join(", ")}`);
+	}
 	return jobs;
 }
 // src/host/project-memory.ts
@@ -1093,7 +1164,7 @@ function outcomeVerifierPrompt(rubricPath) {
 
 This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
 
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require Bash merely to inspect it. Inspect file artifacts with available native tools and personally run relevant Bash/build/tests where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
+Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Inspect file artifacts with available native tools and personally run relevant shell/build/tests with the available native shell (Bash or PowerShell) where applicable; candidate claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1324,9 +1395,9 @@ function bindCompletion(host) {
 			},
 			agentOptions: parent.session.requestHeader()?.config ?? parent.options,
 			signal,
-			setup(ctx) {
+			async setup(ctx) {
 				ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
-				ctx.tools.presentAs("native");
+				await presentNativeTools(ctx);
 				if (role === "builder") {
 					ctx.on("agent/request", async ({ signal }, next) => {
 						const config = await next();
@@ -1592,13 +1663,18 @@ function bindCompletion(host) {
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
 			control.throwIfAborted();
 			const offset = pair.verifier.agent.session.snapshotEvents().length;
-			const successfulBash = /* @__PURE__ */ new Set();
+			const shellKind = (name) => ["bash", "pwsh"].includes(name.toLowerCase());
+			const successfulShell = /* @__PURE__ */ new Set();
 			stopEvidence = pair.verifier.agent.ctx.on("tools/result", (exec, result) => {
-				if (exec.agent !== pair.verifier.agent || exec.name.toLowerCase() !== "bash" || result.isError) return;
+				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || result.isError) return;
 				const value = result.value;
-				if (!value || typeof value !== "object" || Array.isArray(value) || value.kind !== "foreground" || value.exitCode !== 0 || value.timedOut !== false || value.aborted !== false || value.signal !== null) return;
+				const foregroundPassed = value && typeof value === "object" && !Array.isArray(value) && value.kind === "foreground" && value.exitCode === 0 && value.timedOut === false && value.aborted === false && value.signal === null;
+				const meta = result.meta;
+				const nativeShell = meta && typeof meta === "object" && !Array.isArray(meta) ? meta.nativeShell : void 0;
+				const persistentPassed = nativeShell && typeof nativeShell === "object" && !Array.isArray(nativeShell) && nativeShell.kind === exec.name.toLowerCase() && nativeShell.completed === true && nativeShell.exitCode === 0 && nativeShell.signal === null && nativeShell.timedOut === false && nativeShell.aborted === false;
+				if (!foregroundPassed && !persistentPassed) return;
 				const call = pair.verifier.agent.session.snapshotEvents().filter((event) => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
-				if (call) successfulBash.add(call.seq);
+				if (call) successfulShell.add(call.seq);
 			});
 			candidateReview = pair.freezeCandidate(answer, control);
 			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
@@ -1609,7 +1685,7 @@ function bindCompletion(host) {
 			const calls = events.filter((e) => e.type === "tool/call");
 			const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
 			const successfulCalls = calls.filter((e) => e.type === "tool/call" && results.some((result) => result.type === "tool/result" && result.data.step === e.data.step && result.data.message.toolCallId === e.data.callId));
-			const passedBash = successfulCalls.some((call) => successfulBash.has(call.seq)) || events.some((event) => event.type === "job/settled" && event.data.kind === "bash" && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some((call) => call.type === "tool/call" && call.data.name.toLowerCase() === "bash" && call.data.callId === event.data.toolCall?.rootCallId));
+			const passedShell = successfulCalls.some((call) => successfulShell.has(call.seq)) || events.some((event) => event.type === "job/settled" && shellKind(event.data.kind) && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some((call) => call.type === "tool/call" && call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId));
 			let verdict;
 			try {
 				const submittedVerdict = candidateReview.readVerdict();
@@ -1629,7 +1705,7 @@ function bindCompletion(host) {
 				agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
 				return;
 			}
-			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedBash) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedShell) agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
 		} catch (error) {
 			signal.throwIfAborted();
 			if (!wake.signal.aborted && !host.closing.signal.aborted) {
@@ -1799,6 +1875,8 @@ function workerReportingInstructions(contextIndex, notes, archived) {
 }
 // src/host/moa/workspaces.ts
 const exec = promisify(execFile);
+const makeDirectory = "require('node:fs/promises').mkdir(process.argv[1], { recursive: true }).catch(error => { console.error(error); process.exitCode = 1; });";
+const removeFile = "require('node:fs/promises').rm(process.argv[1], { force: true }).catch(error => { console.error(error); process.exitCode = 1; });";
 /** Persist the record and retry destroy when preparation cleanup itself fails. */
 var MoAWorkspacePrepareError = class extends Error {
 	record;
@@ -1938,8 +2016,9 @@ var MoAWorkspaceManager = class {
 			const cwdTarget = await fs.resolve(record.directory, { signal: input.signal });
 			if (!fs.contains(worktreeTarget, cwdTarget)) throw new Error("project-mode/path-escape");
 			if (!await fs.stat(cwdTarget, input.signal)) await this.runCommand(directory, [
-				"mkdir",
-				"-p",
+				process.execPath,
+				"-e",
+				makeDirectory,
 				"--",
 				fs.processPath(cwdTarget)
 			], input.signal);
@@ -2004,8 +2083,9 @@ var MoAWorkspaceManager = class {
 	}
 	async runRemove(cwd, path) {
 		await this.runCommand(cwd, [
-			"rm",
-			"-f",
+			process.execPath,
+			"-e",
+			removeFile,
 			"--",
 			path
 		]);
@@ -2038,11 +2118,21 @@ var MoAWorkspaceManager = class {
 			const markerContent = await fs.readText(marker, signal);
 			if (markerContent !== expectedMarker && markerContent !== legacyMarker) throw new Error("project-mode/workspace-not-owned");
 		}
-		const entry = (await this.git(directory, [
+		const listing = await this.git(directory, [
 			"worktree",
 			"list",
 			"--porcelain"
-		], signal)).split("\n\n").find((item) => item.split("\n").includes(`worktree ${record.worktreeRoot}`));
+		], signal);
+		const worktree = await fs.resolve(record.worktreeRoot, { signal });
+		let entry;
+		for (const item of listing.split("\n\n")) {
+			const path = item.split("\n").find((line) => line.startsWith("worktree "));
+			if (path === void 0) continue;
+			if ((await fs.resolve(path.slice(9), { signal })).targetKey === worktree.targetKey) {
+				entry = item;
+				break;
+			}
+		}
 		if (entry && !entry.split("\n").includes(`branch refs/heads/${record.branch}`)) throw new Error("project-mode/workspace-not-owned");
 		const branch = await this.git(directory, [
 			"branch",
@@ -5100,7 +5190,7 @@ let ProjectMode = (() => {
 			this.config = config;
 		}
 		async [Service.init]() {
-			if (typeof this.ctx.tools.suppress !== "function") throw new Error("project-mode/native-compatibility-required: install the rc.3 Project Mode tool-suppression compatibility patch");
+			if (typeof this.ctx.tools.suppress !== "function") throw new Error("project-mode/native-compatibility-required: missing tools.suppress; provide the native scoped tool-suppression capability");
 			this.domain = await this.ctx.storage.domain.open(domainSpec);
 			const archives = bindProjectArchives(this.ctx, this.domain, (id, fn) => this.update(id, fn));
 			this.outbox = new CompletionOutbox(this.access);

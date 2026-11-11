@@ -1,0 +1,55 @@
+diff --git a/lib/index.js b/lib/index.js
+index 4141e65..2caec5f 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -82,7 +82,7 @@ function resolveAdditionalWritableRoots(roots) {
+ 	return Object.freeze([...new Set(roots)]);
+ }
+ /** Render the policy without claiming which capabilities are mounted. */
+-function renderPolicyContext(policy) {
++function renderModePolicyContext(policy) {
+ 	switch (policy.mode) {
+ 		case "read-only": return "Current DSH file policy: read-only. Any available operation enforced by the DSH file sandbox cannot modify files in the standing mode. Do not refuse a required modification from this policy alone: try an available tool normally and follow any denial and escalation guidance it returns.";
+ 		case "workspace-write": {
+@@ -99,6 +99,11 @@ function renderPolicyContext(policy) {
+ 	}
+ }
+ /** The sandbox-mode projection's state schema (state equals the public shape). */
++function renderPolicyContext(policy) {
++  if (!policy.readOnlyPaths?.length) return renderModePolicyContext(policy);
++  const modeText = policy.mode === "danger-full-access" ? "Current DSH file policy: danger-full-access. File modifications are allowed except for the session read-only paths below." : renderModePolicyContext(policy);
++  return `${modeText}\nSession read-only paths: ${JSON.stringify(policy.readOnlyPaths)}. These paths cannot be modified by this session, including after sandbox-mode escalation.`;
++}
+ const sandboxModeStateSchema = z.union([
+ 	z.literal("read-only"),
+ 	z.literal("workspace-write"),
+@@ -123,6 +128,18 @@ var SandboxPolicyService = class extends Service {
+ 	static inject = ["sessionProjections"];
+ 	/** The deployment default mode — the fallback beneath a session override. */
+ 	defaultMode;
++  readOnlyRestrictions = new Map();
++  restrictReadOnly(sessionId, paths) {
++    if (paths.some(path => !isAbsolute(path) || path.includes("\0"))) throw new Error("sandbox-policy: readonly paths must be absolute execution-world paths without NUL bytes");
++    const token = Symbol();
++    const contributions = this.readOnlyRestrictions.get(sessionId) ?? new Map();
++    contributions.set(token, [...paths]);
++    this.readOnlyRestrictions.set(sessionId, contributions);
++    return () => {
++      contributions.delete(token);
++      if (!contributions.size && this.readOnlyRestrictions.get(sessionId) === contributions) this.readOnlyRestrictions.delete(sessionId);
++    };
++  }
+ 	/** The absolute `workspace-write` fallback root for calls without a session cwd. */
+ 	workspaceRoot;
+ 	/** The frozen extra writable directories shared by every resolved policy, or `undefined` for none. */
+@@ -165,7 +182,10 @@ var SandboxPolicyService = class extends Service {
+ 	*/
+ 	resolve(request = {}) {
+ 		const { session } = request;
++    const contributions = session === void 0 ? void 0 : this.readOnlyRestrictions.get(session.id);
++    const readOnlyPaths = contributions === void 0 ? [] : [...new Set([...contributions.values()].flat())];
+ 		return {
++      ...readOnlyPaths.length ? { readOnlyPaths } : {},
+ 			mode: request.mode ?? (session === void 0 ? void 0 : this.overrideOf(session)) ?? this.defaultMode,
+ 			workspaceRoot: resolveWorkspaceRoot(session?.header.cwd ?? this.workspaceRoot),
+ 			...this.additionalWritableRoots === void 0 ? {} : { additionalWritableRoots: this.additionalWritableRoots },
