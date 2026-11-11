@@ -1,5 +1,13 @@
 # Verification
 
+## MoA+ 0.2.5 Worker task cards — 2026-11-11
+
+The read-only Workers panel now presents task/result previews and native file chips, with communication details folded. The latest card opens by default, previous default cards fold when new work arrives, and manually chosen disclosures survive stream frames. Full Markdown stays outside the summary control. Transport and initial identity prefixes are omitted only after exact source/birth-message verification; original text and attachments remain available.
+
+The production build and Host/Client typechecks passed. The final Host, Client, integration and native-contract run passed **473 tests across 70 files**, with **21 tests and one file skipped**. Panel/nested-address checks passed **16/16**, covering Markdown, attachments, native file opening, older cards, all inputs, original messages, streaming/manual disclosure choices and stream disposal. Host timeline checks passed **3/3**, including a real native Task birth message and refusal to trim unrelated or mismatched text. Launcher checks passed **17 tests**, with three explicit Windows/fixture skips.
+
+An installed Desktop Next candidate hot-reloaded successfully; its native accessibility tree showed the new task/result/file sections, folded communication records and the earlier card folded. The current full-screen application prevented target-window activation, so that observation does not establish desktop pixel appearance or mouse interaction. Screenshot/control resources were released. Native compatibility patches, execution and result delivery remain unchanged; the v0.2.3 execution evidence below retains its original scope.
+
 ## MoA+ 0.2.4 communication presentation — 2026-11-11
 
 Internal MoA correspondence now uses the native process group-tree position, allowing the native completion disclosure to fold it while retaining the final answer. Compact sender/type cards replace user-style bubbles, visible answer text supplies the preview, Markdown stays outside the summary control, and reasoning has a separate disclosure. Completed/handoff cards outside the native process range settle to a heading and remain manually readable. Explicit native Turn-only placement is retained; unowned Session messages are never assigned to a guessed Turn.

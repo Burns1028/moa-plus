@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes MoA+ v0.2.4, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes MoA+ v0.2.5, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
@@ -166,7 +166,7 @@ The same subscription now holds visible direct Workers as well, preserving the e
 
 Incoming messages with a native Turn but no Step retain that exact Turn and use step zero; unowned Session messages never acquire a guessed Turn. Native process ranges can begin after an incoming message, especially in a handoff turn with no final answer. Those messages keep their original anchors and collapse to their own heading when that native Turn completes or hands off. A user can reopen them; another render does not close a manually reopened card. Unknown history and aborted/error turns remain readable.
 
-The Workers tab is read-only. It shows original input, final AI output, and artifacts with two-line expandable Markdown previews. It does not summarize via a model. Workers/notes defaults use native closable tab behavior. Native sidebar rows retain their alignment and controls.
+The Workers tab is a read-only native-event projection grouped into task cards. The latest card opens by default and earlier cards start folded. Task text previews use two lines and final AI results use four; expanding a preview renders its complete original Markdown outside the disclosure control. File chips retain native attachment and artifact opening. Communication records are folded by default, with sender/time details and the original messages available on demand. Optional `WorkerTimelineMessage.displayText` removes only an exactly verified MoA-authored transport prefix; `text` remains unchanged, including user and assignment content. Reading the panel does not resume an Agent or request a model summary. Workers/notes defaults use native closable tab behavior. Native execution, capsule ownership, and sidebar controls remain unchanged.
 
 The draft mode control is a compact accessible wordmark toggle button, gray when off and green when on. The active letters use electric lime in the dark application theme and a darker green for contrast in the light theme; the selected raster artwork is embedded in the browser bundle. Starting the conversation replaces the button with the same fixed identity, preserving the permanent mode lock.
 
