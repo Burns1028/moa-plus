@@ -227,7 +227,8 @@
     "@deepseek-ai/dsh-client-ui-sidebar-right": "^0.2.1-rc.3 || ^0.2.2-rc.1",
     "@deepseek-ai/dsh-tool-present": "^0.2.1-rc.3 || ^0.2.2-rc.1",
     "@deepseek-ai/dsh-jobs": "^0.2.1-rc.3 || ^0.2.2-rc.1",
-    "@deepseek-ai/dsh-shell": "^0.2.1-rc.3 || ^0.2.2-rc.1"
+    "@deepseek-ai/dsh-shell": "^0.2.1-rc.3 || ^0.2.2-rc.1",
+    "@deepseek-ai/dsh-tool-executor-native": "^0.2.1-rc.3 || ^0.2.2-rc.1"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-api-session-controller": {
@@ -240,6 +241,9 @@
       "optional": true
     },
     "@deepseek-ai/dsh-agent-preset-registry": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tool-executor-native": {
       "optional": true
     }
   },

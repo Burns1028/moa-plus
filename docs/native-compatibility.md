@@ -41,6 +41,18 @@ definition from the same native scope/ToolSet as execution, preserving per-Agent
 visibility. This preserves SendMessage Request/Reply lifetime without a separate
 executor or message loop.
 
+Completion helpers select their own native tool presentation. The legacy registry
+uses `tools.presentAs("native")`; rc.2 mounts
+`@deepseek-ai/dsh-tool-executor-native` through the helper's scoped
+`tools.setExecutor` API. The parent keeps its selected native or PTC executor.
+This path runs when the first user turn creates Builder/Verifier helpers.
+
+The `project-mode-results` projection uses `stateVersion: 5`. Starting a turn
+removes the prior optional `lastAssistant` field, keeping checkpoints plain JSON
+even when that turn ends before an AI reply. The native projection registry
+invalidates older-version cache rows and replays the Session history; handoff
+assignment ids and completed results retain their existing meaning.
+
 ## Preparation and verification
 
 Use Node 24.9+ and Git. Stop the affected runtime and retain a full application
@@ -63,6 +75,21 @@ For prepared rc.2 runtime regressions, set `MOA_COMPAT_MODULES` to that runtime'
 use personal profiles or credentials. A Desktop startup and real-model task are
 separate acceptance checks; passing imports or scripted tests does not establish
 that every model workflow has been exercised.
+
+The first-turn regression uses the built plugin and a disposable prepared rc.2
+runtime with its matching AgentLoop testkit:
+
+```powershell
+npm run build
+$env:MOA_COMPAT_MODULES = 'C:\path\to\prepared-runtime\node_modules'
+node --test tests/compat/rc2-completion.test.mjs
+```
+
+It drives native/PTC parents and completion helpers with a scripted model, then
+checks an explicit native cache write and the persisted version-5 projection.
+Windows-only cases also verify that required tests cannot pass when Worker shell
+record protection is unavailable. These cases skip on other platforms; the suite
+requires `MOA_COMPAT_MODULES` and runs separately from the default rc.3 tests.
 
 ## Platform and version limits
 

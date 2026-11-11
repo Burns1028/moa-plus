@@ -215,7 +215,7 @@ const finishedSchema = z.object({
 });
 const projection = {
 	key: "project-mode-results",
-	stateVersion: 4,
+	stateVersion: 5,
 	stateSchema: z.object({
 		turn: z.number().int(),
 		inheritedEventCount: z.number().int().nonnegative().default(0),
@@ -246,14 +246,16 @@ const projection = {
 	apply(state, event) {
 		if (event.seq < state.inheritedEventCount) return state;
 		switch (event.type) {
-			case "turn/start": return {
-				...state,
-				lastSeq: event.seq,
-				turn: event.data.turn,
-				segmentStartSeq: event.seq,
-				messageIds: state.handoffMessageIds,
-				lastAssistant: void 0
-			};
+			case "turn/start": {
+				const { lastAssistant: _previousAssistant, ...current } = state;
+				return {
+					...current,
+					lastSeq: event.seq,
+					turn: event.data.turn,
+					segmentStartSeq: event.seq,
+					messageIds: state.handoffMessageIds
+				};
+			}
 			case "user/message": return {
 				...state,
 				lastSeq: event.seq,
@@ -311,6 +313,24 @@ function normalizeReason(kind) {
 	return kind === "completed" || kind === "max-tokens" || kind === "error" ? kind : kind === "blocked" ? "refusal" : "aborted";
 }
 // src/host/native.ts
+/** Give a helper its own native executor without changing its parent's mode. */
+async function presentNativeTools(ctx) {
+	if (typeof ctx.tools.presentAs === "function") {
+		ctx.tools.presentAs("native");
+		return;
+	}
+	if (typeof Reflect.get(ctx.tools, "setExecutor") !== "function") throw new Error("project-mode/native-tool-executor-incompatible: missing scoped native tool executor API");
+	const nativeExecutorPackage = "@deepseek-ai/dsh-tool-executor-native";
+	let moduleUrl;
+	try {
+		moduleUrl = import.meta.resolve(nativeExecutorPackage);
+	} catch (error) {
+		if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+		throw new Error(`project-mode/native-tool-executor-incompatible: missing ${nativeExecutorPackage}`, { cause: error });
+	}
+	const nativeExecutor = await import(moduleUrl);
+	await ctx.plugin(nativeExecutor);
+}
 const hostPromptSubpath = "@deepseek-ai/dsh-subagent/internal";
 let hostPromptAdapters;
 let hostPromptLoading;
@@ -1364,9 +1384,9 @@ function bindCompletion(host) {
 			},
 			agentOptions: parent.session.requestHeader()?.config ?? parent.options,
 			signal,
-			setup(ctx) {
+			async setup(ctx) {
 				ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
-				ctx.tools.presentAs("native");
+				await presentNativeTools(ctx);
 				if (role === "builder") {
 					ctx.on("agent/request", async ({ signal }, next) => {
 						const config = await next();

@@ -63,8 +63,8 @@ export declare const assignmentSchema: z.ZodObject<{
     }>;
     messageId: z.ZodOptional<z.ZodString>;
     admission: z.ZodEnum<{
-        rejected: "rejected";
         unknown: "unknown";
+        rejected: "rejected";
         prepared: "prepared";
         accepted: "accepted";
     }>;
@@ -113,9 +113,9 @@ export declare const deliverySchema: z.ZodObject<{
     targetId: z.ZodOptional<z.ZodString>;
     message: z.ZodPipe<z.ZodUnknown, z.ZodTransform<UserMessage, unknown>>;
     state: z.ZodEnum<{
+        consumed: "consumed";
         pending: "pending";
         admitted: "admitted";
-        consumed: "consumed";
         suppressed: "suppressed";
     }>;
     attempts: z.ZodNumber;
@@ -150,8 +150,8 @@ export declare const outcomeSchema: z.ZodObject<{
     segmentStartSeq: z.ZodOptional<z.ZodNumber>;
     workerId: z.ZodString;
     status: z.ZodEnum<{
-        deleted: "deleted";
         completed: "completed";
+        deleted: "deleted";
         failed: "failed";
         stopped: "stopped";
         continued: "continued";
@@ -217,8 +217,8 @@ export declare const recordSchema: z.ZodObject<{
         }>;
         messageId: z.ZodOptional<z.ZodString>;
         admission: z.ZodEnum<{
-            rejected: "rejected";
             unknown: "unknown";
+            rejected: "rejected";
             prepared: "prepared";
             accepted: "accepted";
         }>;
@@ -253,9 +253,9 @@ export declare const recordSchema: z.ZodObject<{
         targetId: z.ZodOptional<z.ZodString>;
         message: z.ZodPipe<z.ZodUnknown, z.ZodTransform<UserMessage, unknown>>;
         state: z.ZodEnum<{
+            consumed: "consumed";
             pending: "pending";
             admitted: "admitted";
-            consumed: "consumed";
             suppressed: "suppressed";
         }>;
         attempts: z.ZodNumber;
@@ -290,8 +290,8 @@ export declare const recordSchema: z.ZodObject<{
         segmentStartSeq: z.ZodOptional<z.ZodNumber>;
         workerId: z.ZodString;
         status: z.ZodEnum<{
-            deleted: "deleted";
             completed: "completed";
+            deleted: "deleted";
             failed: "failed";
             stopped: "stopped";
             continued: "continued";
@@ -351,7 +351,7 @@ export declare const domainSpec: {
                 workerId: string;
                 coordinatorTurn: number;
                 delivery: "steer" | "queue";
-                admission: "rejected" | "unknown" | "prepared" | "accepted";
+                admission: "unknown" | "rejected" | "prepared" | "accepted";
                 segmentStartSeq?: number | undefined;
                 participationSeq?: number | undefined;
                 participationKind?: "spawn" | "send" | undefined;
@@ -379,7 +379,7 @@ export declare const domainSpec: {
             deliveries: {
                 completionId: string;
                 message: UserMessage;
-                state: "pending" | "admitted" | "consumed" | "suppressed";
+                state: "consumed" | "pending" | "admitted" | "suppressed";
                 attempts: number;
                 targetId?: string | undefined;
                 lastError?: string | undefined;
@@ -407,7 +407,7 @@ export declare const domainSpec: {
                 coordinatorSessionId: string;
                 coordinatorTurn: number;
                 workerId: string;
-                status: "deleted" | "completed" | "failed" | "stopped" | "continued";
+                status: "completed" | "deleted" | "failed" | "stopped" | "continued";
                 completionIds: string[];
                 segmentStartSeq?: number | undefined;
                 lastResultMessageId?: string | undefined;

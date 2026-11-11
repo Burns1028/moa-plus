@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { z } from "zod";
 import type { HostAccess } from "../host-access.ts";
-import { waitForTurn } from "../native.ts";
+import { waitForTurn, presentNativeTools } from "../native.ts";
 import { outcomeVerifierPrompt, rubricBuilderPrompt } from "../prompts/completion.ts";
 import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./worker-memory-policy.ts";
 
@@ -132,10 +132,10 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       meta: { cwd: root, parentSession: parent.id, origin: "subagent" },
       agentOptions: parent.session.requestHeader()?.config ?? parent.options,
       signal,
-      setup(ctx) {
+      async setup(ctx) {
         ctx.get("agentPresets")?.composeFrom(ctx, parent.ctx);
         // Helpers use direct tool calls, including when the parent uses PTC.
-        ctx.tools.presentAs("native");
+        await presentNativeTools(ctx);
         if (role === "builder") {
           // Rubric extraction has no execution or research to perform. Select
           // the model's least reasoning effort after native model selection;

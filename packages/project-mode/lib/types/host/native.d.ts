@@ -4,6 +4,8 @@ import type { SessionId } from "@deepseek-ai/dsh-session";
 import type { Context } from "@deepseek-ai/cordis";
 import type { Session } from "@deepseek-ai/dsh-session";
 import { type Projection } from "./state.ts";
+/** Give a helper its own native executor without changing its parent's mode. */
+export declare function presentNativeTools(ctx: Context): Promise<void>;
 type HostPromptAdapters = Pick<typeof import("@deepseek-ai/dsh-subagent/internal"), "queueHostSubagentPrompt" | "steerHostSubagentPrompt">;
 type HostPromptAdmission = HostPromptAdapters["queueHostSubagentPrompt"];
 /** Lazy Host-only admission; unsupported runtimes fail at the requested call. */

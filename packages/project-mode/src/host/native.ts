@@ -5,9 +5,32 @@ import type { SessionController } from "@deepseek-ai/dsh-api-session-controller"
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import { SubagentError } from "@deepseek-ai/dsh-subagent";
-import type { Context } from "@deepseek-ai/cordis";
+import type { Context, Plugin } from "@deepseek-ai/cordis";
 import type { Session } from "@deepseek-ai/dsh-session";
 import { projection, type Projection } from "./state.ts";
+
+/** Give a helper its own native executor without changing its parent's mode. */
+export async function presentNativeTools(ctx: Context): Promise<void> {
+  if (typeof ctx.tools.presentAs === "function") {
+    ctx.tools.presentAs("native");
+    return;
+  }
+  if (typeof Reflect.get(ctx.tools, "setExecutor") !== "function")
+    throw new Error("project-mode/native-tool-executor-incompatible: missing scoped native tool executor API");
+  // New Harness releases own execution in separate provider plugins. Keep
+  // this optional module lazy so the rc.3 build/runtime stays supported.
+  const nativeExecutorPackage = "@deepseek-ai/dsh-tool-executor-native";
+  let moduleUrl: string;
+  try { moduleUrl = import.meta.resolve(nativeExecutorPackage); }
+  catch (error) {
+    if ((error as { code?: string })?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+    throw new Error(`project-mode/native-tool-executor-incompatible: missing ${nativeExecutorPackage}`, { cause: error });
+  }
+  // Loading failures inside the installed provider are not missing capability
+  // fallbacks: preserve the actual native error and its dependency details.
+  const nativeExecutor: Plugin = await import(moduleUrl);
+  await ctx.plugin(nativeExecutor);
+}
 
 type HostPromptAdapters = Pick<
   typeof import("@deepseek-ai/dsh-subagent/internal"),
