@@ -11,7 +11,7 @@ import type { BackgroundReceipt } from "@deepseek-ai/dsh-agent";
 import { defineTool, ToolNotFoundError } from "@deepseek-ai/dsh-tools";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 import * as Persistence from "@deepseek-ai/dsh-session-persistence-jsonl";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -245,30 +245,60 @@ function bashCall(command:string,timeoutMs=30,explicit=false):StreamChunk[] {
 }
 it.skipIf(!hasBash)("adopts the actual locked Bash producer at native promotion and publishes its final output",async()=>{
  const f=await setup("after-seconds",60);
+ const directory=await mkdtemp(join(tmpdir(),"moa-producer-ready-")),release=join(directory,"release");
+ const gate=`'${release.replaceAll("\\","/").replaceAll("'","'\\''")}'`;
  try{
   await shell(f);
-  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall("printf 'begin\\n'; sleep 0.2; printf 'actual final\\n'"):response("done");
+  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall(`printf 'begin\\n'; while [ ! -f ${gate} ]; do sleep 0.01; done; printf 'actual final\\n'`):response("done");
   f.agent.followup(user("run"));await f.agent.whenIdle();
   const r=receiptOf(f);expect(r).toBeDefined();expect(r.jobId).toMatch(/^bash-/);expect(r.cause.kind).toBe("producer-promotion");
   expect(f.ctx.jobs.list(f.agent.id)).toHaveLength(1);expect(backgroundResults(f)).toHaveLength(0);
+  // Promotion may happen during process preparation. Wait for the actual
+  // producer's first output, then keep it alive until the test releases it.
+  await until(()=>JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id)).includes("begin"));
+  expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("running");
+  expect(f.ctx.jobs.get(r.jobId,f.agent.id).completionNotice).toBe("producer");
   expect(JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id))).toContain("begin");
+  expect(backgroundResults(f)).toHaveLength(0);
+  await writeFile(release,"release");
   await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
+  expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("begin");
   expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("actual final");
   expect(JSON.stringify(backgroundResults(f)[0].data)).toContain("exit code: 0");
   expect(f.ctx.jobs.get(r.jobId,f.agent.id).completionNotice).toBe("producer");
- }finally{await f.dispose();}
+  const query=()=>f.ctx.tools.execute({agent:f.agent,name:"moa_job_status",callId:"repeatable-producer-query" as any,signal:new AbortController().signal,arguments:{tool_call_id:backgroundHandle(r)}});
+  const result=await query();expect(result).toEqual(await query());
+  expect(JSON.stringify(result)).toContain("begin");expect(JSON.stringify(result)).toContain("actual final");
+ }finally{
+  try{await writeFile(release,"release");}
+  finally{try{await f.dispose();}finally{await rm(directory,{recursive:true,force:true});}}
+ }
 });
 it.skipIf(!hasBash)("joins real Bash termination cleanup beyond its ordinary promotion wait",async()=>{
  const f=await setup("after-seconds",60);
+ const directory=await mkdtemp(join(tmpdir(),"moa-cleanup-ready-")),release=join(directory,"release");
+ const gate=`'${release.replaceAll("\\","/").replaceAll("'","'\\''")}'`;
  try{
   await shell(f);
-  // TERM trap keeps the real shell alive after the cancellation request.
-  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall("trap 'sleep 0.15; exit 0' TERM; printf 'ready\\n'; while :; do sleep 0.02; done",25):response("done");
-  f.agent.followup(user("run"));await f.agent.whenIdle();expect(receiptOf(f)).toBeDefined();
-  let joined=false;const started=Date.now();const stop=f.agent.cancelAndJoin({kind:"parent"}).then(()=>{joined=true;});
-  await new Promise(r=>setTimeout(r,50));expect(joined).toBe(false);await stop;
-  expect(Date.now()-started).toBeGreaterThan(100);expect(f.adapter.requests).toHaveLength(2);
- }finally{await f.dispose();}
+  // Signal only after the real shell confirms its TERM handler is installed.
+  // That handler stays alive until an explicit release, so join must not settle
+  // merely because the ordinary promotion wait elapsed or cancellation began.
+  const command=`cleanup() { printf 'cleanup-started\\n'; while [ ! -f ${gate} ]; do sleep 0.01; done; printf 'cleanup-finished\\n'; exit 0; }; trap cleanup TERM; printf 'ready\\n'; while :; do sleep 0.02; done`;
+  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall(command,25):response("done");
+  f.agent.followup(user("run"));await f.agent.whenIdle();const r=receiptOf(f);expect(r).toBeDefined();
+  await until(()=>JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id)).includes("ready"));
+  expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("running");
+  let joined=false;const stop=f.agent.cancelAndJoin({kind:"parent"}).then(()=>{joined=true;});
+  await until(()=>JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id)).includes("cleanup-started"));
+  expect(joined).toBe(false);expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("stopping");
+  await writeFile(release,"release");await stop;
+  expect(joined).toBe(true);expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("killed");
+  expect(JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id))).toContain("cleanup-finished");
+  expect(f.adapter.requests).toHaveLength(2);
+ }finally{
+  try{await writeFile(release,"release");}
+  finally{try{await f.dispose();}finally{await rm(directory,{recursive:true,force:true});}}
+ }
 });
 it.skipIf(!hasBash)("leaves explicit native background jobs independently controlled",async()=>{
  const f=await setup("after-seconds",60);
