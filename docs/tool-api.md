@@ -33,10 +33,12 @@ Start one to twenty clean-history native continuable Agents. A successful result
 | --- | --- |
 | `name`, `task`, `role` | Required label, complete assignment, and role. |
 | `workspace` | `isolated` by default; `shared` explicitly uses the creator's cwd. |
-| `reportTo` | Optional active member ID; defaults to the creator. |
+| `reportTo` | Optional actual Coordinator or active Worker session ID; omit it to report to the creator. Role labels such as `creator` are not IDs. |
 | `nested` | Defaults to `false`; explicitly permits this child to create/manage a further team. |
 
 Role names are exactly `Explorer`, `Planner`, `Deep Research`, and `General-purpose`. Explorer and Planner expose the native `glob`, `grep`, and `read` execution tools. Deep Research exposes `web_search` and `web_fetch` when installed. General-purpose retains native execution tools. Communication and shared-context tools remain available in each role; role selection does not grant extra filesystem authority.
+
+An invalid `reportTo` returns `moa/invalid-report-to`, identifies the item field, and explains how to omit the field or supply an actual session ID. Recipient membership is checked for the entire batch before reserving identities, workspaces, or admitting children; this parameter error leaves no partially admitted batch. A caller outside the enabled MoA family still receives the separate `moa/not-member` error.
 
 The twenty-item limit is a tool batch limit. Native runtime capacity is a separate limit and can reject additional resident Agents. Isolated execution needs a Git worktree-capable source and permitted Git resources. It snapshots staged, unstaged, and untracked current content without changing the source index. Shared execution is the explicit alternative when isolation is unsuitable.
 

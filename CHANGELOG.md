@@ -2,6 +2,7 @@
 
 ## 0.2.8 — Unreleased
 
+- Identify an invalid dispatch `reportTo` field and explain the default recipient, without admitting a partial batch or accepting role labels as session IDs.
 - Remove conflicting manual Worker result reporting instructions, keep task-local bookkeeping optional, and use source-backed review findings before changing artifacts or checks.
 - Serialize captured source bodies once in acceptance input while preserving chronological versions and legacy recovery. Make review registration explicit: hidden acceptance runs on a final candidate, rather than being a Worker to wait for.
 - Keep one current notes snapshot in each model request through native logged surface replacements. Preserve immutable audit history, clean repeated snapshots from saved sessions, and retain Stop, Worker and failed-read behavior.

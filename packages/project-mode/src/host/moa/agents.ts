@@ -213,7 +213,7 @@ export class MoAAgents {
       )?.nested
     )
       throw new Error("moa/nested-disabled");
-    for (const item of tasks) {
+    for (const [index, item] of tasks.entries()) {
       const reportTo = item.reportTo ?? agent.id;
       if (
         reportTo !== rootId &&
@@ -221,7 +221,9 @@ export class MoAAgents {
           (w) => w.id === reportTo && w.lifecycle === "active",
         )
       )
-        throw new Error("moa/not-member");
+        throw new Error(
+          `moa/invalid-report-to: tasks[${index}].reportTo ${JSON.stringify(reportTo)} is not an active MoA session ID. Omit reportTo to report to the creating Agent (${agent.id}), or use the actual session ID of the project Coordinator or an active Worker. Role labels are not session IDs.`,
+        );
     }
     const batchKey = `moa:task:${operationId}`;
     let ids = this.host.record(rootId)?.operations[batchKey] as
