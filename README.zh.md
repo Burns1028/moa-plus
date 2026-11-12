@@ -20,7 +20,10 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-MoA+ **v0.2.8** 支持经过审查的 **DSH 0.2.1-rc.3** 与
+本页说明 **MoA+ v0.2.8 候选开发版（未发布）**。
+最新已发布的稳定 tag 仍是 **[v0.2.7](https://github.com/Burns1028/moa-plus/tree/v0.2.7)**。
+
+候选版使用经过审查的 **DSH 0.2.1-rc.3** 与
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 兼容配置。rc.3 清单扩展了
 **22 个原生包、50 个文件路径**。插件与对应兼容配置必须来自同一版本，
 原版或其他版本准备的运行时不能替代。桌面准备步骤和精确支持范围见
@@ -30,12 +33,12 @@ MoA+ **v0.2.8** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 
 更新后的 rc.2 Desktop Next 配置支持 Windows 受保护 Worker 使用原生非持久 PowerShell，以及已安装的 Bash。Coordinator 原子更新现有记录时，保护持续生效，进程必须由原生 Windows Job 管理。持久终端和未适配生命周期的进程提供者仍拒绝受保护调用。rc.3 配置仍需 macOS Seatbelt 或 Linux bubblewrap，尚未加入这项 Windows 扩展。支持的策略与文件范围见[后端要求][compatibility]。
 
-下方命令使用 v0.2.8 checkout。跟进开发版本时，将克隆分支改为 `main`。
+下方命令跟进 `main` 开发分支。安装已发布稳定版时，克隆 `v0.2.7` 并使用该 tag 的文档。
 
 克隆项目，准备独立的 Web 运行环境：
 
 ```sh
-git clone --branch v0.2.8 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run

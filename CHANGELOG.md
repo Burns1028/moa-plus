@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.8 — 2026-11-12
+## 0.2.8 — Unreleased
 
 - Keep one current notes snapshot in each model request through native logged surface replacements. Preserve immutable audit history, clean repeated snapshots from saved sessions, and retain Stop, Worker and failed-read behavior.
 - Rename model-facing collaboration, background and review tools into the `moa_*` namespace, together with their factories and host methods. Preserve native interrupted-call recovery and historical message receipts without mounting a second alias set.
