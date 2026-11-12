@@ -112,12 +112,13 @@ it.each(["EACCES", "FS_PERMISSION_DENIED", "FS_IO_ERROR"])("does not replace an 
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("source-read-denied"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     const fs = f.ctx.get("agentPresets")?.serviceFor(agent, "fs") ?? agent.ctx.get("fs")!;
+    const deniedTarget = await fs.resolve(join(f.root, "policy.json"));
+    const siblingTarget = await fs.resolve(join(f.root, "a/policy.json"));
     const originalRead = fs.readText.bind(fs);
     const reads: string[] = [];
     vi.spyOn(fs, "readText").mockImplementation((target, signal) => {
-      const path = fs.processPath(target);
-      reads.push(path);
-      if (path === join(f.root, "policy.json")) {
+      reads.push(target.targetKey);
+      if (target.targetKey === deniedTarget.targetKey) {
         if (code === "EACCES") throw Object.assign(new Error("permission denied"), { code });
         throw new FsError("source is unavailable", code as "FS_PERMISSION_DENIED" | "FS_IO_ERROR");
       }
@@ -127,6 +128,7 @@ it.each(["EACCES", "FS_PERMISSION_DENIED", "FS_IO_ERROR"])("does not replace an 
     await agent.whenIdle();
     const input = (f.ctx.projectMode as any).access.record(agent.id).operations["moa:completion-input"];
     expect(input.sources).toEqual({ "a/spec.md": "RELATED SPEC", "policy.json": null });
-    expect(reads).not.toContain(join(f.root, "a/policy.json"));
+    expect(reads).toContain(deniedTarget.targetKey);
+    expect(reads).not.toContain(siblingTarget.targetKey);
   } finally { vi.restoreAllMocks(); await f.dispose(); }
 });

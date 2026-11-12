@@ -416,12 +416,13 @@ it("leaves the prior snapshot intact when Stop interrupts the fresh read and ref
     const fs =
       f.ctx.get("agentPresets")?.serviceFor(agent, "fs") ??
       agent.ctx.get("fs")!;
+    const notesTarget = await fs.resolve(mode.paths!.notes);
     const originalRead = fs.readText.bind(fs);
     const entered = Promise.withResolvers<void>();
     const read = vi
       .spyOn(fs, "readText")
       .mockImplementation(async (target, signal) => {
-        if (fs.processPath(target) === mode.paths!.notes) {
+        if (target.targetKey === notesTarget.targetKey) {
           entered.resolve();
           await new Promise<void>((resolve) => {
             if (signal?.aborted) resolve();
@@ -580,9 +581,10 @@ it("does not present stale notes as current when a later read is denied", async 
     const fs =
       f.ctx.get("agentPresets")?.serviceFor(agent, "fs") ??
       agent.ctx.get("fs")!;
+    const notesTarget = await fs.resolve(mode.paths!.notes);
     const originalRead = fs.readText.bind(fs);
     vi.spyOn(fs, "readText").mockImplementation((target, signal) => {
-      if (fs.processPath(target) === mode.paths!.notes)
+      if (target.targetKey === notesTarget.targetKey)
         throw new Error("READ_DENIED_FOR_TEST");
       return originalRead(target, signal);
     });
