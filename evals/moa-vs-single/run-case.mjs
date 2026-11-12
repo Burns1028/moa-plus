@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cases } from './suite.mjs';
+import { observeNativeOutcome } from './outcome-observation.mjs';
 
 const [manifestPath, runId, bootOnly] = process.argv.slice(2);
 assert.ok(manifestPath && runId, 'Use run.mjs to prepare and dispatch evaluation runs');
@@ -192,8 +193,9 @@ try {
   if (stopPromise) {
     try { await stopPromise; } catch (error) { errors.push({ phase: 'stop-join', message: errorText(error) }); }
   }
+  const events = root?.session.snapshotEvents() ?? [];
+  Object.assign(result, observeNativeOutcome(events));
   if (root) {
-    const events = root.session.snapshotEvents();
     result.finalReply = textOf(events.filter(event => event.type === 'assistant/message').at(-1)?.data.message);
     result.rootStepCount = events.filter(event => event.type === 'step/start').length;
     result.rootTurnCount = events.filter(event => event.type === 'turn/end').length;

@@ -76,7 +76,7 @@ node evals/moa-vs-single/run.mjs --report --plan C:/eval-output-001/manifest.jso
 输出包含：
 
 - `manifest.json`：固定题目、输入哈希、顺序、上限、模型及候选/可选基线构建哈希。
-- `runs/<id>/result.json`：正常/异常结束、耗时、根 Agent 首文字时间、实际工具清单、所有模型请求与用量、Agent 数量及类型。
+- `runs/<id>/result.json`：预算内正常/异常结束、原生最后 `turn/end` 的原因及序号、耗时、根 Agent 首文字时间、实际工具清单、所有模型请求与用量、Agent 数量及类型。`terminalCandidate` 仅记录末尾无工具调用且后续无新步骤/工具的文本字符数和序号，不是完成判定；旧结果没有采集时为未知。
 - `runs/<id>/scored.json`：独立评分和逐项结果。
 - 各运行的原生 Session、产物、stdout/stderr：便于复核失败和交付。
 - `report.md`、`report.html`、`report.json`：各组独立汇总、逐题结果和两两配对；三组时同时给出旧 MoA+/单 Agent、新 MoA+/单 Agent、新 MoA+/旧 MoA+。

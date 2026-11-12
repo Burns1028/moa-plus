@@ -12,7 +12,7 @@ const repository = resolve(here, '../..');
 const args = process.argv.slice(2);
 const option = (name, fallback) => { const at = args.indexOf(name); return at < 0 ? fallback : args[at + 1]; };
 const hash = value => createHash('sha256').update(value).digest('hex');
-const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'cases-hard.mjs', 'run.mjs', 'run-case.mjs', 'report.mjs'];
+const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'cases-hard.mjs', 'run.mjs', 'run-case.mjs', 'outcome-observation.mjs', 'report.mjs'];
 const fingerprints = async () => Object.fromEntries(await Promise.all(sourceFiles.map(async name => [name, hash(await readFile(join(here, name)))])));
 const planPath = resolve(option('--plan', join(option('--output', '.'), 'manifest.json')));
 async function describeBuild(directory) {
