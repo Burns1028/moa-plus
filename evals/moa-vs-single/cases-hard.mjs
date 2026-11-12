@@ -10,7 +10,7 @@ const verify = (name, action) => check(name, () => bounded(action));
 
 const cacheCase = {
   id: 'hard-concurrent-cache', title: '并发缓存的取消、失效与迟到结果', category: 'code', difficulty: 'hard', timeoutSeconds: 600,
-  prompt: '修复这个异步缓存项目。当前实现会在并发取消、失效与迟到结果时出错。请依据README.md完整契约修复src/cache.mjs，保留createResolver接口，补充测试并运行。项目离线且无依赖；直接使用 node --test --test-isolation=none 运行测试。交付后简短说明。',
+  prompt: '修复这个异步缓存项目。当前实现会在并发取消、失效与迟到结果时出错。请依据 `README.md` 的完整契约修复 `src/cache.mjs`，保留 createResolver 接口，补充测试并运行。项目离线且无依赖；直接使用 node --test --test-isolation=none 运行测试。交付后简短说明。',
   files: {
     'package.json': packageFile('concurrent-cache-repair'),
     'README.md': String.raw`# Concurrent resolver
@@ -178,7 +178,7 @@ await verify('separate-keys-and-resolvers-do-not-share-state',async()=>{
 
 const ledgerCase = {
   id: 'hard-journal-ledger', title: '事务账本的原子提交、去重与恢复', category: 'code', difficulty: 'hard', timeoutSeconds: 600,
-  prompt: '修复这个多模块事务账本。当前实现存在部分更新、重复扣款、持久化失败后状态错误和恢复问题。请按README.md全部契约修改src/中的实现，保留四个公共接口，补充测试并运行。项目离线且无依赖；直接使用 node --test --test-isolation=none。最后简短说明交付和验证。',
+  prompt: '修复这个多模块事务账本。当前实现存在部分更新、重复扣款、持久化失败后状态错误和恢复问题。请按 `README.md` 的全部契约修改 `src/` 中的实现，保留四个公共接口，补充测试并运行。项目离线且无依赖；直接使用 node --test --test-isolation=none。最后简短说明交付和验证。',
   files: {
     'package.json': packageFile('journal-ledger-repair'),
     'README.md': String.raw`# Journal ledger
