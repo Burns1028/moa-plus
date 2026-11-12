@@ -33,6 +33,7 @@
 - MoA+ 使用默认配置 `{}`，按需验收，由主 Agent 自己决定是否协作；不加入专门的协作提示。
 - 每次使用全新 Git 工作区、`DSH_HOME` 和 `DSH_AGENTS_HOME`；不使用个人会话、共享技能或既有项目记忆。
 - 默认每题每组重复两次，共 32 次。第二次反转题目及各题两组的启动顺序。每对两组并行运行，等两组结束后才开始下一对。
+- 指定 `--baseline-repository` 时增加第三组 `moa-baseline`：从该 Git checkout 的冻结构建加载旧 MoA+，仍使用原生协作与独立配置根。每题三组同时运行，第二次反转顺序；原生子 Agent 的并发不另作人为限制。计划记录候选与基线的 commit、Host/Client 哈希和版本，每次启动前核对两份构建，复制后再核对实际插件。旧 MoA+ 不会被当作单 Agent。
 - 简单题分别限时 60/90 秒，复杂题各 420 秒。两组全部 Agent 合计上限相同：64 个模型请求、500,000 个总 token。
 - token 上限在请求开始和 usage 返回时检查；在途请求可能超额，实际超额量另记。超时先原生停止并清理后代；清理卡住时只结束本次启动的进程树。
 - 开始前冻结题目、评分器、运行器与生产构建的哈希。所有失败保留，不重复运行到通过，不在评测过程中修改产品。
@@ -63,19 +64,22 @@ node evals/moa-vs-single/run.mjs --report --plan C:/eval-output-001/manifest.jso
 
 可在准备时指定 `--provider`、`--model`、`--reasoning` 和 `--repetitions`。
 `--suite basic` 默认跑原有8题，`--suite hard` 只跑2道难题，`--suite all` 跑全部。
+`--cases id1,id2` 明确按给定顺序选择任务，取代 `--suite` 的默认选择；重复、空或未知 ID 会拒绝。可用 ID 在 `suite.mjs` 及各 case 模块中。
 难题可以预先设置相同的更高上限，例如两组都使用 `--max-total-tokens 1000000 --max-requests 80`；限额写入冻结计划，不能看过结果再改。本次难题每次限时600秒。基础集保留原输入与评分，以便比较修复前后效率。
 每轮正式对照需要新的输出目录。不要同时从两个控制进程运行同一份计划。
 `--run` 会跳过已有 `scored.json` 的运行，不会覆盖现有原始证据。
+
+固定三组复测可分两份计划：基础题 `--cases code-usage-invoice,code-incremental-build,analysis-reconciliation --baseline-repository C:/moa-baseline`，2次重复共18次，保留500,000总token/64请求上限；难题 `--cases hard-journal-ledger --baseline-repository C:/moa-baseline --max-total-tokens 1000000 --max-requests 80`，2次重复共6次。两份计划都需全新输出目录并在开始前冻结，不能根据结果调限额或重试到通过。
 
 ## 证据与解释
 
 输出包含：
 
-- `manifest.json`：固定题目、输入哈希、顺序、上限、模型及构建哈希。
-- `runs/<id>/result.json`：正常/异常结束、耗时、根 Agent 首文字时间、实际工具清单、所有模型请求与用量、Agent 数量及类型。
+- `manifest.json`：固定题目、输入哈希、顺序、上限、模型及候选/可选基线构建哈希。
+- `runs/<id>/result.json`：预算内正常/异常结束、原生最后 `turn/end` 的原因及序号、耗时、根 Agent 首文字时间、实际工具清单、所有模型请求与用量、Agent 数量及类型。`terminalCandidate` 仅记录末尾无工具调用且后续无新步骤/工具的文本字符数和序号，不是完成判定；旧结果没有采集时为未知。
 - `runs/<id>/scored.json`：独立评分和逐项结果。
 - 各运行的原生 Session、产物、stdout/stderr：便于复核失败和交付。
-- `report.md`、`report.html`、`report.json`：汇总和逐题对比。
+- `report.md`、`report.html`、`report.json`：各组独立汇总、逐题结果和两两配对；三组时同时给出旧 MoA+/单 Agent、新 MoA+/单 Agent、新 MoA+/旧 MoA+。
 
 用量覆盖主 Agent、普通 Worker、验收助手和后台判断请求。每个请求只取最后一份 usage，避免重复累计。
 输入、缓存读取、缓存写入、输出分开记录；reasoning 是输出子集，未上报时记未知。

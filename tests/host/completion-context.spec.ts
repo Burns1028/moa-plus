@@ -35,7 +35,11 @@ function builderInput(request: GenerateOptions) {
   return JSON.parse(body.slice(body.lastIndexOf("\n") + 1));
 }
 
-it.each([false, true])("restores an uncommitted human requirement to Coordinator and Builder through native context (complete preset=%s)", async complete => {
+it.each([
+  { complete: false, legacy: false },
+  { complete: true, legacy: false },
+  { complete: false, legacy: true },
+])("restores one source body to Coordinator and Builder after native restart (%j)", async ({ complete, legacy }) => {
   let f = await fixture(undefined, { completionVerification: true, keepFiles: true });
   try {
     let { agent } = await f.ctx.agents.create({
@@ -58,6 +62,14 @@ it.each([false, true])("restores an uncommitted human requirement to Coordinator
     expect(f.adapter.requests).toHaveLength(0);
     const saved = recordSchema.parse(await f.ctx.storageDomain.get("project_mode")!.table("projects").get(agent.id));
     expect(saved.operations["moa:completion-input"]).toMatchObject({ requirements: [original], finished: false });
+    if (legacy) {
+      await (f.ctx.projectMode as any).access.update(agent.id, (record: typeof saved) => ({
+        ...record,
+        operations: { ...record.operations, "moa:completion-input": {
+          ...record.operations["moa:completion-input"] as object, sourceVersions: [],
+        } },
+      }));
+    }
 
     const root = f.root;
     await f.dispose();
@@ -89,6 +101,11 @@ it.each([false, true])("restores an uncommitted human requirement to Coordinator
       if (id.startsWith("moa-builder-")) {
         const input = builderInput(request);
         expect(input.requirements).toEqual(expected);
+        if (expected[0] === original) {
+          expect(JSON.stringify(input).split("ORIGINAL HUMAN SOURCE SNAPSHOT")).toHaveLength(2);
+          expect(input.sources).toEqual({});
+          expect(input.sourceVersions).toEqual([{ path: "original spec.md", requirement: legacy ? null : 1, content: "ORIGINAL HUMAN SOURCE SNAPSHOT" }]);
+        }
         builtInputs.push(input);
         return call("moa_publish_checklist", { rubric: "- Satisfy the original human requirements", tests_required: false });
       }
@@ -103,8 +120,9 @@ it.each([false, true])("restores an uncommitted human requirement to Coordinator
       admittedInputs.push(input);
       expect(input.requirements).toEqual(expected);
       if (expected[0] === original) {
-        expect(input.sources).toEqual({ "original spec.md": "ORIGINAL HUMAN SOURCE SNAPSHOT" });
-        expect(input.sourceVersions).toEqual([{ path: "original spec.md", requirement: 1, content: "ORIGINAL HUMAN SOURCE SNAPSHOT" }]);
+        expect(input.sources).toEqual({});
+        expect(JSON.stringify(input).split("ORIGINAL HUMAN SOURCE SNAPSHOT")).toHaveLength(2);
+        expect(input.sourceVersions).toEqual([{ path: "original spec.md", requirement: legacy ? null : 1, content: "ORIGINAL HUMAN SOURCE SNAPSHOT" }]);
       } else {
         expect(input.sources).toEqual({});
         expect(input.sourceVersions).toEqual([]);

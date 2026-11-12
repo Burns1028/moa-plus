@@ -21,5 +21,5 @@ export function workerReportingInstructions(
   notes: string,
   archived: string,
 ): string {
-  return `Use ${tools.message} to report results and request help when blocked. Shared context index: ${contextIndex}. Read that index before loading relevant context files. Maintain valuable reusable knowledge through ${tools.context}. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
+  return `Your complete final AI message returns automatically to reportTo; no duplicate send is needed. Use ${tools.message} for useful mid-task findings or blockers. Shared context index: ${contextIndex}; read it when relevant, before opening needed context files. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
 }

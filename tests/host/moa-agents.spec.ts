@@ -1,7 +1,68 @@
 import { expect, it } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import { createUserMessage, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { fixture, response } from "./fixture.ts";
+
+it("rejects an invalid reportTo batch before admission and guides a native retry to the creator", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("actual-creator-session"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const access = (f.ctx.projectMode as any).access;
+    const children: string[] = [];
+    f.ctx.on("agent/created", ({ agent: child }) => children.push(child.id));
+    const returned = Promise.withResolvers<void>();
+    const invoke = (id: string, tasks: object[]): StreamChunk[] => {
+      const block = { type: "tool-call" as const, id, name: "moa_dispatch", arguments: JSON.stringify({ tasks }) };
+      return [
+        { type: "block-start", index: 0, blockType: "tool-call" },
+        { type: "tool-call-delta", index: 0, id, name: block.name, argumentsDelta: block.arguments },
+        { type: "block-end", index: 0, block },
+        { type: "finish", reason: { kind: "tool-calls" } },
+      ];
+    };
+    const item = { name: "worker", task: "Return REPORT_TO_CREATOR_OK", role: "Explorer", workspace: "shared" };
+    let main = 0;
+    f.adapter.handler = async options => {
+      if (options.sessionId !== agent.id) return response("REPORT_TO_CREATOR_OK");
+      if (++main === 1) return invoke("invalid-recipient", [item, { ...item, name: "invalid", reportTo: "creator" }]);
+      if (main === 2) {
+        const failure = options.messages.findLast(message => message.role === "tool");
+        expect(failure).toMatchObject({ role: "tool", isError: true });
+        const feedback = JSON.stringify(failure!.content);
+        expect(feedback).toContain("moa/invalid-report-to");
+        expect(feedback).toContain("tasks[1].reportTo");
+        expect(feedback).toContain("Omit reportTo");
+        expect(feedback).toContain(agent.id);
+        expect(feedback).not.toContain("moa/not-member");
+        expect(children).toEqual([]);
+        expect(await f.ctx.subagents.listChildren(agent.id)).toEqual([]);
+        const record = access.record(agent.id);
+        expect(record.workers).toEqual([]);
+        expect(Object.keys(record.operations).filter(key => key.startsWith("moa:task:") || key.startsWith("moa:agent:"))).toEqual([]);
+        return invoke("default-recipient", [item]);
+      }
+      if (options.messages.some(message => message.role === "user" && message.source.kind === "project-mode-result" && JSON.stringify(message.content).includes("REPORT_TO_CREATOR_OK"))) {
+        returned.resolve();
+        return response("Worker result reviewed");
+      }
+      return response("Awaiting the admitted Worker result");
+    };
+    agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Delegate one task and report the result." }] }));
+    await returned.promise;
+    await agent.whenIdle();
+    expect(children).toHaveLength(1);
+    const record = access.record(agent.id);
+    const descriptor = record.operations[`moa:agent:${children[0]}`];
+    expect(descriptor).toMatchObject({ creatorId: agent.id, reportTo: agent.id });
+    expect(agent.session.snapshotEvents().filter(event => event.type === "user/message" && event.data.source.kind === "project-mode-result")).toHaveLength(1);
+    expect(agent.session.snapshotEvents().findLast(event => event.type === "turn/end")).toMatchObject({ data: { reason: { kind: "completed" } } });
+  } finally { await f.dispose(); }
+});
 
 it("admits a reserved MoA child through native activation with identity before its task", async () => {
   const f = await fixture();

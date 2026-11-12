@@ -54,8 +54,16 @@ function isMissingSource(error: unknown): boolean {
   return code === "ENOENT" || code === "FS_NOT_FOUND";
 }
 function serializeOriginalInputs(input: Input): string {
-  const { attachments: _attachments, ...snapshot } = input;
-  return JSON.stringify(snapshot);
+  const { attachments: _attachments, sources, sourceVersions, ...snapshot } = input;
+  // Persistence retains both latest values and their chronological versions.
+  // Model input needs each captured document once, not a second full copy in
+  // the latest-value map. Keep legacy/unversioned (including attachment) inputs
+  // and any latest value not represented by the last captured version.
+  const latest = new Map(sourceVersions.map(source => [source.path, source.content]));
+  const unversioned = Object.fromEntries(Object.entries(sources).filter(
+    ([path, content]) => !latest.has(path) || latest.get(path) !== content,
+  ));
+  return JSON.stringify({ ...snapshot, sources: unversioned, sourceVersions });
 }
 const output = { schema: { type: "string" as const }, render: (_: unknown, value: string) => [{ type: "text" as const, text: value }] };
 const text = (message: { content: readonly ContentBlock[] }) => message.content.filter((b) => b.type === "text").map((b) => String(b.text)).join("\n");
@@ -312,7 +320,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
     mounted.set(agent, () => {});
     const off = agent.ctx.tools.register(defineTool({
       name: tools.review, description: host.record(agent.id) && host.config.completionVerification === "on-demand"
-        ? "Request independent outcome verification for the current task and bind concrete completion criteria plus an exact, natural completion statement for the final answer. Use your judgment when a separate acceptance check is valuable; ordinary chat need not activate it. The Builder derives its rubric from original human requirements, not these criteria."
+        ? `Register independent acceptance for the current task with concrete criteria and an exact, natural completion statement. Continue the task and present your final candidate; the Host then runs hidden acceptance before closing. These helpers are not children to wait for with ${tools.observe}. Use this when a separate check adds value. The Builder derives its rubric from original human requirements, not these criteria.`
         : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
       parameters: { criteria: { type: "string", required: true, description: "Task completion criteria" }, promise: { type: "string", required: true, description: "Exact complete promise" } }, output,
       async execute(args, exec) {
@@ -327,7 +335,9 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
         if (!start || start.type !== "turn/start") throw new Error("Missing completion task turn");
         const value = { ...criteriaSchema.parse(args), taskId, turn: start.data.turn };
         await host.update(SessionId(record.project.coordinatorSessionId), (r) => ({ ...r, operations: { ...r.operations, [criteriaKey(agent.id)]: value } }));
-        return "Completion criteria and exact promise bound.";
+        return own
+          ? `Independent acceptance registered. Complete the task and present your final candidate with this exact promise when its criteria are met: ${value.promise}\nThe Host reviews the candidate before closure and returns any concrete gaps. Acceptance helpers are hidden; do not wait for them with ${tools.observe}.`
+          : "Completion criteria and exact promise bound. Include the promise when this assignment's criteria are met; this does not create independent acceptance helpers.";
       },
     }));
     mounted.set(agent, off);

@@ -2,6 +2,10 @@
 
 ## 0.2.8 — Unreleased
 
+- Report artifact scores separately from budget completion, and retain native ending and candidate-text metadata without changing evaluation limits or grading.
+- Identify an invalid dispatch `reportTo` field and explain the default recipient, without admitting a partial batch or accepting role labels as session IDs.
+- Remove conflicting manual Worker result reporting instructions, keep task-local bookkeeping optional, and use source-backed review findings before changing artifacts or checks.
+- Serialize captured source bodies once in acceptance input while preserving chronological versions and legacy recovery. Make review registration explicit: hidden acceptance runs on a final candidate, rather than being a Worker to wait for.
 - Keep one current notes snapshot in each model request through native logged surface replacements. Preserve immutable audit history, clean repeated snapshots from saved sessions, and retain Stop, Worker and failed-read behavior.
 - Rename model-facing collaboration, background and review tools into the `moa_*` namespace, together with their factories and host methods. Preserve native interrupted-call recovery and historical message receipts without mounting a second alias set.
 - Let the main Agent complete whole tasks directly, delegate useful independent work and stop redundant branches. Reuse successful checks, focus review on unresolved requirements, and avoid adding process obligations to the acceptance checklist.
