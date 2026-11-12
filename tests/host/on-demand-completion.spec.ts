@@ -103,6 +103,14 @@ it("activates helpers only for a bound human task and rejects later internal-onl
           promise: "EXACT PROMISE",
         });
       }
+      if (main === 2) {
+        const result = options.messages.findLast(message => message.role === "tool");
+        const feedback = result?.content.filter(block => block.type === "text").map(block => block.text).join("");
+        expect(feedback).toContain("Independent acceptance registered");
+        expect(feedback).toContain("present your final candidate");
+        expect(feedback).toContain("do not wait for them with moa_observe");
+        expect(feedback).toContain("EXACT PROMISE");
+      }
       if (main === 4)
         return call("moa_review", {
           criteria: "Internal notice must not resurrect a completed task",

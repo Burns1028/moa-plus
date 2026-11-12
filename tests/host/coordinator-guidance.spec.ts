@@ -6,6 +6,7 @@ import Loader from "@deepseek-ai/cordis-plugin-loader";
 import Presets from "@deepseek-ai/dsh-agent-preset-registry";
 import { fixture, response } from "./fixture.ts";
 import { coordinatorPrompt } from "../../packages/project-mode/src/host/prompts/coordinator.ts";
+import type { MoAAgents } from "../../packages/project-mode/src/host/moa/agents.ts";
 
 function systemText(request: GenerateOptions) {
   return request.messages
@@ -124,7 +125,7 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
   }
 });
 
-it("describes distinct work ownership and selective knowledge contributions in actual model inputs", async () => {
+it("assembles one-owner, source-grounded review and optional memory instructions in both roles", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
@@ -137,24 +138,30 @@ it("describes distinct work ownership and selective knowledge contributions in a
     await agent.whenIdle();
     const coordinator = f.adapter.requests.find((request) => request.sessionId === agent.id)!;
     const policy = `${systemText(coordinator)}\n${runtimeText(coordinator)}`;
-    expect(policy).toContain("Give each workstream a clear owner");
+    expect(policy).toContain("primary executor with a team available when useful");
+    expect(policy).toContain("one owner responsible for its implementation, checks and integration");
     expect(policy).toContain("a brief acknowledgement or a short clarification in the normal chat reply is a complete response");
     expect(policy).toContain("Respond only to that input; do not add unverified claims about workspace, system or runtime state");
     expect(policy).toContain("ordinary chat clarification should not block a turn on a question card");
     expect(policy).toContain("Reuse completed results and existing checks");
     expect(policy).toContain("unresolved question");
+    expect(policy).toContain("verify against original requirements, source data and contracts before changing artifacts or checks");
+    expect(policy).toContain("A later suggestion does not redefine those sources");
+    expect(policy).toContain("Record only state useful for later continuation");
+    expect(policy).not.toContain("update them when the state changes");
 
     const seen = Promise.withResolvers<GenerateOptions>();
     f.adapter.handler = (request) => {
       if (request.sessionId !== agent.id) seen.resolve(request);
       return response("done");
     };
-    const receipt = await f.ctx.projectMode.controlForAgent(
+    const controls: MoAAgents = (f.ctx.projectMode as any).moa;
+    const [receipt] = await controls.dispatch(
       agent,
-      { action: "spawn", name: "reviewer", task: "Review the existing evidence without modifying any file." },
+      [{ name: "reviewer", task: "Review the existing evidence without modifying any file.", role: "General-purpose", workspace: "shared" }],
       "selective-memory",
       new AbortController().signal,
-    ) as { workerId: SessionId };
+    );
     // Native ownership may release a completed Worker before admission returns.
     // The captured model request is the contract under test, not residency.
     const worker = await seen.promise;
@@ -164,6 +171,19 @@ it("describes distinct work ownership and selective knowledge contributions in a
     expect(instructions).toContain("Only contribute knowledge when");
     expect(instructions).toContain("no new reusable finding");
     expect(instructions).toContain("assignment's write constraints");
+    const workerPolicy = `${systemText(worker)}\n${runtimeText(worker)}`;
+    expect(workerPolicy).toContain("Distinguish demonstrated defects from uncertain suggestions");
+    expect(workerPolicy).toContain("workstream owner verifies findings and integrates changes");
+    const identity = worker.messages
+      .flatMap((message) => message.content)
+      .find((block) => block.type === "text" && block.text.startsWith("Agent ID:"));
+    expect(identity?.type).toBe("text");
+    if (identity?.type !== "text") throw new Error("missing worker identity");
+    expect(identity.text).toContain(`Report to: ${agent.id}`);
+    expect(identity.text).toContain("complete final AI message returns automatically to reportTo; no duplicate send is needed");
+    expect(identity.text).toContain("read it when relevant");
+    expect(identity.text).not.toContain("to report results");
+    expect(identity.text).not.toContain("Maintain valuable reusable knowledge");
   } finally {
     await f.dispose();
   }
@@ -197,7 +217,7 @@ it("explains role execution capabilities and explicit reply syntax in native too
   }
 });
 
-it("assembles adaptive scheduling guidance with native wait and history contracts", async () => {
+it("keeps adaptive collaboration policy and native contracts while schemas own control syntax", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
@@ -212,11 +232,12 @@ it("assembles adaptive scheduling guidance with native wait and history contract
     const policy = `${systemText(request)}\n${runtimeText(request)}`;
     expect(policyCopies(request)).toBe(1);
     expect(policy).toMatch(/prefer moa_message.*familiar worker/i);
-    expect(policy).toMatch(/then moa_branch.*useful committed history/);
+    expect(policy).toMatch(/moa_branch.*useful committed history/);
     expect(policy).toMatch(/moa_dispatch.*clean independent context/);
+    expect(policy).toContain("When collaboration helps");
     expect(policy).toContain("ready work in parallel");
     expect(policy).toContain("unlock downstream");
-    expect(policy).toContain("small self-contained actions");
+    expect(policy).toContain("Small self-contained actions");
 
     const query = request.tools!.find((tool) => tool.name === "moa_observe");
     expect(query?.parameters).toMatchObject({
@@ -231,19 +252,19 @@ it("assembles adaptive scheduling guidance with native wait and history contract
         },
       },
     });
-    expect(policy).toContain('wait="all"');
-    expect(policy).toContain('wait="selected"');
-    expect(policy).toContain("timeout_ms");
-    expect(policy).not.toContain("wait_timeout");
+    expect(policy).toContain("native wait");
+    expect(policy).not.toContain("history_offset");
+    expect(policy).not.toContain("timeout_ms");
     expect(policy).toContain("timeout alone is not failure");
-    expect(policy).toMatch(/reasonable.*duration.*progress/);
-    expect(policy).toMatch(/request.*blocker.*ETA/);
+    expect(policy).toContain("use observed progress");
     expect(policy).toContain("carry a complete task through investigation, implementation, testing and delivery yourself");
     expect(policy).toContain("take responsibility off your critical path");
     expect(policy).not.toContain("dispatch or reuse workers before doing their assigned investigation yourself");
     expect(policy).toContain("already adequate independent check may be enough");
     expect(policy).toMatch(/moa_stop.*cancel a branch whose result is no longer needed/);
     expect(policy).toContain("Await native cleanup before revising its assignment or final delivery");
+    expect(policy).toContain("automatically returns its complete final AI message");
+    expect(policy).toContain("message-driven background handoff is not task completion");
   } finally {
     await f.dispose();
   }

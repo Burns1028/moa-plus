@@ -15,7 +15,7 @@ export declare function memoryPaths(root: string): ProjectPaths & {
     index: string;
 };
 export declare function notesInjection(text: string): string;
-export declare const contextIndexTemplate = "# Project context\n\nRead this shared index first, then open only the context files needed for the task. Coordinator and Workers maintain reusable project knowledge here. Workers contribute valuable reusable findings; the Coordinator primarily organizes, consolidates and prunes context. Keep each entry's path and short description current.\n\n## Context files\n";
+export declare const contextIndexTemplate = "# Project context\n\nShared reusable knowledge, loaded when relevant to the current responsibility. Use this index to locate needed context files. Add confirmed findings only when they will help future work and the assignment permits writes; otherwise no update is needed. Link each contribution with its path and a short description. Task-local calculations and execution logs belong with the task, not here.\n\n## Context files\n";
 export declare const contextIndexPath: (paths: ProjectPaths) => string;
 export interface ProjectContextInput {
     action: "read" | "write";

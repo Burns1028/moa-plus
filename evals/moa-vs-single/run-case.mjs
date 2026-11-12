@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { cp, mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cases } from './suite.mjs';
@@ -12,6 +12,18 @@ assert.ok(manifestPath && runId, 'Use run.mjs to prepare and dispatch evaluation
 const manifest = JSON.parse(await readFile(resolve(manifestPath), 'utf8'));
 const entry = manifest.runs.find(row => row.id === runId);
 assert.ok(entry, 'Run must exist in the frozen plan');
+assert.ok(['single', 'moa-baseline', 'moa'].includes(entry.arm), 'Unknown evaluation arm');
+const hash = value => createHash('sha256').update(value).digest('hex');
+async function verifyBuild(directory, expected, label) {
+  assert.ok(directory && expected, `${label} repository and fingerprint are required`);
+  const actual = { commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: directory, encoding: 'utf8' }).trim(),
+    hostSha256: hash(await readFile(join(directory, 'packages/project-mode/lib/index.js'))),
+    clientSha256: hash(await readFile(join(directory, 'packages/project-mode/lib/client.js'))),
+    version: JSON.parse(await readFile(join(directory, 'package.json'), 'utf8')).version };
+  assert.deepEqual(actual, expected, `${label} build changed after the plan was frozen`);
+}
+await verifyBuild(manifest.local.repository, manifest.candidate, 'Candidate');
+if (manifest.baseline) await verifyBuild(manifest.local.baselineRepository, manifest.baseline, 'Baseline');
 const task = cases.find(row => row.id === entry.caseId);
 assert.ok(task);
 const directory = join(dirname(resolve(manifestPath)), 'runs', runId);
@@ -42,14 +54,18 @@ const load = name => import(pathToFileURL(join(runtime, 'node_modules/@deepseek-
 const boot = await load('dsh-app-boot');
 const { runProfile } = await import(pathToFileURL(join(runtime, 'node_modules/@deepseek-ai/dsh/lib/profile-boot.js')).href);
 const { createUserMessage } = await load('dsh-llm');
-const moa = entry.arm === 'moa';
+const moa = entry.arm !== 'single';
+const pluginRepository = entry.arm === 'moa-baseline' ? manifest.local.baselineRepository : manifest.local.repository;
+const pluginBuild = entry.arm === 'moa-baseline' ? manifest.baseline : manifest.candidate;
 boot.initProfile(profileDirectory, ['@deepseek-ai/dsh-base', ...(moa ? ['dsh-plugin-project-mode'] : [])]);
 if (moa) {
   const plugin = join(profileDirectory, 'node_modules/dsh-plugin-project-mode');
   await mkdir(plugin, { recursive: true });
   for (const part of ['lib', 'assets', 'package.json', 'cordis.patch.yml']) {
-    await cp(join(manifest.local.repository, 'packages/project-mode', part), join(plugin, part), { recursive: true });
+    await cp(join(pluginRepository, 'packages/project-mode', part), join(plugin, part), { recursive: true });
   }
+  assert.equal(hash(await readFile(join(plugin, 'lib/index.js'))), pluginBuild.hostSha256, 'Copied plugin Host differs from its frozen build');
+  assert.equal(hash(await readFile(join(plugin, 'lib/client.js'))), pluginBuild.clientSha256, 'Copied plugin Client differs from its frozen build');
 }
 await stat(manifest.local.credentials); // Reference only: native provider resolves secrets.
 const patches = [
@@ -70,7 +86,7 @@ await writeFile(join(profileDirectory, 'cordis.patch.yml'), JSON.stringify(patch
 const started = Date.now();
 const requests = [], agents = [], tools = [], errors = [], textMessages = [];
 const result = { id: runId, caseId: entry.caseId, arm: entry.arm, repetition: entry.repetition,
-  startedAt: new Date().toISOString(), runtime: process.versions, model: manifest.model,
+  startedAt: new Date().toISOString(), runtime: process.versions, model: manifest.model, ...(moa ? { pluginBuild } : {}),
   completed: false, stopReason: null, project, requests, tools, agents, errors };
 let ctx, shutdown, root, submittedAt, firstTextAt, timer;
 let stopPromise;

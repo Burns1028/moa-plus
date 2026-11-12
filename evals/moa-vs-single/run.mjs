@@ -15,6 +15,16 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'cases-hard.mjs', 'run.mjs', 'run-case.mjs', 'report.mjs'];
 const fingerprints = async () => Object.fromEntries(await Promise.all(sourceFiles.map(async name => [name, hash(await readFile(join(here, name)))])));
 const planPath = resolve(option('--plan', join(option('--output', '.'), 'manifest.json')));
+async function describeBuild(directory) {
+  return { commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: directory, encoding: 'utf8' }).trim(),
+    hostSha256: hash(await readFile(join(directory, 'packages/project-mode/lib/index.js'))),
+    clientSha256: hash(await readFile(join(directory, 'packages/project-mode/lib/client.js'))),
+    version: JSON.parse(await readFile(join(directory, 'package.json'), 'utf8')).version };
+}
+async function verifyBuilds(manifest) {
+  assert.deepEqual(await describeBuild(manifest.local.repository), manifest.candidate, 'Candidate build changed after the plan was frozen');
+  if (manifest.baseline) assert.deepEqual(await describeBuild(manifest.local.baselineRepository), manifest.baseline, 'Baseline build changed after the plan was frozen');
+}
 
 async function prepare() {
   const output = resolve(option('--output', ''));
@@ -30,7 +40,13 @@ async function prepare() {
   assert.ok(Number.isInteger(repetitions) && repetitions >= 1 && repetitions <= 10);
   const suite = option('--suite', 'basic');
   assert.ok(['basic', 'hard', 'all'].includes(suite), '--suite is basic, hard, or all');
-  const selectedCases = cases.filter(task => suite === 'all' || (task.difficulty === 'hard') === (suite === 'hard'));
+  if (args.includes('--cases')) assert.ok(typeof option('--cases') === 'string' && option('--cases').length, '--cases requires a comma-separated list');
+  const requestedCases = option('--cases')?.split(',').map(id => id.trim());
+  if (requestedCases) assert.ok(requestedCases.length && requestedCases.every(Boolean) && new Set(requestedCases).size === requestedCases.length && requestedCases.every(id => cases.some(task => task.id === id)), '--cases must list unique known case IDs');
+  const selectedCases = requestedCases ? requestedCases.map(id => cases.find(task => task.id === id)) :
+    cases.filter(task => suite === 'all' || (task.difficulty === 'hard') === (suite === 'hard'));
+  const baselineRepository = args.includes('--baseline-repository') ? resolve(option('--baseline-repository')) : undefined;
+  const arms = baselineRepository ? ['single', 'moa-baseline', 'moa'] : ['single', 'moa'];
   const maxRequests = Number(option('--max-requests', 64));
   const maxTotalTokens = Number(option('--max-total-tokens', 500000));
   assert.ok(Number.isSafeInteger(maxRequests) && maxRequests > 0 && Number.isSafeInteger(maxTotalTokens) && maxTotalTokens > 0, 'Budgets must be positive safe integers');
@@ -40,26 +56,27 @@ async function prepare() {
     const ordered = repetition % 2 ? selectedCases : [...selectedCases].reverse();
     for (let index = 0; index < ordered.length; index++) {
       const task = ordered[index];
-      const arms = (selectedCases.findIndex(item => item.id === task.id) + repetition) % 2 ? ['single', 'moa'] : ['moa', 'single'];
-      for (const arm of arms) runs.push({ id: `${String(runs.length + 1).padStart(2, '0')}-${task.id}-${repetition}-${arm}`, caseId: task.id, repetition, arm });
+      const rotation = selectedCases.findIndex(item => item.id === task.id) % arms.length;
+      const rotatedArms = [...arms.slice(rotation), ...arms.slice(0, rotation)];
+      const orderedArms = repetition % 2 ? rotatedArms : rotatedArms.reverse();
+      for (const arm of orderedArms) runs.push({ id: `${String(runs.length + 1).padStart(2, '0')}-${task.id}-${repetition}-${arm}`, caseId: task.id, repetition, arm });
     }
   }
-  const manifest = { version: 1, preparedAt: new Date().toISOString(), suite, repetitions, concurrency: 2,
+  const manifest = { version: 1, preparedAt: new Date().toISOString(), suite: requestedCases ? 'selected' : suite, arms, repetitions, concurrency: arms.length,
     model: { provider: option('--provider', 'deepseek-official'), model: option('--model', 'deepseek-flash'), reasoningEffort: option('--reasoning', 'high') },
     limits: { maxRequests, maxTotalTokens },
-    candidate: { commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8' }).trim(),
-      hostSha256: hash(await readFile(join(repository, 'packages/project-mode/lib/index.js'))),
-      clientSha256: hash(await readFile(join(repository, 'packages/project-mode/lib/client.js'))),
-      version: JSON.parse(await readFile(join(repository, 'package.json'), 'utf8')).version },
+    candidate: await describeBuild(repository),
+    ...(baselineRepository ? { baseline: await describeBuild(baselineRepository) } : {}),
     sources: await fingerprints(),
     cases: selectedCases.map(task => ({ id: task.id, title: task.title, category: task.category, difficulty: task.difficulty ?? 'basic', prompt: task.prompt,
       timeoutSeconds: task.timeoutSeconds, inputSha256: hash(JSON.stringify(task.files)) })),
-    local: { repository, runtime, credentials, engine }, runs };
+    local: { repository, ...(baselineRepository ? { baselineRepository } : {}), runtime, credentials, engine }, runs };
   await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2));
   console.log(JSON.stringify({ prepared: true, plan: join(output, 'manifest.json'), cases: selectedCases.length, runs: runs.length, modelStarted: false }));
 }
 
 async function dispatch(manifest, entry, bootOnly = false) {
+  await verifyBuilds(manifest);
   const directory = join(dirname(planPath), 'runs', entry.id);
   const task = cases.find(task => task.id === entry.caseId);
   const child = spawn(manifest.local.engine, [join(here, 'run-case.mjs'), planPath, entry.id, ...(bootOnly ? ['--boot-only'] : [])],
@@ -113,11 +130,12 @@ async function dispatch(manifest, entry, bootOnly = false) {
 async function execute() {
   const manifest = JSON.parse(await readFile(planPath, 'utf8'));
   assert.deepEqual(await fingerprints(), manifest.sources, 'Evaluation source must match the frozen plan');
-  assert.equal(hash(await readFile(join(repository, 'packages/project-mode/lib/index.js'))), manifest.candidate.hostSha256, 'Do not change production build during the evaluation');
+  await verifyBuilds(manifest);
   if (args.includes('--boot-check')) {
     // Preflight uses dedicated plan entries and no model calls; retain its evidence.
-    for (const arm of ['single', 'moa']) {
-      const entry = { id: `preflight-${arm}`, caseId: cases[0].id, repetition: 0, arm };
+    for (const arm of manifest.arms ?? ['single', 'moa']) {
+      await verifyBuilds(manifest);
+      const entry = { id: `preflight-${arm}`, caseId: manifest.cases[0].id, repetition: 0, arm };
       const temporary = { ...manifest, runs: [...manifest.runs, entry] };
       const preflightPath = join(dirname(planPath), `preflight-${arm}.json`);
       await writeFile(preflightPath, JSON.stringify(temporary, null, 2));
@@ -130,8 +148,9 @@ async function execute() {
     }
     return;
   }
-  for (let offset = 0; offset < manifest.runs.length; offset += 2) {
-    await Promise.all(manifest.runs.slice(offset, offset + 2).map(async entry => {
+  const batchSize = manifest.arms?.length ?? manifest.concurrency;
+  for (let offset = 0; offset < manifest.runs.length; offset += batchSize) {
+    await Promise.all(manifest.runs.slice(offset, offset + batchSize).map(async entry => {
       const scoredPath = join(dirname(planPath), 'runs', entry.id, 'scored.json');
       try { await stat(scoredPath); return; } catch (error) { if (error.code !== 'ENOENT') throw error; }
       // A failed run is evidence: never silently recreate its directory or retry until pass.

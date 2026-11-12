@@ -50,11 +50,11 @@ export declare class MoAAgents {
     descriptor(id: SessionId): AgentDescriptor | undefined;
     lifecycle(agent: Agent): "Idle" | "Waiting" | "Running" | "Aborting" | "Zombie";
     private workspaceManager;
-    dispatch(agent: Agent, tasks: WorkAssignment[], operationId: string, signal: AbortSignal, seed?: readonly SessionEvent[]): Promise<(import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage | import("../index.ts").ControlReceipt)[]>;
+    dispatch(agent: Agent, tasks: WorkAssignment[], operationId: string, signal: AbortSignal, seed?: readonly SessionEvent[]): Promise<(import("../index.ts").ControlReceipt | import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage)[]>;
     private startAssignments;
-    branch(agent: Agent, sourceId: SessionId, item: WorkAssignment, operationId: string, signal: AbortSignal): Promise<string | number | true | import("zod").JSONType[] | {
+    branch(agent: Agent, sourceId: SessionId, item: WorkAssignment, operationId: string, signal: AbortSignal): Promise<string | number | true | import("../index.ts").ControlReceipt | import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage | import("zod").JSONType[] | {
         [key: string]: import("zod").JSONType;
-    } | import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage | import("../index.ts").ControlReceipt>;
+    }>;
     private recoveryState;
     needsRecovery(record: import("../state.ts").RecordState): boolean;
     private clearWorkspace;
