@@ -30,7 +30,7 @@ it("保留五个内部标识，并以中文名称、说明和提示展开原生�
     }
     expect(pack.prompt).toContain("timeout_ms");
     expect(pack.prompt).not.toMatch(
-      /wait_timeout|Task\.prompt|\/home\/tiger|~\/\.maso|\/cowork\/api|O48|GPT5\.6/,
+      /wait_timeout|moa_dispatch\.prompt|\/home\/tiger|~\/\.maso|\/cowork\/api|O48|GPT5\.6/,
     );
   }
 });
@@ -40,14 +40,14 @@ it("并行攻坚要求真正独立且完整的分工，并在交付前盲验", (
   expect(prompt).toMatch(/不要强行把紧密耦合的工作/);
   expect(prompt).toMatch(/互不重叠.*完整任务/);
   expect(prompt).toMatch(/不与其他执行者相互协调/);
-  expect(prompt).toMatch(/全新的 Task 创建独立验收者/);
+  expect(prompt).toMatch(/全新的 moa_dispatch 创建独立验收者/);
   expect(prompt).toMatch(/不提供你的推理或预期答案/);
   expect(prompt).toMatch(/原执行者.*改进同一部分/);
 });
 
 it("多方会审保持视角独立，并区分汇报关系和子成员管理权限", () => {
   const { prompt } = orchestrationPacks["panel-team"];
-  expect(prompt.indexOf("先用 Task 创建会审主持人")).toBeLessThan(
+  expect(prompt.indexOf("先用 moa_dispatch 创建会审主持人")).toBeLessThan(
     prompt.indexOf("然后批量创建评议者"),
   );
   expect(prompt).toMatch(/reportTo 设为这个已存在的主持人 ID/);
@@ -61,7 +61,7 @@ it("多方会审保持视角独立，并区分汇报关系和子成员管理权�
 
 it("协同探索各区域只有一名写入者，专家自主改变路线", () => {
   const { prompt } = orchestrationPacks["blackboard-team"];
-  expect(prompt.indexOf("先用 Task 创建记录员")).toBeLessThan(
+  expect(prompt.indexOf("先用 moa_dispatch 创建记录员")).toBeLessThan(
     prompt.indexOf("然后批量创建"),
   );
   expect(prompt).toMatch(/charter\.md：由你一次性写入/);
@@ -78,7 +78,7 @@ it("协同探索各区域只有一名写入者，专家自主改变路线", () =
 it("迭代精修复用创作者，每轮新建未受暗示的评审者且轮数有限", () => {
   const { prompt } = orchestrationPacks["critique-loop"];
   expect(prompt).toMatch(/绝不为适应.*而降低标准/);
-  expect(prompt).toMatch(/全新的 Task 创建，不得使用 Fork，也不得复用上一轮评审者/);
+  expect(prompt).toMatch(/全新的 moa_dispatch 创建，不得使用 moa_branch，也不得复用上一轮评审者/);
   expect(prompt).toMatch(
     /只向评审者提供完整产物和固定验收标准/,
   );

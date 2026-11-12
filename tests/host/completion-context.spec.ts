@@ -18,7 +18,7 @@ function call(name: string, args: object = {}): StreamChunk[] {
     { type: "finish", reason: { kind: "tool-calls" } },
   ];
 }
-function currentTask(request: GenerateOptions) {
+function readSavedTaskContext(request: GenerateOptions) {
   const source = request.messages.filter(message => message.source.kind === "runtime-context").at(-1)?.source;
   const section = source?.kind === "runtime-context"
     ? source.sections?.find(section => section.name === "project-mode:task")
@@ -90,16 +90,16 @@ it.each([false, true])("restores an uncommitted human requirement to Coordinator
         const input = builderInput(request);
         expect(input.requirements).toEqual(expected);
         builtInputs.push(input);
-        return call("submit_rubric", { rubric: "- Satisfy the original human requirements", tests_required: false });
+        return call("moa_publish_checklist", { rubric: "- Satisfy the original human requirements", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
         const count = (verification.get(id) ?? 0) + 1;
         verification.set(id, count);
-        if (count === 1) return call("read_rubric");
-        if (count === 2) return call("read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (count === 1) return call("moa_read_checklist");
+        if (count === 2) return call("moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
-      const input = currentTask(request);
+      const input = readSavedTaskContext(request);
       admittedInputs.push(input);
       expect(input.requirements).toEqual(expected);
       if (expected[0] === original) {
@@ -112,12 +112,12 @@ it.each([false, true])("restores an uncommitted human requirement to Coordinator
       if (complete) {
         expect(request.messages.filter(message => message.role === "system").flatMap(message => message.content).filter(block => block.type === "text").map(block => block.text).join("\n")).toBe(completePrompt);
       }
-      if (++parentSteps === 1) return call("set_completion_criteria", { criteria: "Satisfy the original task", promise: "RESTORED TASK COMPLETE" });
+      if (++parentSteps === 1) return call("moa_review", { criteria: "Satisfy the original task", promise: "RESTORED TASK COMPLETE" });
       return response(expected[0] === original ? "RESTORED TASK COMPLETE" : "The next task is complete");
     };
     agent.followup(prompt("456"));
     await agent.whenIdle();
-    currentTask(f.adapter.requests.find(request => request.sessionId === agent.id)!);
+    readSavedTaskContext(f.adapter.requests.find(request => request.sessionId === agent.id)!);
     expect(parentSteps).toBe(2);
     expect(admittedInputs).toEqual([builtInputs[0], builtInputs[0]]);
     expect(agent.session.snapshotEvents().findLast(event => event.type === "turn/end")).toMatchObject({ data: { reason: { kind: "completed" } } });

@@ -11,19 +11,19 @@ const { defineTool } = await import(pathToFileURL(require.resolve('@deepseek-ai/
 const tool = (name, nativeOnly = false) => defineTool({ name, description: name, parameters: {}, nativeOnly, output: { schema: { type: 'string' } }, execute: async () => 'ok' });
 
 test('PTC advertises direct-only tools, excludes SDK bindings, and enforces both invocation routes', () => {
-  const direct = tool('SendMessage', true), ordinary = tool('read_file');
+  const direct = tool('moa_message', true), ordinary = tool('read_file');
   const definitions = [direct, ordinary];
   const tools = { executable: name => definitions.find(definition => definition.name === name), schemas: () => [], get: name => definitions.find(definition => definition.name === name) };
   const ctx = { tools, systemPrompt: { getSectionOrder: () => 1 }, get: name => name === 'ptcRuntime' ? { language: 'typescript', programFormat: 'function-body' } : undefined };
   const executor = new PtcExecutor(ctx);
   executor.ptcTransport = tool('run_code');
-  assert.deepEqual(executor.describe(definitions).schemas.map(schema => schema.name), ['run_code', 'SendMessage']);
-  assert.deepEqual(executor.describe(definitions).knownNames, ['run_code', 'SendMessage']);
+  assert.deepEqual(executor.describe(definitions).schemas.map(schema => schema.name), ['run_code', 'moa_message']);
+  assert.deepEqual(executor.describe(definitions).knownNames, ['run_code', 'moa_message']);
   const sdk = executor.renderSdk(definitions);
   assert.match(sdk, /read_file/);
-  assert.doesNotMatch(sdk, /SendMessage/);
-  assert.equal(executor.pipeline.resolveExecution('SendMessage', undefined, false), direct);
-  assert.equal(executor.pipeline.resolveExecution('SendMessage', undefined, true), undefined);
+  assert.doesNotMatch(sdk, /moa_message/);
+  assert.equal(executor.pipeline.resolveExecution('moa_message', undefined, false), direct);
+  assert.equal(executor.pipeline.resolveExecution('moa_message', undefined, true), undefined);
   assert.equal(executor.pipeline.resolveExecution('read_file', undefined, false), undefined);
   assert.equal(executor.pipeline.resolveExecution('read_file', undefined, true), ordinary);
 });

@@ -25,7 +25,7 @@ function call(name: string, args: object = {}): StreamChunk[] {
   ];
 }
 const rubric = () =>
-  call("submit_rubric", {
+  call("moa_publish_checklist", {
     rubric: "- Deliver the original requested report [human requirement]",
     tests_required: false,
   });
@@ -46,7 +46,7 @@ it("activates helpers only for a bound human task and rejects later internal-onl
             .some(
               (event) =>
                 event.type === "tool/call" &&
-                event.data.name === "set_completion_criteria",
+                event.data.name === "moa_review",
             ),
         });
     });
@@ -63,16 +63,16 @@ it("activates helpers only for a bound human task and rejects later internal-onl
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
         expect(options.tools?.map((tool) => tool.name)).toEqual([
-          "submit_rubric",
+          "moa_publish_checklist",
         ]);
         return rubric();
       }
       if (id.startsWith("moa-verifier-")) {
         expect(options.tools?.map((tool) => tool.name)).not.toContain(
-          "set_completion_criteria",
+          "moa_review",
         );
-        if (++verifier === 1) return call("read_rubric");
-        if (verifier === 2) return call("read_candidate");
+        if (++verifier === 1) return call("moa_read_checklist");
+        if (verifier === 2) return call("moa_read_delivery");
         const evidence = options.messages.findLast(
           (message) => message.role === "tool",
         );
@@ -83,13 +83,13 @@ it("activates helpers only for a bound human task and rejects later internal-onl
             .map((block) => block.text)
             .join(""),
         ).toBe(candidate);
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       main++;
       if (main <= 2) expect(created).toEqual([root.id]);
       if (main === 1) {
         const tool = options.tools?.find(
-          (tool) => tool.name === "set_completion_criteria",
+          (tool) => tool.name === "moa_review",
         );
         expect(tool?.parameters).toMatchObject({
           required: ["criteria", "promise"],
@@ -98,13 +98,13 @@ it("activates helpers only for a bound human task and rejects later internal-onl
             promise: { type: "string" },
           },
         });
-        return call("set_completion_criteria", {
+        return call("moa_review", {
           criteria: "Deliver the report",
           promise: "EXACT PROMISE",
         });
       }
       if (main === 4)
-        return call("set_completion_criteria", {
+        return call("moa_review", {
           criteria: "Internal notice must not resurrect a completed task",
           promise: "ORPHAN PROMISE",
         });
@@ -227,14 +227,14 @@ it("retains the initial human specification when the Coordinator enables verific
         return rubric();
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric");
-        if (verifier === 2) return call("read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (++verifier === 1) return call("moa_read_checklist");
+        if (verifier === 2) return call("moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       expect(builderInputs).toEqual([]);
       if (++main === 1) return call("implement_spec");
       if (main === 2)
-        return call("set_completion_criteria", {
+        return call("moa_review", {
           criteria: "MODEL CRITERIA MUST NOT REPLACE HUMAN REQUIREMENTS",
           promise: "LATE PROMISE",
         });
@@ -278,7 +278,7 @@ it("preserves an activated task and original sources across Stop and native rest
     f.adapter.handler = (options) => {
       expect(isHelper(String(options.sessionId))).toBe(false);
       if (++main === 1)
-        return call("set_completion_criteria", {
+        return call("moa_review", {
           criteria: "Meet the original report requirements",
           promise: "PERSISTED PROMISE",
         });
@@ -320,9 +320,9 @@ it("preserves an activated task and original sources across Stop and native rest
         return rubric();
       }
       if (sessionId.startsWith("moa-verifier-")) {
-        if (++verified === 1) return call("read_rubric");
-        if (verified === 2) return call("read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (++verified === 1) return call("moa_read_checklist");
+        if (verified === 2) return call("moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       if (++resumed === 1) return response("Candidate missing its promise");
       expect(JSON.stringify(options.messages)).toContain("PERSISTED PROMISE");
@@ -388,9 +388,9 @@ it("finishes a task across a non-human background handoff before capturing the n
       if (id.startsWith("moa-verifier-")) {
         const step = (verifierSteps.get(id) ?? 0) + 1;
         verifierSteps.set(id, step);
-        if (step === 1) return call("read_rubric");
-        if (step === 2) return call("read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (step === 1) return call("moa_read_checklist");
+        if (step === 2) return call("moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       const human = options.messages.findLast(
         (message) => message.source.kind === "user",
@@ -403,7 +403,7 @@ it("finishes a task across a non-human background handoff before capturing the n
       if (current.includes("SECOND INDEPENDENT TASK")) {
         if (!secondBound) {
           secondBound = true;
-          return call("set_completion_criteria", {
+          return call("moa_review", {
             criteria: "Deliver the new report",
             promise: "SECOND PROMISE",
           });
@@ -411,7 +411,7 @@ it("finishes a task across a non-human background handoff before capturing the n
         return response("SECOND PROMISE");
       }
       if (++firstSteps === 1)
-        return call("set_completion_criteria", {
+        return call("moa_review", {
           criteria: "Deliver the first report",
           promise: "FIRST PROMISE",
         });
@@ -484,7 +484,7 @@ it("lets a Worker bind its exact promise without creating recursive outcome help
       if (options.sessionId === agent.id)
         return response("Worker result reviewed");
       if (++worker === 1)
-        return call("set_completion_criteria", {
+        return call("moa_review", {
           criteria: "Deliver the assigned report",
           promise: "WORKER PROMISE",
         });

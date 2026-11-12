@@ -14,16 +14,16 @@ it("unloads a nested family by draining only its root branches", async () => {
       return response("done");
     };
     const host = f.ctx.projectMode as any;
-    const [leader] = await host.moa.task(root, [{ name: "leader", task: "coordinate", workspace: "shared", role: "General-purpose", nested: true }], "leader", signal);
+    const [leader] = await host.moa.dispatch(root, [{ name: "leader", task: "coordinate", workspace: "shared", role: "General-purpose", nested: true }], "leader", signal);
     const creator = f.ctx.agents.get(SessionId(leader.workerId))!;
-    const [child] = await host.moa.task(creator, [{ name: "child", task: "inspect", workspace: "shared", role: "General-purpose" }], "child", signal);
+    const [child] = await host.moa.dispatch(creator, [{ name: "child", task: "inspect", workspace: "shared", role: "General-purpose" }], "child", signal);
     const drain = vi.spyOn(f.ctx.subagents, "drainChildren");
     release.resolve();
     await f.plugin.dispose();
     expect(drain.mock.calls.some(([parent, ids]) => parent.id === root.id && ids.includes(SessionId(leader.workerId)))).toBe(true);
     expect(drain.mock.calls.some(([parent, ids]) => parent.id === root.id && ids.includes(SessionId(child.workerId)))).toBe(false);
     expect(f.ctx.agents.get(SessionId(child.workerId))).toBeUndefined();
-    expect(f.ctx.tools.get("Task", root)).toBeUndefined();
+    expect(f.ctx.tools.get("moa_dispatch", root)).toBeUndefined();
   } finally { release.resolve(); await f.dispose(); }
 });
 
@@ -38,7 +38,7 @@ it("does not resume a Worker after deletion wins a pending native hydration", as
     const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("review-delete-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     const host = f.ctx.projectMode as any;
-    const [child] = await host.moa.task(root, [{ name: "child", task: "inspect", workspace: "shared", role: "General-purpose" }], "child", signal);
+    const [child] = await host.moa.dispatch(root, [{ name: "child", task: "inspect", workspace: "shared", role: "General-purpose" }], "child", signal);
     const childId = SessionId(child.workerId);
     await expect.poll(() => f.ctx.agents.get(childId)).toBeUndefined();
     let resumed = false;
@@ -50,7 +50,7 @@ it("does not resume a Worker after deletion wins a pending native hydration", as
     const sending = host.messages.send(root, { target: childId, message: "new work", mode: "notify", delivery: "steer" }, "race-send", signal);
     const outcome = sending.then(() => "delivered", () => "rejected");
     await entered.promise;
-    await host.moa.kill(root, childId, signal, { destroy: true });
+    await host.moa.stopWork(root, childId, signal, { destroy: true });
     release.resolve();
     expect(await outcome).toBe("rejected");
     expect(resumed).toBe(false);
@@ -70,12 +70,12 @@ it("does not inherit an old approval wait into a fresh Fork lifecycle", async ()
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     f.adapter.handler = async (options) => { if (options.sessionId !== root.id) await model.promise; return response("done"); };
     const host = f.ctx.projectMode as any;
-    const [receipt] = await host.moa.task(root, [{ name: "source", task: "inspect", workspace: "shared", role: "General-purpose" }], "source", signal);
+    const [receipt] = await host.moa.dispatch(root, [{ name: "source", task: "inspect", workspace: "shared", role: "General-purpose" }], "source", signal);
     const source = f.ctx.agents.get(SessionId(receipt.workerId))!;
     await expect.poll(() => source.session.snapshotEvents().some(event => event.type === "turn/start")).toBe(true);
     const deciding = f.ctx.approval.request({ agent: source, toolName: "write", reason: "pending source-only approval" });
     expect(host.moa.lifecycle(source)).toBe("Waiting");
-    const fork = await host.moa.fork(root, source.id, { name: "fork", task: "separate branch", workspace: "shared", role: "General-purpose" }, "fork", signal);
+    const fork = await host.moa.branch(root, source.id, { name: "fork", task: "separate branch", workspace: "shared", role: "General-purpose" }, "fork", signal);
     const child = f.ctx.agents.get(SessionId(fork.workerId))!;
     await expect.poll(() => child.session.snapshotEvents().some(event => event.type === "turn/start" && event.seq >= child.session.inheritedEventCount)).toBe(true);
     expect(host.moa.lifecycle(child)).toBe("Running");
@@ -94,9 +94,9 @@ it("keeps a nested Worker's native direct-parent address in its capsule", async 
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     f.adapter.handler = async (options) => { if (options.sessionId !== root.id) await release.promise; return response("done"); };
     const host = f.ctx.projectMode as any;
-    const [leader] = await host.moa.task(root, [{ name: "leader", task: "coordinate", workspace: "shared", role: "General-purpose", nested: true }], "leader", signal);
+    const [leader] = await host.moa.dispatch(root, [{ name: "leader", task: "coordinate", workspace: "shared", role: "General-purpose", nested: true }], "leader", signal);
     const creator = f.ctx.agents.get(SessionId(leader.workerId))!;
-    const [child] = await host.moa.task(creator, [{ name: "child", task: "inspect", workspace: "shared", role: "General-purpose" }], "child", signal);
+    const [child] = await host.moa.dispatch(creator, [{ name: "child", task: "inspect", workspace: "shared", role: "General-purpose" }], "child", signal);
     const state = await f.ctx.projectMode.snapshot(root.id);
     const store = new ProjectStore(0);
     store.accept(state!);
@@ -116,7 +116,7 @@ it("recovers a persisted answer when the Request waiter exits before its Tool Me
   let requestId = "";
   let interrupted = false;
   try {
-    const { createNativeMessageBroker, sendMessageSchema } = await import("../../packages/project-mode/src/host/moa/messages.ts");
+    const { createNativeMessageBroker, peerMessageSchema } = await import("../../packages/project-mode/src/host/moa/messages.ts");
     const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("review-answer-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     const host = f.ctx.projectMode as any;
@@ -135,8 +135,8 @@ it("recovers a persisted answer when the Request waiter exits before its Tool Me
       const content = JSON.stringify(args);
       return [
         { type: "block-start", index: 0, blockType: "tool-call" },
-        { type: "tool-call-delta", index: 0, id, name: "SendMessage", argumentsDelta: content },
-        { type: "block-end", index: 0, block: { type: "tool-call", id, name: "SendMessage", arguments: content } },
+        { type: "tool-call-delta", index: 0, id, name: "moa_message", argumentsDelta: content },
+        { type: "block-end", index: 0, block: { type: "tool-call", id, name: "moa_message", arguments: content } },
         { type: "finish", reason: { kind: "tool-calls" } },
       ] as any;
     }
@@ -156,13 +156,13 @@ it("recovers a persisted answer when the Request waiter exits before its Tool Me
       }
       return response("root done");
     };
-    await host.moa.task(root, [{ name: "requester", task: "ask", workspace: "shared", role: "General-purpose" }], "requester", signal);
+    await host.moa.dispatch(root, [{ name: "requester", task: "ask", workspace: "shared", role: "General-purpose" }], "requester", signal);
     await requestStarted.promise;
     await expect.poll(() => interrupted).toBe(true);
     await root.whenIdle();
     const recovered = createNativeMessageBroker(host.access, async () => false);
     await recovered.recover(root.id);
-    await recovered.send(root, sendMessageSchema.parse({ target: requester.id, message: "RETAIN THIS ANSWER", reply_to: requestId }), "retry-answer", signal);
+    await recovered.send(root, peerMessageSchema.parse({ target: requester.id, message: "RETAIN THIS ANSWER", reply_to: requestId }), "retry-answer", signal);
     using observed = await f.ctx.sessionQuery.observeSession(requester.id);
     const received = observed.events.some(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === requestId);
     const committedToolAnswer = observed.events.some(event => event.type === "tool/result" && !event.data.message.isError && JSON.stringify(event.data.message.content).includes("RETAIN THIS ANSWER"));
@@ -188,7 +188,7 @@ it("retains a dispatched capsule after a root handoff when the client reconnects
       if (options.sessionId !== root.id) { await worker.promise; return response("worker done"); }
       if (!first) { resumed.resolve(); return response("responding to new input"); }
       first = false;
-      const [created] = await host.moa.task(root, [{ name: "worker", task: "inspect", workspace: "shared", role: "General-purpose" }], "dispatch-before-handoff", signal);
+      const [created] = await host.moa.dispatch(root, [{ name: "worker", task: "inspect", workspace: "shared", role: "General-purpose" }], "dispatch-before-handoff", signal);
       childId = created.workerId;
       return [
         { type: "block-start", index: 0, blockType: "tool-call" },

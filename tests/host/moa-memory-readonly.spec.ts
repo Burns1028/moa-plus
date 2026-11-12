@@ -55,7 +55,7 @@ it.each(["shared", "isolated"] as const)(
         "enable",
       );
       const paths = mode.paths!;
-      const [receipt] = await (f.ctx.projectMode as any).moa.task(
+      const [receipt] = await (f.ctx.projectMode as any).moa.dispatch(
         parent,
         [
           {
@@ -126,7 +126,7 @@ it.each(["shared", "isolated"] as const)(
             JSON.stringify({ own, paths, result: ownWrite }),
           ).toBe(false);
           expect(
-            await (f.ctx.projectMode as any).moa.context(
+            await (f.ctx.projectMode as any).moa.sharedContext(
               worker,
               {
                 action: "write",
@@ -148,7 +148,7 @@ it.each(["shared", "isolated"] as const)(
             "Coordinator update",
           );
           if (workspace === "shared") {
-            const [leaf] = await (f.ctx.projectMode as any).moa.task(
+            const [leaf] = await (f.ctx.projectMode as any).moa.dispatch(
               worker,
               [
                 {
@@ -306,7 +306,7 @@ it("keeps Worker restrictions until background cancellation cleanup actually joi
         { type: "finish", reason: { kind: "tool-calls" } },
       ];
     };
-    await (f.ctx.projectMode as any).moa.task(
+    await (f.ctx.projectMode as any).moa.dispatch(
       parent,
       [
         {

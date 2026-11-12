@@ -11,7 +11,7 @@ import type { BackgroundReceipt } from "@deepseek-ai/dsh-agent";
 import { defineTool, ToolNotFoundError } from "@deepseek-ai/dsh-tools";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 import * as Persistence from "@deepseek-ai/dsh-session-persistence-jsonl";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -88,7 +88,7 @@ it.each(["consumed","stopped"])("reads a %s background result from durable JSONL
   if(state==="consumed"){expect(after).toEqual(before);expect(current.adapter.requests).toHaveLength(0);}
   await current.off();current.off=await bindBackground(current.ctx,current.agent,{backgroundStrategy:"after-seconds",backgroundAfterSeconds:0.01});await current.agent.whenIdle();
   expect(current.agent.session.snapshotEvents().filter(e=>e.type==="user/message"&&e.data.id===saved[0].data.delivery.id)).toHaveLength(1);
-  const result=await current.ctx.tools.execute({agent:current.agent,name:"query_background_tool",callId:"query" as any,signal:new AbortController().signal,arguments:{tool_call_id:handle}});
+  const result=await current.ctx.tools.execute({agent:current.agent,name:"moa_job_status",callId:"query" as any,signal:new AbortController().signal,arguments:{tool_call_id:handle}});
   expect(result.isError).toBe(false);expect(result.value).toMatchObject({status:"finished",...saved[0].data.result});
   expect(["running","stopping"]).toContain(saved[0].data.job?.status);
   expect(result.value).not.toHaveProperty("job");
@@ -114,7 +114,7 @@ it("can disable a draft inside native maintenance without joining itself", async
    expect(signal.aborted).toBe(false);
   });
   expect(f.agent.session.snapshotEvents().filter(e => e.type === "turn/start")).toHaveLength(0);
-  expect(f.ctx.tools.get("query_background_tool", f.agent)).toBeUndefined();
+  expect(f.ctx.tools.get("moa_job_status", f.agent)).toBeUndefined();
  } finally { await f.dispose(); }
 });
 
@@ -135,24 +135,43 @@ it("keeps strict schema/finalizers authoritative and continues the same turn aft
   expect([rendered,projected,finalized,observed]).toEqual([1,1,1,1]);
   expect(JSON.stringify(f.adapter.requests.at(-1))).toContain(full);
   const r=receiptOf(f);const exec={agent:f.agent,callId:"query" as any,signal:new AbortController().signal};
-  const query=()=>f.ctx.tools.execute({...exec,name:"query_background_tool",arguments:{tool_call_id:backgroundHandle(r)}});
+  const query=()=>f.ctx.tools.execute({...exec,name:"moa_job_status",arguments:{tool_call_id:backgroundHandle(r)}});
   expect(await query()).toEqual(await query());
  } finally{gate.resolve("cleanup");await f.dispose();}
 });
-it("allows a slow SendMessage Notify and explicit reply to use ordinary tool backgrounding",async()=>{
+it("allows a slow moa_message Notify and explicit reply to use ordinary tool backgrounding",async()=>{
  const f=await setup();const gate=Promise.withResolvers<string>();
  try{
-  f.ctx.tools.register({name:"SendMessage",description:"notify",parameters:{type:"object",properties:{mode:{type:"string"},reply_to:{type:"string"}}},output:{schema:{type:"string"},render:(_args,value)=>[{type:"text",text:String(value)}]},execute:()=>gate.promise});
+  f.ctx.tools.register({name:"moa_message",description:"notify",parameters:{type:"object",properties:{mode:{type:"string"},reply_to:{type:"string"}}},output:{schema:{type:"string"},render:(_args,value)=>[{type:"text",text:String(value)}]},execute:()=>gate.promise});
   const args=JSON.stringify({mode:"notify",reply_to:"an-explicit-request"});
   f.adapter.handler=()=>f.adapter.requests.length===1?[
    {type:"block-start",index:0,blockType:"tool-call"},
-   {type:"block-end",index:0,block:{type:"tool-call",id:"notification",name:"SendMessage",arguments:args}},
+   {type:"block-end",index:0,block:{type:"tool-call",id:"notification",name:"moa_message",arguments:args}},
    {type:"finish",reason:{kind:"tool-calls"}},
   ]:response("done");
   f.agent.followup(user("send notification"));await f.agent.whenIdle();
   expect(receiptOf(f)).toMatchObject({callId:"notification",cause:{kind:"after-seconds"}});
   gate.resolve("notification accepted");await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
   expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("notification accepted");
+ }finally{gate.resolve("cleanup");await f.dispose();}
+});
+it.each(["moa_message", "SendMessage", "moa_observe", "QueryAgent"])("keeps %s protocol waits in their original foreground call", async name => {
+ const f=await setup("after-seconds",0);const gate=Promise.withResolvers<string>(),started=Promise.withResolvers<void>();
+ try{
+  f.ctx.tools.register({name,description:"protocol wait",parameters:{type:"object",properties:{mode:{type:"string"},wait:{type:"string"}}},output:{schema:{type:"string"},render:(_args,value)=>[{type:"text",text:String(value)}]},execute:()=>{started.resolve();return gate.promise;}});
+  const args=JSON.stringify(name.includes("essage")?{mode:"request"}:{wait:"all"});
+  f.adapter.handler=()=>f.adapter.requests.length===1?[
+   {type:"block-start",index:0,blockType:"tool-call"},
+   {type:"block-end",index:0,block:{type:"tool-call",id:"protocol",name,arguments:args}},
+   {type:"finish",reason:{kind:"tool-calls"}},
+  ]:response("done");
+  f.agent.followup(user("wait for protocol result"));await started.promise;
+  await new Promise(resolve=>setTimeout(resolve,20));
+  expect(f.agent.session.snapshotEvents().some(event=>event.type==="tool/result"&&(event.data.meta as any)?.moaBackground)).toBe(false);
+  expect(f.agent.status).toBe("running");
+  gate.resolve("original protocol result");await f.agent.whenIdle();
+  expect(f.agent.session.snapshotEvents().filter(event=>event.type==="tool/result")).toHaveLength(1);
+  expect(backgroundResults(f)).toHaveLength(0);
  }finally{gate.resolve("cleanup");await f.dispose();}
 });
 it("message handoff drains every foreground sibling and carries the complete next-step batch into a new turn",async()=>{
@@ -226,30 +245,60 @@ function bashCall(command:string,timeoutMs=30,explicit=false):StreamChunk[] {
 }
 it.skipIf(!hasBash)("adopts the actual locked Bash producer at native promotion and publishes its final output",async()=>{
  const f=await setup("after-seconds",60);
+ const directory=await mkdtemp(join(tmpdir(),"moa-producer-ready-")),release=join(directory,"release");
+ const gate=`'${release.replaceAll("\\","/").replaceAll("'","'\\''")}'`;
  try{
   await shell(f);
-  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall("printf 'begin\\n'; sleep 0.2; printf 'actual final\\n'"):response("done");
+  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall(`printf 'begin\\n'; while [ ! -f ${gate} ]; do sleep 0.01; done; printf 'actual final\\n'`):response("done");
   f.agent.followup(user("run"));await f.agent.whenIdle();
   const r=receiptOf(f);expect(r).toBeDefined();expect(r.jobId).toMatch(/^bash-/);expect(r.cause.kind).toBe("producer-promotion");
   expect(f.ctx.jobs.list(f.agent.id)).toHaveLength(1);expect(backgroundResults(f)).toHaveLength(0);
+  // Promotion may happen during process preparation. Wait for the actual
+  // producer's first output, then keep it alive until the test releases it.
+  await until(()=>JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id)).includes("begin"));
+  expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("running");
+  expect(f.ctx.jobs.get(r.jobId,f.agent.id).completionNotice).toBe("producer");
   expect(JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id))).toContain("begin");
+  expect(backgroundResults(f)).toHaveLength(0);
+  await writeFile(release,"release");
   await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
+  expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("begin");
   expect(JSON.stringify(backgroundResults(f)[0].data.result)).toContain("actual final");
   expect(JSON.stringify(backgroundResults(f)[0].data)).toContain("exit code: 0");
   expect(f.ctx.jobs.get(r.jobId,f.agent.id).completionNotice).toBe("producer");
- }finally{await f.dispose();}
+  const query=()=>f.ctx.tools.execute({agent:f.agent,name:"moa_job_status",callId:"repeatable-producer-query" as any,signal:new AbortController().signal,arguments:{tool_call_id:backgroundHandle(r)}});
+  const result=await query();expect(result).toEqual(await query());
+  expect(JSON.stringify(result)).toContain("begin");expect(JSON.stringify(result)).toContain("actual final");
+ }finally{
+  try{await writeFile(release,"release");}
+  finally{try{await f.dispose();}finally{await rm(directory,{recursive:true,force:true});}}
+ }
 });
 it.skipIf(!hasBash)("joins real Bash termination cleanup beyond its ordinary promotion wait",async()=>{
  const f=await setup("after-seconds",60);
+ const directory=await mkdtemp(join(tmpdir(),"moa-cleanup-ready-")),release=join(directory,"release");
+ const gate=`'${release.replaceAll("\\","/").replaceAll("'","'\\''")}'`;
  try{
   await shell(f);
-  // TERM trap keeps the real shell alive after the cancellation request.
-  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall("trap 'sleep 0.15; exit 0' TERM; printf 'ready\\n'; while :; do sleep 0.02; done",25):response("done");
-  f.agent.followup(user("run"));await f.agent.whenIdle();expect(receiptOf(f)).toBeDefined();
-  let joined=false;const started=Date.now();const stop=f.agent.cancelAndJoin({kind:"parent"}).then(()=>{joined=true;});
-  await new Promise(r=>setTimeout(r,50));expect(joined).toBe(false);await stop;
-  expect(Date.now()-started).toBeGreaterThan(100);expect(f.adapter.requests).toHaveLength(2);
- }finally{await f.dispose();}
+  // Signal only after the real shell confirms its TERM handler is installed.
+  // That handler stays alive until an explicit release, so join must not settle
+  // merely because the ordinary promotion wait elapsed or cancellation began.
+  const command=`cleanup() { printf 'cleanup-started\\n'; while [ ! -f ${gate} ]; do sleep 0.01; done; printf 'cleanup-finished\\n'; exit 0; }; trap cleanup TERM; printf 'ready\\n'; while :; do sleep 0.02; done`;
+  f.adapter.handler=()=>f.adapter.requests.length===1?bashCall(command,25):response("done");
+  f.agent.followup(user("run"));await f.agent.whenIdle();const r=receiptOf(f);expect(r).toBeDefined();
+  await until(()=>JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id)).includes("ready"));
+  expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("running");
+  let joined=false;const stop=f.agent.cancelAndJoin({kind:"parent"}).then(()=>{joined=true;});
+  await until(()=>JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id)).includes("cleanup-started"));
+  expect(joined).toBe(false);expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("stopping");
+  await writeFile(release,"release");await stop;
+  expect(joined).toBe(true);expect(f.ctx.jobs.get(r.jobId,f.agent.id).status).toBe("killed");
+  expect(JSON.stringify(f.ctx.jobs.readAt(r.jobId,0,f.agent.id))).toContain("cleanup-finished");
+  expect(f.adapter.requests).toHaveLength(2);
+ }finally{
+  try{await writeFile(release,"release");}
+  finally{try{await f.dispose();}finally{await rm(directory,{recursive:true,force:true});}}
+ }
 });
 it.skipIf(!hasBash)("leaves explicit native background jobs independently controlled",async()=>{
  const f=await setup("after-seconds",60);
@@ -470,12 +519,12 @@ it.skipIf(!hasBash)("queries the settled native PTC job after real nested Bash c
 
   await until(()=>f.ctx.jobs.list(f.agent.id).some(job=>job.kind==="bash"&&f.ctx.jobs.readAt(job.id,0,f.agent.id).chunks.some(chunk=>chunk.text.includes("inner-job-output"))));
   const receipt=receiptOf(f),handle=backgroundHandle(receipt),signal=new AbortController().signal,parent=Symbol("native-control-dispatch") as any;
-  const cancelled=await f.ctx.tools.execute({agent:f.agent,name:"cancel_background_tool",callId:"cancel" as any,parent,signal,arguments:{tool_call_id:handle}});
+  const cancelled=await f.ctx.tools.execute({agent:f.agent,name:"moa_job_stop",callId:"cancel" as any,parent,signal,arguments:{tool_call_id:handle}});
   expect(cancelled.isError).toBe(false);
   await until(()=>f.ctx.jobs.get(receipt.jobId,f.agent.id).status==="killed");await f.agent.whenIdle();
   const saved=backgroundResults(f)[0].data;
   expect(saved.job?.status).toBe("stopping");
-  const queried=await f.ctx.tools.execute({agent:f.agent,name:"query_background_tool",callId:"query" as any,parent,signal,arguments:{tool_call_id:handle}});
+  const queried=await f.ctx.tools.execute({agent:f.agent,name:"moa_job_status",callId:"query" as any,parent,signal,arguments:{tool_call_id:handle}});
   expect(queried.isError).toBe(false);
   expect(queried.value).toMatchObject({status:"finished",job:{status:"killed"},...saved.result});
   expect(f.ctx.jobs.list(f.agent.id).find(job=>job.kind==="bash")?.status).toBe("killed");
@@ -517,7 +566,7 @@ it.each(["empty", "nontext", "error"] as const)("durably returns %s canonical ou
   if(kind==="empty")expect(record.result.content).toEqual([]);
   if(kind==="nontext"){expect(record.result.content).toEqual([image]);expect(JSON.stringify(f.adapter.requests.at(-1))).toContain("background-image.png");}
   if(kind==="error"){expect(record.result.isError).toBe(true);expect(record.result.error?.info?.code).toBe("UNKNOWN_TOOL");expect(JSON.stringify(f.adapter.requests.at(-1))).toContain("deliberate-missing");await until(()=>f.ctx.jobs.get(record.receipt.jobId,f.agent.id).status==="failed");}
-  const query=()=>f.ctx.tools.execute({agent:f.agent,name:"query_background_tool",callId:"query" as any,signal:new AbortController().signal,arguments:{tool_call_id:backgroundHandle(record.receipt)}});
+  const query=()=>f.ctx.tools.execute({agent:f.agent,name:"moa_job_status",callId:"query" as any,signal:new AbortController().signal,arguments:{tool_call_id:backgroundHandle(record.receipt)}});
   expect(await query()).toEqual(await query());
   expect(f.agent.session.snapshotEvents().filter(e=>e.type==="user/message" && e.data.id===record.delivery.id)).toHaveLength(1);
  }finally{gate.resolve();await f.dispose();}
@@ -537,7 +586,7 @@ it("retains a stopped result for deliberate resume and rejects a copied owner's 
   const {agent:other}=await f.ctx.agents.create({sessionId:SessionId("other-owner"),meta:{isSeeded:true},agentOptions:{provider:"test",model:"test"},seed:f.agent.session.snapshotEvents(),inheritedEventCount:f.agent.session.seq});
   const off=await bindBackground(f.ctx,other,{backgroundStrategy:"after-seconds",backgroundAfterSeconds:0.01});
   try{
-   const result=await f.ctx.tools.execute({agent:other,name:"query_background_tool",callId:"foreign" as any,signal:new AbortController().signal,arguments:{tool_call_id:backgroundHandle(record.receipt)}});
+   const result=await f.ctx.tools.execute({agent:other,name:"moa_job_status",callId:"foreign" as any,signal:new AbortController().signal,arguments:{tool_call_id:backgroundHandle(record.receipt)}});
    expect(result.isError).toBe(true);expect(JSON.stringify(result)).toContain("another Agent");
   }finally{await off();}
  }finally{gate.resolve();await f.dispose();}
@@ -598,9 +647,9 @@ it("query timeout leaves work alive and cancel reports stopping until actual cle
   f.ctx.tools.register({name:"held",description:"held",parameters:{type:"object"},output:{schema:{type:"string"},render:(_a,v)=>[{type:"text",text:String(v)}]},async execute(_a,e){await new Promise<void>(r=>e.signal.addEventListener("abort",()=>r(),{once:true}));await cleanup.promise;return "resource cleanup completed";}});
   f.adapter.handler=()=>f.adapter.requests.length===1?calls("held"):response("done");f.agent.followup(user("run"));await f.agent.whenIdle();
   const receipt=receiptOf(f),handle=backgroundHandle(receipt),signal=new AbortController().signal;
-  const query=(seconds=0)=>f.ctx.tools.execute({agent:f.agent,name:"query_background_tool",callId:"query" as any,signal,arguments:{tool_call_id:handle,wait_timeout:seconds}});
+  const query=(seconds=0)=>f.ctx.tools.execute({agent:f.agent,name:"moa_job_status",callId:"query" as any,signal,arguments:{tool_call_id:handle,wait_timeout:seconds}});
   const waiting=await query(0.01);expect(waiting.isError).toBe(false);expect(JSON.stringify(waiting)).toContain('"running"');
-  const cancel=await f.ctx.tools.execute({agent:f.agent,name:"cancel_background_tool",callId:"cancel" as any,signal,arguments:{tool_call_id:handle}});
+  const cancel=await f.ctx.tools.execute({agent:f.agent,name:"moa_job_stop",callId:"cancel" as any,signal,arguments:{tool_call_id:handle}});
   expect(cancel.isError).toBe(false);expect(f.ctx.jobs.get(receipt.jobId,f.agent.id).status).toBe("stopping");
   expect(JSON.stringify(await query())).toContain('"stopping"');cleanup.resolve();await until(()=>backgroundResults(f).length===1);await f.agent.whenIdle();
   expect(f.ctx.jobs.get(receipt.jobId,f.agent.id).status).toBe("killed");const final=await query();expect(final.value).toMatchObject({status:"finished",job:{status:"killed"}});expect(final).toEqual(await query());

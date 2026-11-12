@@ -27,7 +27,7 @@ it("does not readmit a nested result after native inbox claim but before prompt 
     };
     const host = f.ctx.projectMode as any;
     const signal = new AbortController().signal;
-    const [leader] = await host.moa.task(root, [{
+    const [leader] = await host.moa.dispatch(root, [{
       name: "leader", task: "coordinate Scout", role: "General-purpose",
       workspace: "shared", nested: true,
     }], "leader", signal);
@@ -45,7 +45,7 @@ it("does not readmit a nested result after native inbox claim but before prompt 
       }
       return next();
     });
-    const [scout] = await host.moa.task(target, [{
+    const [scout] = await host.moa.dispatch(target, [{
       name: "Scout", task: "inspect", role: "General-purpose", workspace: "shared",
     }], "Scout", signal);
     await vi.waitFor(() => expect(host.record(root.id).deliveries.some((d: any) =>

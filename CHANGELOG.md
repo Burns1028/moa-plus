@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.8 — Unreleased
+
+- Keep one current notes snapshot in each model request through native logged surface replacements. Preserve immutable audit history, clean repeated snapshots from saved sessions, and retain Stop, Worker and failed-read behavior.
+- Rename model-facing collaboration, background and review tools into the `moa_*` namespace, together with their factories and host methods. Preserve native interrupted-call recovery and historical message receipts without mounting a second alias set.
+- Let the main Agent complete whole tasks directly, delegate useful independent work and stop redundant branches. Reuse successful checks, focus review on unresolved requirements, and avoid adding process obligations to the acceptance checklist.
+- Capture explicitly referenced inputs across Chinese punctuation, CSV/JSONL references and unambiguous sibling filenames before implementation, while excluding declared output paths.
+- Add reproducible single-Agent/MoA comparisons and separate concurrency/recovery tasks with deterministic outcome scoring. Runtime improvements and quality gains must be judged from actual runs, not tool activation alone.
+
 ## 0.2.7 — 2026-11-12
 
 - Let the Coordinator request independent acceptance for the current task through the existing completion-criteria tool. Default to `on-demand`, preserving explicit `true` automatic and `false` disabled configurations.

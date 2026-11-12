@@ -11,9 +11,9 @@ async function family() {
   await f.ctx.projectMode.setEnabled(root.agent.id, true, 0, "enable");
   f.adapter.handler = async (options) => { if (options.sessionId !== root.agent.id) await release.promise; return response("initial result"); };
   const host = f.ctx.projectMode as any;
-  const [leader] = await host.moa.task(root.agent, [{ name: "leader", task: "coordinate", role: "General-purpose", workspace: "shared", nested: true }], "leader", signal);
+  const [leader] = await host.moa.dispatch(root.agent, [{ name: "leader", task: "coordinate", role: "General-purpose", workspace: "shared", nested: true }], "leader", signal);
   const parent = f.ctx.agents.get(SessionId(leader.workerId))!;
-  const [child] = await host.moa.task(parent, [{ name: "child", task: "inspect", role: "General-purpose", workspace: "shared", reportTo: root.agent.id }], "child", signal);
+  const [child] = await host.moa.dispatch(parent, [{ name: "child", task: "inspect", role: "General-purpose", workspace: "shared", reportTo: root.agent.id }], "child", signal);
   release.resolve();
   await expect.poll(() => f.ctx.agents.get(parent.id)).toBeUndefined();
   await expect.poll(() => f.ctx.agents.get(SessionId(child.workerId))).toBeUndefined();

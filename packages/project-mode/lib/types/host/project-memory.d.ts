@@ -42,5 +42,5 @@ export declare function ensureContextIndex(ctx: Context, agent: Agent, project: 
     workspacePath: string;
     paths: ProjectPaths;
 }, signal: AbortSignal): Promise<void>;
-/** Native admission owns the history commit; unchanged notes still reach each inference. */
+/** Every inference sees the full current notes without accumulating old copies. */
 export declare function bindProjectMemory(host: HostAccess): void;

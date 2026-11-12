@@ -48,7 +48,7 @@ it("offers on-demand verification but completes default-config 123 without activ
     expect(f.adapter.requests).toHaveLength(1);
     const request = f.adapter.requests[0];
     expect(request.tools?.map((tool) => tool.name)).toContain(
-      "set_completion_criteria",
+      "moa_review",
     );
     const facts = request.messages
       .filter((message) => message.source.kind === "runtime-context")
@@ -57,7 +57,7 @@ it("offers on-demand verification but completes default-config 123 without activ
       .map((block) => block.text)
       .join("\n");
     expect(facts).toMatch(/on[- ]demand/i);
-    expect(facts).toContain("set_completion_criteria");
+    expect(facts).toContain("moa_review");
     expect(facts).not.toContain(
       "Automatic outcome verification is not enabled",
     );

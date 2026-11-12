@@ -11,7 +11,7 @@ import { fixture, response } from "./fixture.ts";
 function rubric(testsRequired = false): StreamChunk[] {
   return [
     { type: "block-start", index: 0, blockType: "tool-call" },
-    { type: "block-end", index: 0, block: { type: "tool-call", id: "rubric", name: "submit_rubric", arguments: JSON.stringify({ rubric: "- Reply to the user's message", tests_required: testsRequired }) } },
+    { type: "block-end", index: 0, block: { type: "tool-call", id: "rubric", name: "moa_publish_checklist", arguments: JSON.stringify({ rubric: "- Reply to the user's message", tests_required: testsRequired }) } },
     { type: "finish", reason: { kind: "tool-calls" } },
   ];
 }
@@ -76,9 +76,9 @@ it("ends review and releases native helper resources when required execution can
       const id = String(request.sessionId);
       if (id.startsWith("moa-builder-")) return rubric(testsRequired);
       if (id.startsWith("moa-verifier-")) {
-        if (++verifierRequests === 1) return call("read_rubric");
+        if (++verifierRequests === 1) return call("moa_read_checklist");
         if (verifierRequests === 2) return call("pwsh");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       if (++parentRequests > 1) agent.cancel({ kind: "user" });
       return response("123");
@@ -129,16 +129,16 @@ it("continues optional shell failures with native file evidence, scopes each una
       const id = String(request.sessionId);
       if (id.startsWith("moa-builder-")) return rubric();
       if (id.startsWith("moa-verifier-")) {
-        if (++verifierRequests === 1) return call("read_rubric");
+        if (++verifierRequests === 1) return call("moa_read_checklist");
         if (verifierRequests === 2) return parallelCalls("pwsh", "pwsh", "bash");
         expect(request.tools?.map(tool => tool.name)).not.toContain("pwsh");
         expect(request.tools?.map(tool => tool.name)).not.toContain("bash");
         expect(f.ctx.tools.get("pwsh", agent)).toBeDefined();
         expect(f.ctx.tools.get("bash", agent)).toBeUndefined();
-        if (verifierRequests === 3) return call("read_candidate");
+        if (verifierRequests === 3) return call("moa_read_delivery");
         if (verifierRequests === 4) return call("read", { file_path: join(f.root, "artifact.txt") });
         expect(JSON.stringify(request.messages)).toContain("ACTUAL FILE EVIDENCE");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       if (++parentRequests > 1) agent.cancel({ kind: "user" });
       return response("The artifact contains ACTUAL FILE EVIDENCE");
@@ -177,19 +177,19 @@ it.each(["runtime blocked", "malformed verdict", "uninspected Pass", "Partial", 
       if (id.startsWith("moa-builder-")) return rubric();
       if (id.startsWith("moa-verifier-")) {
         verifierRequests++;
-        if (verifierRequests === 1 || verifierRequests === 5) return call("read_rubric");
+        if (verifierRequests === 1 || verifierRequests === 5) return call("moa_read_checklist");
         if (verifierRequests === 2) return call("pwsh");
         if (verifierRequests === 3) {
           if (outcome === "malformed verdict") return response("No structured verdict");
-          if (outcome === "uninspected Pass") return call("submit_verdict", { status: "Pass", issues: [] });
-          return call("read_candidate");
+          if (outcome === "uninspected Pass") return call("moa_submit_review", { status: "Pass", issues: [] });
+          return call("moa_read_delivery");
         }
-        if (verifierRequests === 4) return call("submit_verdict", {
+        if (verifierRequests === 4) return call("moa_submit_review", {
           status: recoverable ? outcome : "Block", issues: [recoverable ? "Missing conclusion" : "Need an unavailable runtime capability"],
           ...(outcome === "runtime blocked" ? { runtime_blocked: true } : {}),
         });
-        if (verifierRequests === 6) return call("read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (verifierRequests === 6) return call("moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       parentRequests++;
       if (parentRequests > (recoverable ? 2 : 1)) agent.cancel({ kind: "user" });
@@ -225,9 +225,9 @@ it.each(["nonzero exit", "code in console text"])("keeps ordinary shell outcomes
       const id = String(request.sessionId);
       if (id.startsWith("moa-builder-")) return rubric(true);
       if (id.startsWith("moa-verifier-")) {
-        if (++verifierRequests === 1) return call("read_rubric");
+        if (++verifierRequests === 1) return call("moa_read_checklist");
         if (verifierRequests <= 3) return call("pwsh");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       if (++parentRequests > 1) agent.cancel({ kind: "user" });
       return response("123");
@@ -271,9 +271,9 @@ it.each(["stop", "new human input"])("preserves %s at an unsupported-tool helper
       if (id.startsWith("moa-verifier-")) {
         const count = (verifierRequests.get(id) ?? 0) + 1;
         verifierRequests.set(id, count);
-        if (count === 1) return call("read_rubric");
-        if (count === 2) return call(failedVerifier === undefined ? "pwsh" : "read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (count === 1) return call("moa_read_checklist");
+        if (count === 2) return call(failedVerifier === undefined ? "pwsh" : "moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       if (++parentRequests > 2) agent.cancel({ kind: "user" });
       return response(parentRequests === 1 ? "123" : "The updated answer");
@@ -329,9 +329,9 @@ it.each(["stop", "new human input"])("preserves %s at an optional-shell capabili
       if (id.startsWith("moa-verifier-")) {
         const count = (verifierRequests.get(id) ?? 0) + 1;
         verifierRequests.set(id, count);
-        if (count === 1) return call("read_rubric");
-        if (count === 2) return call(failedVerifier === undefined ? "pwsh" : "read_candidate");
-        return call("submit_verdict", { status: "Pass", issues: [] });
+        if (count === 1) return call("moa_read_checklist");
+        if (count === 2) return call(failedVerifier === undefined ? "pwsh" : "moa_read_delivery");
+        return call("moa_submit_review", { status: "Pass", issues: [] });
       }
       if (++parentRequests > 2) agent.cancel({ kind: "user" });
       return response(parentRequests === 1 ? "The initial answer" : "The updated answer");
@@ -373,8 +373,8 @@ it("continues with new human input arriving at the failed helper's native turn-e
         }
         const count = (verificationRequests.get(id) ?? 0) + 1;
         verificationRequests.set(id, count);
-        if (count === 1) return call("read_rubric");
-        if (count === 2) return call("read_candidate");
+        if (count === 1) return call("moa_read_checklist");
+        if (count === 2) return call("moa_read_delivery");
         return response('{"status":"Pass","issues":[]}');
       }
       parentRequests++;

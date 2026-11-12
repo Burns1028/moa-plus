@@ -56,7 +56,7 @@ it("admits a reserved MoA child through native activation with identity before i
 });
 
 it("forks a selected session through native activation with a fresh identity", async () => {
-  const { createForkProvider, prepareForkSeed } = await import(
+  const { createHistoryBranchProvider, prepareHistoryBranch } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
   const f = await fixture();
@@ -69,9 +69,9 @@ it("forks a selected session through native activation with a fresh identity", a
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     (f.ctx.projectMode as any).moa.dispose();
     const child = SessionId("fork-child");
-    let seed: ReturnType<typeof prepareForkSeed> | undefined;
+    let seed: ReturnType<typeof prepareHistoryBranch> | undefined;
     const unregister = f.ctx.subagents.registerProvider(
-      createForkProvider((id) => id === child ? seed : undefined),
+      createHistoryBranchProvider((id) => id === child ? seed : undefined),
     );
     const { agent: source } = await f.ctx.agents.create({
       sessionId: SessionId("selected-source"),
@@ -86,7 +86,7 @@ it("forks a selected session through native activation with a fresh identity", a
     );
     await source.whenIdle();
     const events = source.session.snapshotEvents();
-    seed = prepareForkSeed(events, events.at(-1)!.seq);
+    seed = prepareHistoryBranch(events, events.at(-1)!.seq);
     const received = Promise.withResolvers<void>();
     f.adapter.handler = (options) => {
       if (options.sessionId === child) received.resolve();
@@ -228,13 +228,13 @@ it("queries actual direct children and waits for native completion", async () =>
       new AbortController().signal,
     );
     const controls = new MoAAgents(access, workers);
-    const initial = await controls.query(
+    const initial = await controls.observe(
       agent,
       {},
       new AbortController().signal,
     );
     expect(initial.children[0].workerId).toBe(child);
-    const pending = controls.query(
+    const pending = controls.observe(
       agent,
       { wait: "all", timeoutMs: 5000 },
       new AbortController().signal,
@@ -282,7 +282,7 @@ it("kills the native child without deleting its project membership", async () =>
       new AbortController().signal,
     );
     const controls = new MoAAgents(access, workers);
-    const stopped = controls.kill(agent, child, new AbortController().signal);
+    const stopped = controls.stopWork(agent, child, new AbortController().signal);
     await new Promise((resolve) => setTimeout(resolve, 0));
     const live = f.ctx.agents.get(child);
     if (live) expect(controls.lifecycle(live)).toBe("Aborting");
@@ -293,7 +293,7 @@ it("kills the native child without deleting its project membership", async () =>
       lifecycle: "Zombie",
     });
     expect(
-      (await controls.query(agent, {}, new AbortController().signal))
+      (await controls.observe(agent, {}, new AbortController().signal))
         .children[0].workerId,
     ).toBe(child);
   } finally {
@@ -302,11 +302,11 @@ it("kills the native child without deleting its project membership", async () =>
   }
 });
 
-it("runs QueryAgent as a native model tool", async () => {
+it("runs moa_observe as a native model tool", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
-  const { createQueryAgentTool } = await import(
+  const { createTeamObserver } = await import(
     "../../packages/project-mode/src/host/moa/tools.ts"
   );
   const f = await fixture();
@@ -330,7 +330,7 @@ it("runs QueryAgent as a native model tool", async () => {
               type: "tool-call-delta",
               index: 0,
               id: "query",
-              name: "QueryAgent",
+              name: "moa_observe",
               argumentsDelta: "{}",
             },
             {
@@ -339,7 +339,7 @@ it("runs QueryAgent as a native model tool", async () => {
               block: {
                 type: "tool-call",
                 id: "query",
-                name: "QueryAgent",
+                name: "moa_observe",
                 arguments: "{}",
               },
             },
@@ -365,7 +365,7 @@ it("runs QueryAgent as a native model tool", async () => {
   }
 });
 
-it("creates a shared Task with durable identity and workspace facts before native execution", async () => {
+it("creates a shared moa_dispatch with durable identity and workspace facts before native execution", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
@@ -388,7 +388,7 @@ it("creates a shared Task with durable identity and workspace facts before nativ
     };
     const access = (f.ctx.projectMode as any).access;
     const controls = new MoAAgents(access, (f.ctx.projectMode as any).workers);
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       agent,
       [
         {
@@ -422,7 +422,7 @@ it("creates a shared Task with durable identity and workspace facts before nativ
   }
 });
 
-it("defaults Task to an isolated current-content workspace", async () => {
+it("defaults moa_dispatch to an isolated current-content workspace", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
@@ -453,7 +453,7 @@ it("defaults Task to an isolated current-content workspace", async () => {
     };
     const access = (f.ctx.projectMode as any).access;
     const controls = new MoAAgents(access, (f.ctx.projectMode as any).workers);
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       agent,
       [{ name: "worker", task: "work", role: "General-purpose" }],
       "isolated-task",
@@ -476,11 +476,11 @@ it("defaults Task to an isolated current-content workspace", async () => {
   }
 });
 
-it("runs Task as a native model tool and admits a child", async () => {
+it("runs moa_dispatch as a native model tool and admits a child", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
-  const { createTaskTool } = await import(
+  const { createWorkDispatcher } = await import(
     "../../packages/project-mode/src/host/moa/tools.ts"
   );
   const f = await fixture();
@@ -521,7 +521,7 @@ it("runs Task as a native model tool and admits a child", async () => {
               type: "tool-call-delta",
               index: 0,
               id: "task",
-              name: "Task",
+              name: "moa_dispatch",
               argumentsDelta: args,
             },
             {
@@ -530,7 +530,7 @@ it("runs Task as a native model tool and admits a child", async () => {
               block: {
                 type: "tool-call",
                 id: "task",
-                name: "Task",
+                name: "moa_dispatch",
                 arguments: args,
               },
             },
@@ -593,7 +593,7 @@ it("Fork carries selected source history into a fresh child identity", async () 
       (f.ctx.projectMode as any).access,
       (f.ctx.projectMode as any).workers,
     );
-    const receipt = await controls.fork(
+    const receipt = await controls.branch(
       agent,
       agent.id,
       {
@@ -642,7 +642,7 @@ it("runs Fork as a native model tool", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
-  const { createForkTool } = await import(
+  const { createContextBrancher } = await import(
     "../../packages/project-mode/src/host/moa/tools.ts"
   );
   const f = await fixture();
@@ -680,7 +680,7 @@ it("runs Fork as a native model tool", async () => {
               type: "tool-call-delta",
               index: 0,
               id: "fork",
-              name: "Fork",
+              name: "moa_branch",
               argumentsDelta: args,
             },
             {
@@ -689,7 +689,7 @@ it("runs Fork as a native model tool", async () => {
               block: {
                 type: "tool-call",
                 id: "fork",
-                name: "Fork",
+                name: "moa_branch",
                 arguments: args,
               },
             },
@@ -754,7 +754,7 @@ it("restricts Explorer's native execution tools to read-only capabilities", asyn
   }
 });
 
-it("ProjectContext writes only inside the shared context using the acting sandbox policy", async () => {
+it("moa_context writes only inside the shared context using the acting sandbox policy", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
@@ -801,20 +801,20 @@ it("ProjectContext writes only inside the shared context using the acting sandbo
       (f.ctx.projectMode as any).access,
       (f.ctx.projectMode as any).workers,
     );
-    await controls.context(
+    await controls.sharedContext(
       agent,
       { action: "write", path: "fact.md", content: "reusable fact" },
       new AbortController().signal,
     );
     expect(
-      await controls.context(
+      await controls.sharedContext(
         agent,
         { action: "read", path: "fact.md" },
         new AbortController().signal,
       ),
     ).toMatchObject({ content: "reusable fact" });
     await expect(
-      controls.context(
+      controls.sharedContext(
         agent,
         { action: "write", path: "../notes.md", content: "bad" },
         new AbortController().signal,
@@ -822,7 +822,7 @@ it("ProjectContext writes only inside the shared context using the acting sandbo
     ).rejects.toThrow(/path/);
     setSandboxMode(agent.session, "read-only");
     await expect(
-      controls.context(
+      controls.sharedContext(
         agent,
         { action: "write", path: "denied.md", content: "bad" },
         new AbortController().signal,
@@ -833,11 +833,11 @@ it("ProjectContext writes only inside the shared context using the acting sandbo
   }
 });
 
-it("runs ProjectContext as a native model tool", async () => {
+it("runs moa_context as a native model tool", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
-  const { createProjectContextTool } = await import(
+  const { createSharedContextAccess } = await import(
     "../../packages/project-mode/src/host/moa/tools.ts"
   );
   const f = await fixture();
@@ -866,7 +866,7 @@ it("runs ProjectContext as a native model tool", async () => {
               type: "tool-call-delta",
               index: 0,
               id: "context",
-              name: "ProjectContext",
+              name: "moa_context",
               argumentsDelta: args,
             },
             {
@@ -875,7 +875,7 @@ it("runs ProjectContext as a native model tool", async () => {
               block: {
                 type: "tool-call",
                 id: "context",
-                name: "ProjectContext",
+                name: "moa_context",
                 arguments: args,
               },
             },
@@ -890,7 +890,7 @@ it("runs ProjectContext as a native model tool", async () => {
     );
     await agent.whenIdle();
     expect(
-      await controls.context(
+      await controls.sharedContext(
         agent,
         { action: "read", path: "fact.md" },
         new AbortController().signal,
@@ -901,7 +901,7 @@ it("runs ProjectContext as a native model tool", async () => {
   }
 });
 
-it("deduplicates concurrent Task retries before workspace and activation", async () => {
+it("deduplicates concurrent moa_dispatch retries before workspace and activation", async () => {
   const { MoAAgents } = await import(
     "../../packages/project-mode/src/host/moa/agents.ts"
   );
@@ -931,8 +931,8 @@ it("deduplicates concurrent Task retries before workspace and activation", async
       },
     ];
     const [a, b] = await Promise.all([
-      controls.task(agent, input, "same", new AbortController().signal),
-      controls.task(agent, input, "same", new AbortController().signal),
+      controls.dispatch(agent, input, "same", new AbortController().signal),
+      controls.dispatch(agent, input, "same", new AbortController().signal),
     ]);
     expect(a).toEqual(b);
     expect(await f.ctx.subagents.listChildren(agent.id)).toHaveLength(1);

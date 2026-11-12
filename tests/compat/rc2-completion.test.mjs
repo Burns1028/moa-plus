@@ -182,27 +182,27 @@ for (const { mode, testsRequired, selectedEffort, attemptShell, persistent, comp
         const names = request.tools.map(tool => tool.name);
         if (id.startsWith('moa-builder-')) {
           builder++;
-          assert.deepEqual(names, ['submit_rubric']);
-          return call('submit_rubric', { rubric: '- Deliver the requested report [human requirement]', tests_required: testsRequired });
+          assert.deepEqual(names, ['moa_publish_checklist']);
+          return call('moa_publish_checklist', { rubric: '- Deliver the requested report [human requirement]', tests_required: testsRequired });
         }
         if (id.startsWith('moa-verifier-')) {
           verifier++;
-          assert.ok(names.includes('read_rubric') && names.includes('read_candidate') && names.includes('submit_verdict'));
+          assert.ok(names.includes('moa_read_checklist') && names.includes('moa_read_delivery') && names.includes('moa_submit_review'));
           assert.ok(!names.includes('run_code'));
-          if (verifier === 1) return call('read_rubric');
+          if (verifier === 1) return call('moa_read_checklist');
           if (verifier === 2) return attemptShell
             ? call('pwsh', { command: "Write-Output 'should not run without record protection'",
               ...(persistent ? {} : { description: 'Run required tests', timeoutMs: 1000 }) })
-            : call('read_candidate');
+            : call('moa_read_delivery');
           if (attemptShell) {
             assert.ok(!names.includes('pwsh'), 'the native scope must remove the unavailable shell before the next request');
             const notices = request.messages.filter(message => message.source.kind === 'moa-completion' &&
               message.content.some(block => block.type === 'text' && block.text.startsWith('The native shell backend cannot enforce')));
             assert.equal(notices.length, 1);
             if (verifier === 3) return call('read', { file_path: join(f.directory, 'verification-artifact.txt') });
-            if (verifier === 4) return call('read_candidate');
+            if (verifier === 4) return call('moa_read_delivery');
           }
-          return call('submit_verdict', { status: 'Pass', issues: [] });
+          return call('moa_submit_review', { status: 'Pass', issues: [] });
         }
         main++;
         if (mode === 'ptc') assert.ok(names.includes('run_code'));
@@ -308,7 +308,7 @@ for (const failedRole of ['builder', 'verifier']) {
       f.adapter.handler = request => {
         const id = String(request.sessionId);
         if (id.startsWith(`moa-${failedRole}-`)) throw new Error(`fixture-${failedRole}-infrastructure-failure`);
-        if (id.startsWith('moa-builder-')) return call('submit_rubric', {
+        if (id.startsWith('moa-builder-')) return call('moa_publish_checklist', {
           rubric: '- Deliver the requested report [human requirement]', tests_required: false,
         });
         if (id.startsWith('moa-verifier-')) throw new Error('unexpected Verifier request after failed Builder');
@@ -328,7 +328,7 @@ for (const failedRole of ['builder', 'verifier']) {
   });
 }
 
-test('rc2 Windows native Task and Fork run protected PowerShell in isolated workspaces and clean only owned resources', {
+test('rc2 Windows native moa_dispatch and Fork run protected PowerShell in isolated workspaces and clean only owned resources', {
   skip: !modules || process.platform !== 'win32', timeout: 60000,
 }, async () => {
   const f = await fixture('native', false, 'high', true, { sandboxMode: 'workspace-write', completionVerification: false, defaultPwshJobs: true });
@@ -343,7 +343,7 @@ test('rc2 Windows native Task and Fork run protected PowerShell in isolated work
     if (exec.agent !== f.agent && exec.name === 'pwsh') childShellResults.push(result);
     if (exec.agent === f.agent) {
       results.push({ name: exec.name, result });
-      if (!result.isError && ['Task', 'Fork'].includes(exec.name)) {
+      if (!result.isError && ['moa_dispatch', 'moa_branch'].includes(exec.name)) {
         const value = JSON.parse(result.value);
         receipts.push(...(Array.isArray(value) ? value : [value]));
       }
@@ -376,12 +376,12 @@ test('rc2 Windows native Task and Fork run protected PowerShell in isolated work
       }
       parentSteps++;
       if (cleaning) {
-        if (parentSteps <= receipts.length) return call('KillAgent', { id: receipts[parentSteps - 1].workerId, destroy: true });
+        if (parentSteps <= receipts.length) return call('moa_stop', { id: receipts[parentSteps - 1].workerId, destroy: true });
         return text('Owned isolated resources removed');
       }
-      if (parentSteps === 1) return call('Task', { tasks: [{ name: 'isolated task', task: 'Execute the native Worker command and return its result', role: 'General-purpose', workspace: 'isolated' }] });
-      if (parentSteps === 2) return call('Fork', { source: f.agent.id, name: 'isolated fork', task: 'Execute the native fork command and return its result', role: 'General-purpose', workspace: 'isolated' });
-      if (parentSteps === 3) return call('QueryAgent', { wait: 'all', timeout_ms: 5000 });
+      if (parentSteps === 1) return call('moa_dispatch', { tasks: [{ name: 'isolated task', task: 'Execute the native Worker command and return its result', role: 'General-purpose', workspace: 'isolated' }] });
+      if (parentSteps === 2) return call('moa_branch', { source: f.agent.id, name: 'isolated fork', task: 'Execute the native fork command and return its result', role: 'General-purpose', workspace: 'isolated' });
+      if (parentSteps === 3) return call('moa_observe', { wait: 'all', timeout_ms: 5000 });
       if (parentSteps > 5) f.agent.cancel({ kind: 'user' });
       return text('Both native Workers have returned');
     };

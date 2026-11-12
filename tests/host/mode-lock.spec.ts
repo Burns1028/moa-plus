@@ -77,7 +77,7 @@ it("fixes Project at turn start and rejects downgrade while running and after id
     await expect(
       f.ctx.projectMode.setEnabled(agent.id, false, mode.revision, "idle-off"),
     ).rejects.toThrow("project-mode/session-mode-locked");
-    expect(f.ctx.tools.get("Task", agent)).toBeDefined();
+    expect(f.ctx.tools.get("moa_dispatch", agent)).toBeDefined();
   } finally {
     gate.resolve();
     await f.dispose();

@@ -48,10 +48,10 @@ it.each([
     let verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the report [human requirement]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver the report [human requirement]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
-        if (verifier === 2) return call("read_candidate", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
+        if (verifier === 2) return call("moa_read_delivery", {});
         return response('{"status":"Pass","issues":[]}');
       }
       return response("The completed report");
@@ -64,7 +64,7 @@ it.each([
     expect(builder[0]).toMatchObject({ provider: "test", model: "selected" });
     expect(builder[0].reasoningEffort).toBe(expected);
     expect(builder[0].maxTokens).toBeUndefined();
-    expect(builder[0].tools?.map(tool => tool.name)).toEqual(["submit_rubric"]);
+    expect(builder[0].tools?.map(tool => tool.name)).toEqual(["moa_publish_checklist"]);
     expect(execution).toHaveLength(4);
     for (const request of execution) {
       expect(request).toMatchObject({ provider: "test", model: "selected" });
@@ -108,11 +108,11 @@ it.skipIf(!hasBash).each(["native", "ptc"])("inherits preset execution tools for
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
         builderTools = (options.tools ?? []).map(tool => tool.name);
-        return call("submit_rubric", { rubric: "- Run the requested command [human]", tests_required: true });
+        return call("moa_publish_checklist", { rubric: "- Run the requested command [human]", tests_required: true });
       }
       if (id.startsWith("moa-verifier-")) {
         verifierTools = (options.tools ?? []).map(tool => tool.name);
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("bash", { description: "Verify artifact", command: "printf 'preset verifier works\\n'", timeoutMs: 2000 });
         return response('{"status":"Pass","issues":[]}');
       }
@@ -121,9 +121,9 @@ it.skipIf(!hasBash).each(["native", "ptc"])("inherits preset execution tools for
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the requested command" }] }));
     await agent.whenIdle();
-    expect(builderTools).toEqual(["submit_rubric"]);
-    expect(verifierTools).toEqual(expect.arrayContaining(["bash", "read_rubric"]));
-    expect(verifierTools).not.toContain("Task");
+    expect(builderTools).toEqual(["moa_publish_checklist"]);
+    expect(verifierTools).toEqual(expect.arrayContaining(["bash", "moa_read_checklist"]));
+    expect(verifierTools).not.toContain("moa_dispatch");
     expect(main).toBe(1);
     expect(verifier).toBe(3);
     expect(agent.session.snapshotEvents().filter(event => event.type === "turn/end")).toMatchObject([{ data: { reason: { kind: "completed" } } }]);
@@ -144,14 +144,14 @@ it("withdraws an answer missing its bound promise and verifies with an independe
         const source = JSON.stringify(options.messages);
         expect(source).toContain("ORIGINAL SPECIFICATION");
         expect(source).not.toContain("MAIN OUTPUT SECRET");
-        return call("submit_rubric", { rubric: "- Original requirement: deliver report [spec.md: ORIGINAL SPECIFICATION]", tests_required: false });
+        return call("moa_publish_checklist", { rubric: "- Original requirement: deliver report [spec.md: ORIGINAL SPECIFICATION]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[],"tests_required":false}');
       }
-      if (++main === 1) return call("set_completion_criteria", { criteria: "deliver report", promise: "EXACT PROMISE" });
+      if (++main === 1) return call("moa_review", { criteria: "deliver report", promise: "EXACT PROMISE" });
       if (main === 2) return response("MAIN OUTPUT SECRET");
       expect(JSON.stringify(options.messages)).toContain("exact completion promise is missing");
       return response("EXACT PROMISE");
@@ -173,13 +173,13 @@ it.each(["legacy", "structured"])("reworks a Partial verdict in the same native 
     let main = 0, verify = 0, built = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) { built++; expect(JSON.stringify(options.messages)).not.toContain("Missing conclusion"); return call("submit_rubric", { rubric: "- Deliver a report [human request]", tests_required: false }); }
+      if (id.startsWith("moa-builder-")) { built++; expect(JSON.stringify(options.messages)).not.toContain("Missing conclusion"); return call("moa_publish_checklist", { rubric: "- Deliver a report [human request]", tests_required: false }); }
       if (id.startsWith("moa-verifier-")) {
         verify++;
-        if (verify % 3 === 1) return call("read_rubric", {});
+        if (verify % 3 === 1) return call("moa_read_checklist", {});
         if (verify % 3 === 2) return call("inspect_artifact", {});
         const verdict = { status: verify === 3 ? "Partial" : "Pass", issues: verify === 3 ? ["Missing conclusion"] : [] };
-        return format === "structured" ? call("submit_verdict", verdict) : response(JSON.stringify(verdict));
+        return format === "structured" ? call("moa_submit_review", verdict) : response(JSON.stringify(verdict));
       }
       main++;
       if (main === 2) expect(JSON.stringify(options.messages)).toContain("Missing conclusion");
@@ -202,20 +202,20 @@ it("accepts a private structured verdict alongside prose without another model s
     let main = 0, verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the report [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver the report [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) {
-          expect(options.tools?.find(tool => tool.name === "submit_verdict")?.parameters).toMatchObject({ properties: { status: { enum: ["Pass", "Partial", "Block"] }, issues: { type: "array", items: { type: "string" } } } });
-          return call("read_rubric", {});
+          expect(options.tools?.find(tool => tool.name === "moa_submit_review")?.parameters).toMatchObject({ properties: { status: { enum: ["Pass", "Partial", "Block"] }, issues: { type: "array", items: { type: "string" } } } });
+          return call("moa_read_checklist", {});
         }
-        if (verifier === 2) return call("read_candidate", {});
+        if (verifier === 2) return call("moa_read_delivery", {});
         if (verifier === 3) return [
           ...response('I inspected the complete report.\n{"status":"Block","issues":["Text is not the submitted verdict"]}').slice(0, -1),
-          ...call("submit_verdict", { status: "Pass", issues: [] }).map(chunk => "index" in chunk ? { ...chunk, index: 1 } : chunk),
+          ...call("moa_submit_review", { status: "Pass", issues: [] }).map(chunk => "index" in chunk ? { ...chunk, index: 1 } : chunk),
         ];
         return response("Legacy fallback cannot parse this prose.");
       }
-      expect(options.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
+      expect(options.tools?.map(tool => tool.name)).not.toContain("moa_submit_review");
       if (++main > 1) agent.cancel({ kind: "user" });
       return response("The completed report");
     };
@@ -235,11 +235,11 @@ it.each([false, true])("still requires actual inspection and required tests afte
     let main = 0, verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver and verify report [human]", tests_required: testsRequired });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver and verify report [human]", tests_required: testsRequired });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
-        if (testsRequired && verifier === 2) return call("read_candidate", {});
-        if (verifier === (testsRequired ? 3 : 2)) return call("submit_verdict", { status: "Pass", issues: [] });
+        if (++verifier === 1) return call("moa_read_checklist", {});
+        if (testsRequired && verifier === 2) return call("moa_read_delivery", {});
+        if (verifier === (testsRequired ? 3 : 2)) return call("moa_submit_review", { status: "Pass", issues: [] });
         return response('{"status":"Pass","issues":[]}');
       }
       if (++main === 2) {
@@ -263,12 +263,12 @@ it("does not reuse a prior structured Pass when a new attempt has no submission"
     let main = 0, verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver report [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         verifier++;
-        if ([1, 3, 6].includes(verifier)) return call("read_rubric", {});
-        if ([4, 7].includes(verifier)) return call("read_candidate", {});
-        if ([2, 8].includes(verifier)) return call("submit_verdict", { status: "Pass", issues: [] });
+        if ([1, 3, 6].includes(verifier)) return call("moa_read_checklist", {});
+        if ([4, 7].includes(verifier)) return call("moa_read_delivery", {});
+        if ([2, 8].includes(verifier)) return call("moa_submit_review", { status: "Pass", issues: [] });
         return response("This review ended without a submitted or JSON verdict.");
       }
       main++;
@@ -298,11 +298,11 @@ it("lets incoming human steering escape a waiting verifier before any final turn
     const counts = new Map<string, number>();
     f.adapter.handler = async (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Original request [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Original request [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) { entered.resolve(); await release.promise; }
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
-        if (count === 1) return call("read_rubric", {});
+        if (count === 1) return call("moa_read_checklist", {});
         if (count === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[],"tests_required":false}');
       }
@@ -331,7 +331,7 @@ it.each(["plain", "fenced"])("rejects a self-declared Pass without actual tool w
     let main = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver report [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) return response(format === "plain" ? '{"status":"Pass","issues":[],"tests_required":false}' : 'Review complete.\n\n```json\n{"status":"Pass","issues":[]}\n```');
       if (++main === 2) {
         expect(JSON.stringify(options.messages)).toContain("Outcome verification did not pass");
@@ -358,10 +358,10 @@ it.each([
     let main = 0, verifier = 0, notice = "";
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the report [human requirement]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver the report [human requirement]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
-        if (verifier === 2) return call("read_candidate", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
+        if (verifier === 2) return call("moa_read_delivery", {});
         return response(body);
       }
       if (++main === 2) {
@@ -389,8 +389,8 @@ it("allows Stop while the verifier is waiting without committing completion", as
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     f.adapter.handler = async (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver report [human]", tests_required: false });
-      if (id.startsWith("moa-verifier-")) { entered.resolve(); await release.promise; return call("submit_verdict", { status: "Pass", issues: [] }); }
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver report [human]", tests_required: false });
+      if (id.startsWith("moa-verifier-")) { entered.resolve(); await release.promise; return call("moa_submit_review", { status: "Pass", issues: [] }); }
       return response("candidate");
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
@@ -410,9 +410,9 @@ it.each(["Bash", "pwsh"])("uses the independent rubric to reject a claimed Pass 
     let main = 0, verifier = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run the test [human request]", tests_required: true });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Run the test [human request]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call(name, {});
         return response('{"status":"Pass","issues":[],"tests_required":false}');
       }
@@ -456,9 +456,9 @@ it.each([
     let main = 0, verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run required tests [human]", tests_required: true });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Run required tests [human]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("pwsh", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -513,9 +513,9 @@ it.skipIf(!hasNativePwsh).each([0, 7])("verifies foreground evidence produced by
     let main = 0, verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run required tests [human]", tests_required: true });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Run required tests [human]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("pwsh", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -538,10 +538,10 @@ it("verifies the current task while explicit next-turn input stays queued", asyn
     const counts = new Map<string, number>();
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Requested deliverable [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Requested deliverable [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
-        if (count === 1) { verifications++; expect(agent.session.snapshotEvents().filter((e) => e.type === "turn/end")).toHaveLength(verifications - 1); return call("read_rubric", {}); }
+        if (count === 1) { verifications++; expect(agent.session.snapshotEvents().filter((e) => e.type === "turn/end")).toHaveLength(verifications - 1); return call("moa_read_checklist", {}); }
         if (count === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -564,8 +564,8 @@ it("keeps original source snapshots and the bound promise across a stopped runti
     await writeFile(join(f.root, "original spec.md"), "ORIGINAL REQUIREMENT SNAPSHOT");
     let main = 0;
     f.adapter.handler = (options) => {
-      if (String(options.sessionId).startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Original requirement [source]", tests_required: false });
-      if (++main === 1) return call("set_completion_criteria", { criteria: "meet original requirement", promise: "PERSISTED PROMISE" });
+      if (String(options.sessionId).startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Original requirement [source]", tests_required: false });
+      if (++main === 1) return call("moa_review", { criteria: "meet original requirement", promise: "PERSISTED PROMISE" });
       agent.cancel({ kind: "user" });
       return response("unfinished");
     };
@@ -584,10 +584,10 @@ it("keeps original source snapshots and the bound promise across a stopped runti
         const input = JSON.stringify(options.messages);
         expect(input).toContain("ORIGINAL REQUIREMENT SNAPSHOT");
         expect(input).not.toContain("REPLACED ARTIFACT MUST NOT");
-        return call("submit_rubric", { rubric: "- Original requirement [source]", tests_required: false });
+        return call("moa_publish_checklist", { rubric: "- Original requirement [source]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verified === 1) return call("read_rubric", {});
+        if (++verified === 1) return call("moa_read_checklist", {});
         if (verified === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -612,16 +612,16 @@ it("clears a delivered task's promise before the next unrelated user task", asyn
     const counts = new Map<string, number>();
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver task [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver task [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
-        if (count === 1) return call("read_rubric", {});
+        if (count === 1) return call("moa_read_checklist", {});
         if (count === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
       if (++main === 1) {
-        expect(options.tools.map(tool => tool.name)).toContain("set_completion_criteria");
-        return call("set_completion_criteria", { criteria: "finish first", promise: "FIRST TASK PROMISE" });
+        expect(options.tools.map(tool => tool.name)).toContain("moa_review");
+        return call("moa_review", { criteria: "finish first", promise: "FIRST TASK PROMISE" });
       }
       return response(main === 2 ? "FIRST TASK PROMISE" : "SECOND TASK COMPLETE");
     };
@@ -644,8 +644,8 @@ it("applies the bound promise to a Worker without spawning recursive outcome hel
       expect(String(options.sessionId)).not.toMatch(/^moa-(builder|verifier)-/);
       if (options.sessionId === agent.id) return response("Worker result reviewed");
       if (++work === 1) {
-        expect(options.tools.map(tool => tool.name)).toContain("set_completion_criteria");
-        return call("set_completion_criteria", { criteria: "deliver assigned result", promise: "WORKER PROMISE" });
+        expect(options.tools.map(tool => tool.name)).toContain("moa_review");
+        return call("moa_review", { criteria: "deliver assigned result", promise: "WORKER PROMISE" });
       }
       if (work === 2) return response("candidate without promise");
       expect(JSON.stringify(options.messages)).toContain("exact completion promise is missing");
@@ -679,12 +679,12 @@ it.skipIf(!hasBash).each([
     let main = 0, verifier = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run the specified command [human]", tests_required: true });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Run the specified command [human]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("bash", { command: `${promote ? "sleep 0.12; " : ""}printf 'background capability is tested\\n'`, description: "Run verification", timeoutMs: promote ? 20 : 2000 });
         if (promote && verifier === 3) return call("job_output", { job_id: f.ctx.jobs.list(SessionId(id))[0].id, wait: true, timeout_ms: 2000 });
-        if (format === "structured") return call("submit_verdict", { status: "Pass", issues: [] });
+        if (format === "structured") return call("moa_submit_review", { status: "Pass", issues: [] });
         return response(format === "plain" ? '{"status":"Pass","issues":[]}' : 'I verified the candidate and ran the required command successfully.\n\n```json\n{"status":"Pass","issues":[]}\n```\nReady for delivery.');
       }
       if (++main > 1) { agent.cancel({ kind: "user" }); throw new Error("Native exit zero was rejected"); }
@@ -718,10 +718,10 @@ it("preserves original file-attachment specifications through native file projec
         built++;
         expect(JSON.stringify(options.messages)).toContain(source);
         expect(JSON.stringify(options.messages)).toContain("uploaded original.md");
-        return call("submit_rubric", { rubric: "- Implement attached original spec [attachment]", tests_required: false });
+        return call("moa_publish_checklist", { rubric: "- Implement attached original spec [attachment]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -745,10 +745,10 @@ it("rebuilds invalid Builder output from saved original requirements on the next
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
         expect(JSON.stringify(options.messages)).toContain("ORIGINAL HUMAN REQUIREMENT");
-        return ++built === 1 ? response("invalid JSON") : call("submit_rubric", { rubric: "- Deliver original requirement [human]", tests_required: false });
+        return ++built === 1 ? response("invalid JSON") : call("moa_publish_checklist", { rubric: "- Deliver original requirement [human]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -775,10 +775,10 @@ it("does not accept another task's rubric after inspection and republishes its o
     const counts = new Map<string, number>();
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Original task requirement [human]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Original task requirement [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
-        if (count === 1) return call("read_rubric", {});
+        if (count === 1) return call("moa_read_checklist", {});
         if (count === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -805,10 +805,10 @@ it("accepts a rubric through the Builder's sole native submission capability", a
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
         builderTools = (options.tools ?? []).map(tool => tool.name);
-        return ++builder === 1 ? call("submit_rubric", { rubric: "- Deliver report [human: Deliver a report]", tests_required: false }) : response("No submission capability");
+        return ++builder === 1 ? call("moa_publish_checklist", { rubric: "- Deliver report [human: Deliver a report]", tests_required: false }) : response("No submission capability");
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }
@@ -817,7 +817,7 @@ it("accepts a rubric through the Builder's sole native submission capability", a
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver a report" }] }));
     await agent.whenIdle();
-    expect(builderTools).toEqual(["submit_rubric"]);
+    expect(builderTools).toEqual(["moa_publish_checklist"]);
     expect(builder).toBe(1);
     expect(main).toBe(1);
     expect(verifier).toBe(3);
@@ -838,7 +838,7 @@ it.each([
       if (id.startsWith("moa-builder-")) return response(body);
       if (id.startsWith("moa-verifier-")) { verifier++; return response('{"status":"Pass","issues":[]}'); }
       if (++main === 2) {
-        expect(JSON.stringify(options.messages)).toContain("without a validated submit_rubric call");
+        expect(JSON.stringify(options.messages)).toContain("without a validated moa_publish_checklist call");
         agent.cancel({ kind: "user" });
       }
       return response("candidate");
@@ -861,13 +861,13 @@ it("returns invalid rubric arguments as a native tool error before accepting a c
     f.adapter.handler = options => {
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) {
-        if (++builder === 1) return call("submit_rubric", { rubric: "", tests_required: "false" });
+        if (++builder === 1) return call("moa_publish_checklist", { rubric: "", tests_required: "false" });
         const result = options.messages.findLast(message => message.role === "tool");
         expect(result?.role === "tool" && result.isError).toBe(true);
-        return call("submit_rubric", { rubric: "- Deliver report [human: Deliver report]", tests_required: false });
+        return call("moa_publish_checklist", { rubric: "- Deliver report [human: Deliver report]", tests_required: false });
       }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric", {});
+        if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("inspect_artifact", {});
         return response('{"status":"Pass","issues":[]}');
       }

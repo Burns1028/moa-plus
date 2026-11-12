@@ -2,12 +2,13 @@ import type { Agent, AgentHandle, ModelSelection } from "@deepseek-ai/dsh-agent"
 import { createUserMessage, type ContentBlock, type UserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import { moaToolNames as tools } from "../../shared/tool-names.ts";
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import type { HostAccess } from "../host-access.ts";
 import { waitForTurn, presentNativeTools } from "../native.ts";
-import { outcomeVerifierPrompt, rubricBuilderPrompt } from "../prompts/completion.ts";
+import { buildDeliveryReviewInstructions, buildChecklistInstructions } from "../prompts/completion.ts";
 import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./worker-memory-policy.ts";
 
 declare module "@deepseek-ai/dsh-llm" {
@@ -26,7 +27,33 @@ const sourceVersionSchema = z.object({ path: z.string(), requirement: z.number()
 const inputSchema = z.object({ taskId: z.string(), turn: z.number(), finished: z.boolean().default(false), requirements: z.array(z.string()), sources: z.record(z.string(), z.string().nullable()), sourceVersions: z.array(sourceVersionSchema).default([]), attachments: z.array(z.custom<ContentBlock>()).default([]) });
 const boundSchema = criteriaSchema.extend({ taskId: z.string(), turn: z.number() });
 type Input = z.infer<typeof inputSchema>;
-function serializeInput(input: Input): string {
+/** Explicit file references; a declared delivery path is not an input specification. */
+function referencedInputPaths(body: string): string[] {
+  const paths: string[] = [];
+  let previousEnd = 0, previousOutput = false;
+  const references = /`([^`\n]+)`|\[[^\]\n]*\]\(([^)\n]+)\)|"([^"\n]+)"|(?:^|[\s（(\[，、；：。！？])((?:(?:[A-Za-z]:)?[\\/]|\.\.?[\\/])?[\p{L}\p{N}_.-]+(?:[\\/][\p{L}\p{N}_.-]+)*\.(?:md|txt|csv|tsv|jsonl?|ya?ml|pdf))(?=$|[\s，、；：。！？,.;:)\]）])/giu;
+  for (const match of body.matchAll(references)) {
+    const path = match[1] ?? match[2] ?? match[3] ?? match[4];
+    if (!path || !/\.[\w]+$/.test(path) || /^[\w+.-]+:\/\//.test(path)) continue;
+    const before = body.slice(0, match.index);
+    // In "generate <document>'s summary" the named document is the input,
+    // even though the request starts with a delivery verb.
+    const documentSubject = /^\s*(?:的|之|['’]s\b)/i.test(body.slice(match.index + match[0].length));
+    const isDeliveryTarget: boolean = !documentSubject && (/(?:交付|输出|生成|写入|写到|保存到|保存|导出)(?:为|到|至|成)?\s*$/.test(before) ||
+      /\b(?:write|save|create|deliver|output|generate|export)(?:\s+(?:the|a|an|result|report|file|artifact|json|to|in|at|as))*\s*$/i.test(before) ||
+      (previousOutput && /^(?:[\s,、;；和及与&]|and\b)*$/i.test(body.slice(previousEnd, match.index))));
+    previousEnd = match.index + match[0].length;
+    previousOutput = isDeliveryTarget;
+    if (!isDeliveryTarget) paths.push(path);
+  }
+  return [...new Set(paths)];
+}
+function isMissingSource(error: unknown): boolean {
+  if (error === null || typeof error !== "object") return false;
+  const code: unknown = Reflect.get(error, "code");
+  return code === "ENOENT" || code === "FS_NOT_FOUND";
+}
+function serializeOriginalInputs(input: Input): string {
   const { attachments: _attachments, ...snapshot } = input;
   return JSON.stringify(snapshot);
 }
@@ -37,11 +64,11 @@ function lastText(agent: Agent, from = 0): string {
   const event = agent.session.snapshotEvents().slice(from).filter((e) => e.type === "assistant/message").at(-1);
   return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
-class CompletionHelperFailure extends Error {}
-function checkHelperFailure(agent: Agent, role: string, from = 0): void {
+class ReviewAgentFailure extends Error {}
+function assertReviewAgentHealthy(agent: Agent, role: string, from = 0): void {
   const end = agent.session.snapshotEvents().slice(from).findLast(event => event.type === "turn/end");
   if (end?.type === "turn/end" && end.data.reason.kind === "error")
-    throw new CompletionHelperFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
+    throw new ReviewAgentFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
 }
 interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal): { readVerdict(): Verdict | undefined; dispose(): void } }
 
@@ -56,7 +83,7 @@ function hasNativeModelSelection(agent: Agent): agent is Agent & { model: {
 }
 
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
-export function bindCompletion(host: HostAccess): (agent: Agent) => void {
+export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
   host.ctx.systemPrompt.context({
     name: "project-mode:task", order: 655, required: true, interpolate: false,
     text: ({ agent }) => {
@@ -67,7 +94,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const bound = boundSchema.safeParse(record.operations[`${key}:${record.project.coordinatorSessionId}`]);
       if (host.config.completionVerification !== true &&
         (!bound.success || bound.data.taskId !== input.data.taskId)) return "";
-      return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeInput(input.data)}`;
+      return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeOriginalInputs(input.data)}`;
     },
   });
   const helpers = new Map<Agent, Helpers>();
@@ -92,7 +119,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     });
   };
   const filesystem = (agent: Agent) => host.ctx.get("agentPresets")?.serviceFor(agent, "fs") ?? agent.ctx.get("fs")!;
-  const capture = async (parent: Agent, input: Input, added: readonly UserMessage[], signal: AbortSignal): Promise<Input> => {
+  const retainTaskInputs = async (parent: Agent, input: Input, added: readonly UserMessage[], signal: AbortSignal): Promise<Input> => {
     const root = host.record(parent.id)!.project.workspacePath;
     const fs = filesystem(parent);
     const sources = { ...input.sources };
@@ -100,21 +127,31 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     // without inventing an exact human-message anchor for them.
     const sourceVersions = input.sourceVersions.length ? [...input.sourceVersions] : Object.entries(sources).map(([path, content]) => ({ path, requirement: null, content }));
     const requirements = added.map(text);
-    // Explicit Markdown links and quoted paths retain spaces. Plain paths are
-    // accepted too; only named sources are read, never implementation outputs.
+    // Capture before implementation. An unqualified name may abbreviate a
+    // sibling of an explicitly named input; resolve it only when unique.
     for (const [index, body] of requirements.entries()) {
-      const paths = new Set<string>();
-      for (const match of body.matchAll(/`([^`\n]+\.[\w]+)`|\]\(([^)\n]+)\)|"([^"\n]+\.[\w]+)"|(?:^|\s)((?:\/?[\w.\-\u0080-\uffff]+\/)*[\w.\-\u0080-\uffff]+\.(?:md|txt|pdf|json|ya?ml))(?=$|\s|[.,;])/g)) {
-        const path = match[1] ?? match[2] ?? match[3] ?? match[4];
-        if (path && !/^[\w+.-]+:\/\//.test(path)) paths.add(path);
-      }
+      const paths = referencedInputPaths(body);
+      const directories = [...new Set(paths.filter(path => /[\\/]/.test(path)).map(path => dirname(path)))];
       for (const token of paths) {
+        let path = token;
         let content: string | null = null;
+        let missing = false;
         try {
           content = await fs.readText(await fs.resolve(token, { cwd: root, signal }), signal);
-        } catch { signal.throwIfAborted(); /* Only an explicit human reference captures a source version. */ }
-        sources[token] = content;
-        sourceVersions.push({ path: token, requirement: input.requirements.length + index + 1, content });
+        } catch (error) { signal.throwIfAborted(); missing = isMissingSource(error); }
+        if (missing && !/[\\/]/.test(token)) {
+          const siblings: { path: string; content: string }[] = [];
+          let unresolved = false;
+          for (const directory of directories) {
+            const sibling = join(directory, token);
+            try {
+              siblings.push({ path: sibling, content: await fs.readText(await fs.resolve(sibling, { cwd: root, signal }), signal) });
+            } catch (error) { signal.throwIfAborted(); unresolved ||= !isMissingSource(error); }
+          }
+          if (!unresolved && siblings.length === 1) ({ path, content } = siblings[0]);
+        }
+        sources[path] = content;
+        sourceVersions.push({ path, requirement: input.requirements.length + index + 1, content });
       }
     }
     const attachments = added.flatMap(message => message.content.filter(block => block.type === "file" || block.type === "image"));
@@ -164,7 +201,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       writes.set(parent, write);
       await write;
     };
-    const hiddenDelegation = [...new Set([...host.config.coordinatorHiddenTools, "subagent", "subagent_fork", "workflow", "send_message", "control_workers", "Task", "Fork", "SendMessage", "QueryAgent", "KillAgent"])];
+    const hiddenDelegation = [...new Set([...host.config.coordinatorHiddenTools, "subagent", "subagent_fork", "workflow", "send_message", "control_workers", tools.dispatch, tools.branch, tools.message, tools.observe, tools.stop])];
     const inherited = parent.session.requestHeader()?.config ?? parent.options;
     const selected = hasNativeModelSelection(parent) ? parent.model.current() : undefined;
     // A pending native selection can be newer than the last request header.
@@ -201,7 +238,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
           }
           ctx.tools.restrict({ allow: [] });
           ctx.tools.register(defineTool({
-            name: "submit_rubric",
+            name: tools.publishChecklist,
             description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots. This completes rubric building without reading implementation outputs.",
             parameters: {
               rubric: { type: "string", required: true, description: "Markdown acceptance criteria with original requirement/source anchors" },
@@ -214,16 +251,16 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
               return "Rubric submitted.";
             },
           }));
-          ctx.tools.guard(exec => exec.name === "submit_rubric" ? undefined : "Rubric Builder cannot access execution tools or implementation outputs");
+          ctx.tools.guard(exec => exec.name === tools.publishChecklist ? undefined : "Rubric Builder cannot access execution tools or implementation outputs");
         } else {
-          ctx.tools.register(defineTool({ name: "read_rubric", description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
-          ctx.tools.register(defineTool({ name: "read_candidate", description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.", parameters: {}, output, execute: async () => {
+          ctx.tools.register(defineTool({ name: tools.readChecklist, description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
+          ctx.tools.register(defineTool({ name: tools.readDelivery, description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.", parameters: {}, output, execute: async () => {
             if (!candidate) throw new Error("No active candidate review");
             candidate.signal.throwIfAborted();
             return candidate.answer;
           } }));
           ctx.tools.register(defineTool({
-            name: "submit_verdict",
+            name: tools.submitReview,
             description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables. This ends the review; submission alone is not inspection or required test evidence.",
             parameters: {
               status: { type: "string", required: true, enum: ["Pass", "Partial", "Block"] },
@@ -251,10 +288,10 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     try {
       verifier = await make("verifier");
       verifierMemoryPolicy = bindWorkerMemoryPolicy(host.ctx, verifier.agent, record.project.paths);
-      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: rubricBuilderPrompt(serializeInput(input)) }, ...input.attachments] }));
+      builder.agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: buildChecklistInstructions(serializeOriginalInputs(input)) }, ...input.attachments] }));
       const build = builder.agent.whenIdle().then(async () => {
-        checkHelperFailure(builder.agent, "Rubric Builder");
-        if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
+        assertReviewAgentHealthy(builder.agent, "Rubric Builder");
+        if (!submitted) throw new Error(`Rubric Builder ended without a validated ${tools.publishChecklist} call`);
         rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
         await publish(signal);
         return submitted.tests_required;
@@ -274,7 +311,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     if (mounted.has(agent)) return;
     mounted.set(agent, () => {});
     const off = agent.ctx.tools.register(defineTool({
-      name: "set_completion_criteria", description: host.record(agent.id) && host.config.completionVerification === "on-demand"
+      name: tools.review, description: host.record(agent.id) && host.config.completionVerification === "on-demand"
         ? "Request independent outcome verification for the current task and bind concrete completion criteria plus an exact, natural completion statement for the final answer. Use your judgment when a separate acceptance check is valuable; ordinary chat need not activate it. The Builder derives its rubric from original human requirements, not these criteria."
         : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
       parameters: { criteria: { type: "string", required: true, description: "Task completion criteria" }, promise: { type: "string", required: true, description: "Exact complete promise" } }, output,
@@ -316,7 +353,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
     }
     const continuation = prior.success && !prior.data.finished && !priorCompleted;
     const base: Input = continuation ? { ...prior.data, turn: start.data.turn } : { taskId: randomUUID(), turn: start.data.turn, finished: false, requirements: [], sources: {}, sourceVersions: [], attachments: [] };
-    const input = await capture(agent, base, human, signal);
+    const input = await retainTaskInputs(agent, base, human, signal);
     await host.update(agent.id, (r) => ({ ...r, operations: { ...r.operations, [sourceKey]: z.json().parse(input) } }));
     const old = helpers.get(agent);
     helpers.delete(agent);
@@ -372,7 +409,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
       const offset = pair.verifier.agent.session.snapshotEvents().length;
       const shellKind = (name: string) => ["bash", "pwsh"].includes(name.toLowerCase());
       const successfulShell = new Set<number>();
-      let capabilityFailure: CompletionHelperFailure | undefined;
+      let capabilityFailure: ReviewAgentFailure | undefined;
       let capabilityJoin: Promise<void> | undefined;
       const unavailableTools = new Set<string>();
       let capabilityNotice = false;
@@ -380,7 +417,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || control.aborted) return;
         if (result.isError) {
           if (result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
-            capabilityFailure ??= new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
+            capabilityFailure ??= new ReviewAgentFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
             if (testsRequired) {
               // Required execution cannot be replaced with file inspection.
               if (!capabilityJoin) {
@@ -393,7 +430,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
               capabilitySuppressions.push(pair.verifier.agent.ctx.tools.suppress({ deny: [exec.name] }));
               if (!capabilityNotice) {
                 capabilityNotice = true;
-                pair.verifier.agent.inject(msg("The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and read_candidate. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag."));
+                pair.verifier.agent.inject(msg(`The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and ${tools.readDelivery}. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag.`));
               }
             }
           }
@@ -412,17 +449,17 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         if (call) successfulShell.add(call.seq);
       });
       candidateReview = pair.freezeCandidate(answer, control);
-      pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
+      pair.verifier.agent.followup(msg(buildDeliveryReviewInstructions(pair.rubricPath)));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       if (capabilityJoin) {
         try { await waitForTurn(capabilityJoin, control); }
         catch (error) {
           control.throwIfAborted();
-          throw new CompletionHelperFailure(`${capabilityFailure!.message}; native cleanup failed`, { cause: error });
+          throw new ReviewAgentFailure(`${capabilityFailure!.message}; native cleanup failed`, { cause: error });
         }
       }
       if (capabilityFailure && testsRequired) throw capabilityFailure;
-      checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
+      assertReviewAgentHealthy(pair.verifier.agent, "Outcome Verifier", offset);
       await pair.read(control);
       control.throwIfAborted();
       const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
@@ -445,11 +482,11 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         }
       } catch {
         if (capabilityFailure) throw capabilityFailure;
-        agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
+        agent.steer(msg(`Outcome verification did not pass. Verifier must call ${tools.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block.`));
         return;
       }
       if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || verdict.runtime_blocked === true)) throw capabilityFailure;
-      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || (testsRequired && !passedShell)) {
+      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === tools.readChecklist) || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== tools.readChecklist && e.data.name !== tools.submitReview) || (testsRequired && !passedShell)) {
         if (capabilityFailure && verdict.status === "Pass") throw capabilityFailure;
         agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
       }
@@ -460,7 +497,7 @@ export function bindCompletion(host: HostAccess): (agent: Agent) => void {
         // A failed native helper turn is an infrastructure failure, not evidence
         // that the user's deliverable needs more work. Let the native loop report
         // it instead of directing the Coordinator into repeated self-repair.
-        if (error instanceof CompletionHelperFailure) throw error;
+        if (error instanceof ReviewAgentFailure) throw error;
         agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
       }
     } finally {

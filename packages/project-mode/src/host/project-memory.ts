@@ -1,10 +1,15 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ProjectPaths } from "../shared/index.ts";
-import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import {
+  createDeveloperMessage,
+  createUserMessage,
+  type UserMessage,
+} from "@deepseek-ai/dsh-llm";
 import { FsVersion } from "@deepseek-ai/dsh-fs";
 import { resolve, basename } from "node:path";
 import type { HostAccess } from "./host-access.ts";
+import { observeForTurn } from "./native.ts";
 
 declare module "@deepseek-ai/dsh-llm" {
   interface MessageSourceMap {
@@ -176,7 +181,100 @@ export async function ensureContextIndex(
   );
 }
 
-/** Native admission owns the history commit; unchanged notes still reach each inference. */
+/**
+ * Refresh only our transient snapshot through native, logged surface operations.
+ * The append-origin notes remain in the audit history; the request surface keeps
+ * one current value. Empty developer replacements are native dormant nodes, not
+ * instructions, and do not interfere with the loop-owned system prompt.
+ */
+async function activeNotesSnapshots(
+  host: HostAccess,
+  agent: Agent,
+  signal: AbortSignal,
+) {
+  using observed = await observeForTurn(host.ctx, agent.id, signal);
+  return agent.session.surface.nodes.flatMap((seq) => {
+    const event = observed.events[seq];
+    return event?.type === "user/message" &&
+      event.data.source.kind === "moa-notes"
+      ? [event]
+      : [];
+  });
+}
+
+async function refreshNotesSurface(
+  host: HostAccess,
+  agent: Agent,
+  current: UserMessage,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const retained = agent.session
+    .deriveMessages()
+    .findLast(
+      (message) =>
+        message.role === "user" && message.source.kind === "moa-notes",
+    );
+  if (!retained) return false;
+  if (
+    JSON.stringify(retained.content) === JSON.stringify(current.content) &&
+    JSON.stringify(retained.source) === JSON.stringify(current.source)
+  )
+    return true;
+  const snapshots = await activeNotesSnapshots(host, agent, signal);
+  const latest = snapshots.at(-1);
+  if (!latest) return false;
+  signal.throwIfAborted();
+  agent.session.append("user/message", current, {
+    surfaceOp: { op: "replace", startSeq: latest.seq, endSeq: latest.seq },
+    sourceEventSeqs: [latest.seq],
+  });
+  return true;
+}
+
+async function retireSupersededNotes(
+  host: HostAccess,
+  agent: Agent,
+  turn: number,
+  step: number,
+  signal: AbortSignal,
+) {
+  if (
+    agent.session
+      .deriveMessages()
+      .filter(
+        (message) =>
+          message.role === "user" && message.source.kind === "moa-notes",
+      ).length < 2
+  )
+    return;
+  const snapshots = await activeNotesSnapshots(host, agent, signal);
+  signal.throwIfAborted();
+  // The current full value already exists. Only retire older copies after the
+  // native loop opens this step, as developer-message lifecycle validation requires.
+  for (const previous of snapshots.slice(0, -1)) {
+    agent.session.append(
+      "developer/message",
+      {
+        turn,
+        step,
+        message: createDeveloperMessage({
+          source: previous.data.source,
+          content: [],
+        }),
+      },
+      {
+        surfaceOp: {
+          op: "replace",
+          startSeq: previous.seq,
+          endSeq: previous.seq,
+        },
+        sourceEventSeqs: [previous.seq],
+      },
+    );
+  }
+}
+
+/** Every inference sees the full current notes without accumulating old copies. */
 export function bindProjectMemory(host: HostAccess): void {
   host.ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
     const decision = await next();
@@ -190,29 +288,47 @@ export function bindProjectMemory(host: HostAccess): void {
       control.throwIfAborted();
       host.ctx.logger.warn(`project-mode: context index: ${String(error)}`);
     }
-    if (host.record(agent.id)?.project.mode !== "enabled") return decision;
+    const messages = decision.messages.filter(
+      (message) => message.source.kind !== "moa-notes",
+    );
+    if (host.record(agent.id)?.project.mode !== "enabled") {
+      // Workers do not receive Coordinator-only live notes.
+      return { ...decision, messages };
+    }
+    let body: string;
     try {
       const notes = await readNotes(host.ctx, agent, record.project, control);
-      return {
-        ...decision,
-        messages: [
-          ...decision.messages,
-          createUserMessage({
-            source: { kind: "moa-notes", coordinatorSessionId: agent.id },
-            content: [
-              {
-                type: "text",
-                text: `Current notes.md (complete):\n${notesInjection(notes)}`,
-              },
-            ],
-          }),
-        ],
-      };
+      body = `Current notes.md (complete):\n${notesInjection(notes)}`;
     } catch (error) {
       control.throwIfAborted();
       // A denied memory read must not disable otherwise available native work.
       host.ctx.logger.warn(`project-mode: notes unavailable: ${String(error)}`);
-      return decision;
+      body =
+        "Current notes.md is unavailable. Earlier notes snapshots are historical; continue using the user's request and available evidence.";
     }
+    control.throwIfAborted();
+    const snapshot = createUserMessage({
+      source: { kind: "moa-notes", coordinatorSessionId: agent.id },
+      content: [{ type: "text", text: body }],
+    });
+    const retained = await refreshNotesSurface(host, agent, snapshot, control);
+    return {
+      ...decision,
+      messages: retained ? messages : [...messages, snapshot],
+    };
+  });
+  host.ctx.on("agent/request", async ({ agent, signal, turn, step }, next) => {
+    const config = await next();
+    const record = host.record(agent.id) ?? host.owner(agent.id);
+    if (record?.project.mode === "enabled") {
+      await retireSupersededNotes(
+        host,
+        agent,
+        turn,
+        step,
+        AbortSignal.any([signal, host.closing.signal]),
+      );
+    }
+    return config;
   });
 }

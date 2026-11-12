@@ -1,12 +1,12 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import type { TaskInput } from "./agents.ts";
+import type { WorkAssignment } from "./agents.ts";
 
 /** Restrict inherited execution tools; own communication tools remain available. */
 export function applyRoleRestrictions(
   ctx: Context,
   agent: Agent,
-  role: TaskInput["role"],
+  role: WorkAssignment["role"],
 ): () => void {
   if (role === "General-purpose") return () => {};
   const names =

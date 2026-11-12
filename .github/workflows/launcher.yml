@@ -26,6 +26,10 @@ jobs:
           tests/native-contract/worker-attachments.spec.ts
           tests/native-contract/worker-file-input.spec.tsx
           tests/host/attachment-views.spec.ts
+          tests/host/project-memory.spec.ts
+          tests/host/tool-name-migration.spec.ts
+          tests/host/completion-source-references.spec.ts
+          tests/native-contract/moa-background.spec.ts
           tests/client/worker-parent.spec.ts
           tests/host/coordinator-guidance.spec.ts
           tests/host/moa-completion.spec.ts

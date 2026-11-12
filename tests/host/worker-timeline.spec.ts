@@ -24,7 +24,7 @@ it("projects only the complete authored MoA prefix and preserves raw text and at
   };
   const prefix = `Request ID: request-1\nReply to: request-0\nFrom: ${parentId}\n`;
   const body =
-    "## Task\n\nFrom: a quoted user message\nRequest ID: keep this\n";
+    "## moa_dispatch\n\nFrom: a quoted user message\nRequest ID: keep this\n";
   const file: ContentBlock = {
     type: "file",
     attachment: {
@@ -168,7 +168,7 @@ it("removes the exact initial identity only from its accepted native birth messa
     const host = service.access as HostAccess;
     const task =
       "## Prepare report\n\nAgent ID: this quoted user text stays.\nWorkdir: keep this too.\n";
-    const [result] = await service.moa.task(
+    const [result] = await service.moa.dispatch(
       parent,
       [
         {

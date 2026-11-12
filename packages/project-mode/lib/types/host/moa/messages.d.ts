@@ -2,7 +2,7 @@ import type { HostAccess } from "../host-access.ts";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
 import { z } from "zod";
-export declare const sendMessageSchema: z.ZodObject<{
+export declare const peerMessageSchema: z.ZodObject<{
     target: z.ZodString;
     message: z.ZodString;
     mode: z.ZodDefault<z.ZodEnum<{
@@ -16,7 +16,7 @@ export declare const sendMessageSchema: z.ZodObject<{
     timeout_ms: z.ZodOptional<z.ZodNumber>;
     reply_to: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
-export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type PeerMessageInput = z.infer<typeof peerMessageSchema>;
 export type MoAMessageEnvelope = {
     rootId: string;
     senderId: string;
@@ -71,7 +71,7 @@ export declare class MoAMessageBroker {
     constructor(ports: MessagePorts);
     dispose(): void;
     recover(rootId: string, step?: RecoveryStep): Promise<void>;
-    send(actor: Agent, input: SendMessageInput, operationId: string, signal: AbortSignal): Promise<unknown>;
+    send(actor: Agent, input: PeerMessageInput, operationId: string, signal: AbortSignal): Promise<unknown>;
     private withRouteLock;
     private cycle;
     private run;

@@ -1,3 +1,4 @@
+import { moaToolNames as tools } from "../../shared/tool-names.ts";
 import { isAbsolute } from "node:path";
 
 export interface MoAIdentity {
@@ -20,5 +21,5 @@ export function workerReportingInstructions(
   notes: string,
   archived: string,
 ): string {
-  return `Use SendMessage to report results and request help when blocked. Shared context index: ${contextIndex}. Read that index before loading relevant context files. Maintain valuable reusable knowledge through ProjectContext. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
+  return `Use ${tools.message} to report results and request help when blocked. Shared context index: ${contextIndex}. Read that index before loading relevant context files. Maintain valuable reusable knowledge through ${tools.context}. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
 }
