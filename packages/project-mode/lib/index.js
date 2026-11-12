@@ -1,12 +1,12 @@
 import { SessionId, SessionSeq, appendPluginRecord, buildForkSeed, pluginRecordOf, snapshotSessionEvent } from "@deepseek-ai/dsh-session";
-import { MessageId, createUserMessage, freezeMessage } from "@deepseek-ai/dsh-llm";
+import { MessageId, createDeveloperMessage, createUserMessage, freezeMessage } from "@deepseek-ai/dsh-llm";
 import * as NativeTools from "@deepseek-ai/dsh-tools";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { SubagentError } from "@deepseek-ai/dsh-subagent";
 import { z } from "zod";
 import { defineDomain, domainTable } from "@deepseek-ai/dsh-storage-domain";
 import { FsVersion } from "@deepseek-ai/dsh-fs";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { scrubbedParentEnv } from "@deepseek-ai/dsh-subprocess";
 import { execFile } from "node:child_process";
@@ -53,7 +53,7 @@ const workerSchema = z.object({
 	deletedAt: z.number().optional(),
 	archivedByCoordinator: z.boolean().optional()
 });
-const assignmentSchema = z.object({
+const assignmentSchema$1 = z.object({
 	id,
 	operationId: id,
 	workerId: id,
@@ -186,7 +186,7 @@ const outcomeSchema = z.object({
 const recordSchema = z.object({
 	project: projectSchema,
 	workers: z.array(workerSchema),
-	assignments: z.array(assignmentSchema),
+	assignments: z.array(assignmentSchema$1),
 	completions: z.array(completionSchema),
 	deliveries: z.array(deliverySchema),
 	memberships: z.array(membershipSchema),
@@ -495,6 +495,61 @@ function requireNativeBackground(ctx, agent) {
 	}
 	return jobs;
 }
+// \0@oxc-project+runtime@0.155.0/helpers/esm/usingCtx.js
+function _usingCtx() {
+	var r = "function" == typeof SuppressedError ? SuppressedError : function(r, e) {
+		var n = Error();
+		return n.name = "SuppressedError", n.error = r, n.suppressed = e, n;
+	}, e = {}, n = [];
+	function using(r, e) {
+		if (null != e) {
+			if (Object(e) !== e) throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");
+			if (r) var o = e[Symbol.asyncDispose || Symbol["for"]("Symbol.asyncDispose")];
+			if (void 0 === o && (o = e[Symbol.dispose || Symbol["for"]("Symbol.dispose")], r)) var t = o;
+			if ("function" != typeof o) throw new TypeError("Object is not disposable.");
+			t && (o = function o() {
+				try {
+					t.call(e);
+				} catch (r) {
+					return Promise.reject(r);
+				}
+			}), n.push({
+				v: e,
+				d: o,
+				a: r
+			});
+		} else r && n.push({
+			d: e,
+			a: r
+		});
+		return e;
+	}
+	return {
+		e,
+		u: using.bind(null, !1),
+		a: using.bind(null, !0),
+		d: function d() {
+			var o, t = this.e, s = 0;
+			function next() {
+				for (; o = n.pop();) try {
+					if (!o.a && 1 === s) return s = 0, n.push(o), Promise.resolve().then(next);
+					if (o.d) {
+						var r = o.d.call(o.v);
+						if (o.a) return s |= 2, Promise.resolve(r).then(next, err);
+					} else s |= 1;
+				} catch (r) {
+					return err(r);
+				}
+				if (1 === s) return t !== e ? Promise.reject(t) : Promise.resolve();
+				if (t !== e) throw t;
+			}
+			function err(n) {
+				return t = t !== e ? new r(n, t) : n, next();
+			}
+			return next();
+		}
+	};
+}
 // src/host/project-memory.ts
 function memoryPaths(root) {
 	const context = resolve(root, "context");
@@ -592,7 +647,64 @@ async function ensureContextIndex(ctx, agent, project, signal) {
 	}).join("");
 	await fs.writeText(index, contextIndexTemplate + links, { kind: "createIfAbsent" }, signal, policy);
 }
-/** Native admission owns the history commit; unchanged notes still reach each inference. */
+/**
+* Refresh only our transient snapshot through native, logged surface operations.
+* The append-origin notes remain in the audit history; the request surface keeps
+* one current value. Empty developer replacements are native dormant nodes, not
+* instructions, and do not interfere with the loop-owned system prompt.
+*/
+async function activeNotesSnapshots(host, agent, signal) {
+	try {
+		var _usingCtx$11 = _usingCtx();
+		const observed = _usingCtx$11.u(await observeForTurn(host.ctx, agent.id, signal));
+		return agent.session.surface.nodes.flatMap((seq) => {
+			const event = observed.events[seq];
+			return event?.type === "user/message" && event.data.source.kind === "moa-notes" ? [event] : [];
+		});
+	} catch (_) {
+		_usingCtx$11.e = _;
+	} finally {
+		_usingCtx$11.d();
+	}
+}
+async function refreshNotesSurface(host, agent, current, signal) {
+	const retained = agent.session.deriveMessages().findLast((message) => message.role === "user" && message.source.kind === "moa-notes");
+	if (!retained) return false;
+	if (JSON.stringify(retained.content) === JSON.stringify(current.content) && JSON.stringify(retained.source) === JSON.stringify(current.source)) return true;
+	const latest = (await activeNotesSnapshots(host, agent, signal)).at(-1);
+	if (!latest) return false;
+	signal.throwIfAborted();
+	agent.session.append("user/message", current, {
+		surfaceOp: {
+			op: "replace",
+			startSeq: latest.seq,
+			endSeq: latest.seq
+		},
+		sourceEventSeqs: [latest.seq]
+	});
+	return true;
+}
+async function retireSupersededNotes(host, agent, turn, step, signal) {
+	if (agent.session.deriveMessages().filter((message) => message.role === "user" && message.source.kind === "moa-notes").length < 2) return;
+	const snapshots = await activeNotesSnapshots(host, agent, signal);
+	signal.throwIfAborted();
+	for (const previous of snapshots.slice(0, -1)) agent.session.append("developer/message", {
+		turn,
+		step,
+		message: createDeveloperMessage({
+			source: previous.data.source,
+			content: []
+		})
+	}, {
+		surfaceOp: {
+			op: "replace",
+			startSeq: previous.seq,
+			endSeq: previous.seq
+		},
+		sourceEventSeqs: [previous.seq]
+	});
+}
+/** Every inference sees the full current notes without accumulating old copies. */
 function bindProjectMemory(host) {
 	host.ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
 		const decision = await next();
@@ -605,27 +717,40 @@ function bindProjectMemory(host) {
 			control.throwIfAborted();
 			host.ctx.logger.warn(`project-mode: context index: ${String(error)}`);
 		}
-		if (host.record(agent.id)?.project.mode !== "enabled") return decision;
+		const messages = decision.messages.filter((message) => message.source.kind !== "moa-notes");
+		if (host.record(agent.id)?.project.mode !== "enabled") return {
+			...decision,
+			messages
+		};
+		let body;
 		try {
-			const notes = await readNotes(host.ctx, agent, record.project, control);
-			return {
-				...decision,
-				messages: [...decision.messages, createUserMessage({
-					source: {
-						kind: "moa-notes",
-						coordinatorSessionId: agent.id
-					},
-					content: [{
-						type: "text",
-						text: `Current notes.md (complete):\n${notesInjection(notes)}`
-					}]
-				})]
-			};
+			body = `Current notes.md (complete):\n${notesInjection(await readNotes(host.ctx, agent, record.project, control))}`;
 		} catch (error) {
 			control.throwIfAborted();
 			host.ctx.logger.warn(`project-mode: notes unavailable: ${String(error)}`);
-			return decision;
+			body = "Current notes.md is unavailable. Earlier notes snapshots are historical; continue using the user's request and available evidence.";
 		}
+		control.throwIfAborted();
+		const snapshot = createUserMessage({
+			source: {
+				kind: "moa-notes",
+				coordinatorSessionId: agent.id
+			},
+			content: [{
+				type: "text",
+				text: body
+			}]
+		});
+		const retained = await refreshNotesSurface(host, agent, snapshot, control);
+		return {
+			...decision,
+			messages: retained ? messages : [...messages, snapshot]
+		};
+	});
+	host.ctx.on("agent/request", async ({ agent, signal, turn, step }, next) => {
+		const config = await next();
+		if ((host.record(agent.id) ?? host.owner(agent.id))?.project.mode === "enabled") await retireSupersededNotes(host, agent, turn, step, AbortSignal.any([signal, host.closing.signal]));
+		return config;
 	});
 }
 // src/host/agent-events.ts
@@ -780,6 +905,23 @@ async function judgeInterrupt(ctx, agent, messages, context, signal) {
 		return true;
 	}
 }
+// src/shared/tool-names.ts
+/** Current model-facing MoA names. Stored native history keeps its original names. */
+const moaToolNames = {
+	dispatch: "moa_dispatch",
+	branch: "moa_branch",
+	message: "moa_message",
+	observe: "moa_observe",
+	stop: "moa_stop",
+	context: "moa_context",
+	review: "moa_review",
+	jobStatus: "moa_job_status",
+	jobStop: "moa_job_stop",
+	publishChecklist: "moa_publish_checklist",
+	readChecklist: "moa_read_checklist",
+	readDelivery: "moa_read_delivery",
+	submitReview: "moa_submit_review"
+};
 // src/host/moa/background.ts
 const backgroundHandle = (receipt) => JSON.stringify([receipt.owner, receipt.callSeq]);
 const backgroundRecordType = "plugin:moa/background-result";
@@ -999,7 +1141,7 @@ async function bindBackground(ctx, agent, config) {
 		additionalProperties: false
 	};
 	disposers.push(agent.ctx.tools.register({
-		name: "query_background_tool",
+		name: moaToolNames.jobStatus,
 		description: "Read the full repeatable result or actual native job progress. wait_timeout is seconds (maximum 300).",
 		parameters,
 		output: {
@@ -1015,7 +1157,7 @@ async function bindBackground(ctx, agent, config) {
 		}
 	}));
 	disposers.push(agent.ctx.tools.register({
-		name: "cancel_background_tool",
+		name: moaToolNames.jobStop,
 		description: "Request cancellation of an owned background tool. Stopping remains visible until actual resource exit.",
 		parameters: {
 			...parameters,
@@ -1086,7 +1228,7 @@ async function bindBackground(ctx, agent, config) {
 }
 function watchActivity(ctx, agent, activity, config) {
 	const args = activity.execution.arguments;
-	if (activity.execution.name === "SendMessage" && args?.mode === "request" || activity.execution.name === "QueryAgent" && (args?.wait === "all" || args?.wait === "selected")) return () => {};
+	if ([moaToolNames.message, "SendMessage"].includes(activity.execution.name) && args?.mode === "request" || [moaToolNames.observe, "QueryAgent"].includes(activity.execution.name) && (args?.wait === "all" || args?.wait === "selected")) return () => {};
 	const started = Date.now();
 	const abort = new AbortController();
 	const signal = AbortSignal.any([activity.execution.signal, abort.signal]);
@@ -1152,24 +1294,30 @@ function watchActivity(ctx, agent, activity, config) {
 	};
 }
 // src/host/prompts/completion.ts
-/** Helper instructions only; requirements, attachments and review state stay with the completion gate. */
-function rubricBuilderPrompt(requirementsJson) {
-	return `Independently derive task-deliverable acceptance criteria only from these original human requirements and source snapshots. Cite exact requirement/source passages as anchors. Read the requirements in chronological order: later clarifications supersede conflicting earlier instructions. sourceVersions records each explicit human source reference with its 1-based requirements position; a null position denotes a legacy snapshot captured before version tracking. sources contains the latest captured content for each path. Apply a revised source from its associated requirement while preserving unaffected earlier requirements. An instruction governing subsequent actions applies from its arrival unless the user explicitly makes it retroactive; do not turn it into a restriction on earlier actions. Preserve all other explicit deliverable, artifact, build and test requirements. Report unavailable referenced sources; never fill missing specs from an implementation. Do not infer criteria from implementation.
+/** Helper instructions only; original inputs and review state stay with the gate. */
+function buildChecklistInstructions(requirementsJson) {
+	return `Independently derive task-deliverable criteria only from the original human requirements and source snapshots below. Anchor each criterion to exact requirement/source passages; never derive standards from implementation output. Read inputs chronologically: later clarifications supersede conflicts while unaffected earlier requirements remain. sourceVersions gives each explicit reference's 1-based requirement position (null for legacy snapshots); sources gives latest captured content. Apply revisions from their associated requirement. Instructions about subsequent actions apply from arrival unless explicitly retroactive. Preserve explicit artifact, build and test requirements.
 
-You are part of a pre-end completion gate. The parent turn is still open while the Builder and Verifier run; a passing review allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Do not require this review's own completed record or the subsequent parent turn/end as already-existing task deliverables.
+This review runs before the parent turn closes. The Host enforces inbox, resource exit and actual closure. Do not require this review's completed record or the later parent turn/end to already exist as task deliverables.
 
-Do not invent a substantive assignment from input that gives no actionable goal. When no concrete deliverable was requested and no earlier unfinished concrete requirement applies, a brief acknowledgement or an appropriate clarification in the normal chat reply is a valid completed deliverable. Do not require the human to invent a further task before that response can pass. An empty sources map means no external source was explicitly referenced; it is not evidence of missing specifications. Only an explicitly referenced but unavailable source is missing. Set tests_required only from actual human or specification requirements, not from a generic expectation that every conversation needs tests.
+Without an actionable goal or earlier unfinished concrete requirement, a brief acknowledgement or ordinary chat clarification is a valid deliverable; it need not wait for a new human task. An empty sources map means no external source was explicitly referenced, not missing specifications. Only explicitly referenced unavailable inputs are missing. Do not fill those from implementation or invent generic testing requirements.
 
-Submit the completed Markdown rubric by calling submit_rubric. Set tests_required true whenever the human requirements or specs require build or test execution. Your only tool submits the rubric; no file, shell, or delegation tools are available or needed. A plain-text answer does not submit a rubric.\n${requirementsJson}`;
+Combine duplicate requirements, retain independent obligations, and add no process, record-keeping or review artifacts absent from the original request. Report unavailable input snapshots as limitations; they do not create new author deliverables.
+
+Submit the Markdown rubric through ${moaToolNames.publishChecklist}, your only tool. Set tests_required true whenever original requirements/specs require build or test execution; otherwise false. No file, shell or delegation tools are needed. Plain text does not submit a rubric.\n${requirementsJson}`;
 }
-function outcomeVerifierPrompt(rubricPath) {
+function buildDeliveryReviewInstructions(rubricPath) {
 	return `Independently verify actual deliverables against this rubric. Interpret the anchored requirements chronologically: later clarifications supersede conflicting earlier instructions, and instructions about subsequent actions apply from their arrival unless explicitly retroactive.
 
-This is a pre-end review: the parent turn is still open, and your passing verdict allows the native runtime to attempt closure. The Host enforces actual inbox, resource-exit and turn-end checks. Your own completed review record and the subsequent parent turn/end cannot already exist as evidence at this gate; do not reject task deliverables solely because those later lifecycle events have not happened.
+This is a pre-end review: the parent remains open until the Host enforces inbox, resource exit and closure. Your own completed record and the later parent turn/end cannot already exist here; do not reject deliverables for those later lifecycle events.
 
-Judge only actual requested deliverables. If there is no actionable goal and no earlier unfinished concrete requirement, an appropriate brief acknowledgement or ordinary chat clarification can pass; it does not require a further human reply, workspace exploration or shell execution. Read_rubric and read_candidate inspect the actual chat artifact. Do not infer missing specifications from an empty sources map or add requirements absent from the original human inputs. Report genuine requirement ambiguities through your verdict rather than blocking this review on a question to the human.
+Judge only requested deliverables. Without an actionable goal or unfinished concrete requirement, an appropriate acknowledgement or ordinary clarification can pass without another human reply, workspace exploration or shell execution. Do not infer missing specs from an empty sources map or add requirements. Report genuine ambiguity through your verdict instead of blocking on a question to the human.
 
-Use read_candidate to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Prefer native glob, grep and read for file and directory inspection. Use the native shell (Bash or PowerShell) only when the verification responsibility requires command execution, builds or tests, and personally perform required execution. Candidate factual claims still require evidence; claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use read_rubric to read the rubric from disk. Finish by calling submit_verdict with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
+Use ${moaToolNames.readDelivery} to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Prefer native glob, grep and read for file and directory inspection. Use the native shell (Bash or PowerShell) only when the verification responsibility requires command execution, builds or tests, and personally perform required execution. Candidate factual claims still require evidence; claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use ${moaToolNames.readChecklist} to read the rubric from disk.
+
+Choose checks that establish the requested properties and stop once those properties have evidence. Repeat a successful check only after a relevant change or for a concrete unresolved concern. A validation-script failure is not by itself an artifact defect: inspect the cause, decoded data types and actual requirement before reporting a mismatch. Distinguish a tool/environment limitation from a deliverable error; report a specific unresolved gap instead of adding tests without a purpose.
+
+Finish by calling ${moaToolNames.submitReview} with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This submits the outcome and ends this review without another model response; it does not replace inspection or required tests. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1229,7 +1377,27 @@ const boundSchema = criteriaSchema.extend({
 	taskId: z.string(),
 	turn: z.number()
 });
-function serializeInput(input) {
+/** Explicit file references; a declared delivery path is not an input specification. */
+function referencedInputPaths(body) {
+	const paths = [];
+	let previousEnd = 0, previousOutput = false;
+	for (const match of body.matchAll(/`([^`\n]+)`|\[[^\]\n]*\]\(([^)\n]+)\)|"([^"\n]+)"|(?:^|[\s（(\[，、；：。！？])((?:(?:[A-Za-z]:)?[\\/]|\.\.?[\\/])?[\p{L}\p{N}_.-]+(?:[\\/][\p{L}\p{N}_.-]+)*\.(?:md|txt|csv|tsv|jsonl?|ya?ml|pdf))(?=$|[\s，、；：。！？,.;:)\]）])/giu)) {
+		const path = match[1] ?? match[2] ?? match[3] ?? match[4];
+		if (!path || !/\.[\w]+$/.test(path) || /^[\w+.-]+:\/\//.test(path)) continue;
+		const before = body.slice(0, match.index);
+		const isDeliveryTarget = !/^\s*(?:的|之|['’]s\b)/i.test(body.slice(match.index + match[0].length)) && (/(?:交付|输出|生成|写入|写到|保存到|保存|导出)(?:为|到|至|成)?\s*$/.test(before) || /\b(?:write|save|create|deliver|output|generate|export)(?:\s+(?:the|a|an|result|report|file|artifact|json|to|in|at|as))*\s*$/i.test(before) || previousOutput && /^(?:[\s,、;；和及与&]|and\b)*$/i.test(body.slice(previousEnd, match.index)));
+		previousEnd = match.index + match[0].length;
+		previousOutput = isDeliveryTarget;
+		if (!isDeliveryTarget) paths.push(path);
+	}
+	return [...new Set(paths)];
+}
+function isMissingSource(error) {
+	if (error === null || typeof error !== "object") return false;
+	const code = Reflect.get(error, "code");
+	return code === "ENOENT" || code === "FS_NOT_FOUND";
+}
+function serializeOriginalInputs(input) {
 	const { attachments: _attachments, ...snapshot } = input;
 	return JSON.stringify(snapshot);
 }
@@ -1256,10 +1424,10 @@ function lastText(agent, from = 0) {
 	const event = agent.session.snapshotEvents().slice(from).filter((e) => e.type === "assistant/message").at(-1);
 	return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
-var CompletionHelperFailure = class extends Error {};
-function checkHelperFailure(agent, role, from = 0) {
+var ReviewAgentFailure = class extends Error {};
+function assertReviewAgentHealthy(agent, role, from = 0) {
 	const end = agent.session.snapshotEvents().slice(from).findLast((event) => event.type === "turn/end");
-	if (end?.type === "turn/end" && end.data.reason.kind === "error") throw new CompletionHelperFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
+	if (end?.type === "turn/end" && end.data.reason.kind === "error") throw new ReviewAgentFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
 }
 /** New native loops record selection before preparing a step; legacy loops use request hooks. */
 function hasNativeModelSelection(agent) {
@@ -1267,7 +1435,7 @@ function hasNativeModelSelection(agent) {
 	return typeof model === "object" && model !== null && typeof Reflect.get(model, "current") === "function" && typeof Reflect.get(model, "select") === "function";
 }
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
-function bindCompletion(host) {
+function bindDeliveryReview(host) {
 	host.ctx.systemPrompt.context({
 		name: "project-mode:task",
 		order: 655,
@@ -1280,7 +1448,7 @@ function bindCompletion(host) {
 			if (!input.success || input.data.finished) return "";
 			const bound = boundSchema.safeParse(record.operations[`${key}:${record.project.coordinatorSessionId}`]);
 			if (host.config.completionVerification !== true && (!bound.success || bound.data.taskId !== input.data.taskId)) return "";
-			return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeInput(input.data)}`;
+			return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeOriginalInputs(input.data)}`;
 		}
 	});
 	const helpers = /* @__PURE__ */ new Map();
@@ -1307,7 +1475,7 @@ function bindCompletion(host) {
 		});
 	};
 	const filesystem = (agent) => host.ctx.get("agentPresets")?.serviceFor(agent, "fs") ?? agent.ctx.get("fs");
-	const capture = async (parent, input, added, signal) => {
+	const retainTaskInputs = async (parent, input, added, signal) => {
 		const root = host.record(parent.id).project.workspacePath;
 		const fs = filesystem(parent);
 		const sources = { ...input.sources };
@@ -1318,24 +1486,44 @@ function bindCompletion(host) {
 		}));
 		const requirements = added.map(text);
 		for (const [index, body] of requirements.entries()) {
-			const paths = /* @__PURE__ */ new Set();
-			for (const match of body.matchAll(/`([^`\n]+\.[\w]+)`|\]\(([^)\n]+)\)|"([^"\n]+\.[\w]+)"|(?:^|\s)((?:\/?[\w.\-\u0080-\uffff]+\/)*[\w.\-\u0080-\uffff]+\.(?:md|txt|pdf|json|ya?ml))(?=$|\s|[.,;])/g)) {
-				const path = match[1] ?? match[2] ?? match[3] ?? match[4];
-				if (path && !/^[\w+.-]+:\/\//.test(path)) paths.add(path);
-			}
+			const paths = referencedInputPaths(body);
+			const directories = [...new Set(paths.filter((path) => /[\\/]/.test(path)).map((path) => dirname(path)))];
 			for (const token of paths) {
+				let path = token;
 				let content = null;
+				let missing = false;
 				try {
 					content = await fs.readText(await fs.resolve(token, {
 						cwd: root,
 						signal
 					}), signal);
-				} catch {
+				} catch (error) {
 					signal.throwIfAborted();
+					missing = isMissingSource(error);
 				}
-				sources[token] = content;
+				if (missing && !/[\\/]/.test(token)) {
+					const siblings = [];
+					let unresolved = false;
+					for (const directory of directories) {
+						const sibling = join(directory, token);
+						try {
+							siblings.push({
+								path: sibling,
+								content: await fs.readText(await fs.resolve(sibling, {
+									cwd: root,
+									signal
+								}), signal)
+							});
+						} catch (error) {
+							signal.throwIfAborted();
+							unresolved ||= !isMissingSource(error);
+						}
+					}
+					if (!unresolved && siblings.length === 1) ({path, content} = siblings[0]);
+				}
+				sources[path] = content;
 				sourceVersions.push({
-					path: token,
+					path,
 					requirement: input.requirements.length + index + 1,
 					content
 				});
@@ -1414,11 +1602,11 @@ function bindCompletion(host) {
 			"workflow",
 			"send_message",
 			"control_workers",
-			"Task",
-			"Fork",
-			"SendMessage",
-			"QueryAgent",
-			"KillAgent"
+			moaToolNames.dispatch,
+			moaToolNames.branch,
+			moaToolNames.message,
+			moaToolNames.observe,
+			moaToolNames.stop
 		])];
 		const inherited = parent.session.requestHeader()?.config ?? parent.options;
 		const selected = hasNativeModelSelection(parent) ? parent.model.current() : void 0;
@@ -1460,7 +1648,7 @@ function bindCompletion(host) {
 					}, { prepend: true });
 					ctx.tools.restrict({ allow: [] });
 					ctx.tools.register(defineTool({
-						name: "submit_rubric",
+						name: moaToolNames.publishChecklist,
 						description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots. This completes rubric building without reading implementation outputs.",
 						parameters: {
 							rubric: {
@@ -1481,17 +1669,17 @@ function bindCompletion(host) {
 							return "Rubric submitted.";
 						}
 					}));
-					ctx.tools.guard((exec) => exec.name === "submit_rubric" ? void 0 : "Rubric Builder cannot access execution tools or implementation outputs");
+					ctx.tools.guard((exec) => exec.name === moaToolNames.publishChecklist ? void 0 : "Rubric Builder cannot access execution tools or implementation outputs");
 				} else {
 					ctx.tools.register(defineTool({
-						name: "read_rubric",
+						name: moaToolNames.readChecklist,
 						description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.",
 						parameters: {},
 						output: output$1,
 						execute: async (_args, exec) => read(exec.signal)
 					}));
 					ctx.tools.register(defineTool({
-						name: "read_candidate",
+						name: moaToolNames.readDelivery,
 						description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.",
 						parameters: {},
 						output: output$1,
@@ -1502,7 +1690,7 @@ function bindCompletion(host) {
 						}
 					}));
 					ctx.tools.register(defineTool({
-						name: "submit_verdict",
+						name: moaToolNames.submitReview,
 						description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables. This ends the review; submission alone is not inspection or required test evidence.",
 						parameters: {
 							status: {
@@ -1549,12 +1737,12 @@ function bindCompletion(host) {
 				source: { kind: "user" },
 				content: [{
 					type: "text",
-					text: rubricBuilderPrompt(serializeInput(input))
+					text: buildChecklistInstructions(serializeOriginalInputs(input))
 				}, ...input.attachments]
 			}));
 			const build = builder.agent.whenIdle().then(async () => {
-				checkHelperFailure(builder.agent, "Rubric Builder");
-				if (!submitted) throw new Error("Rubric Builder ended without a validated submit_rubric call");
+				assertReviewAgentHealthy(builder.agent, "Rubric Builder");
+				if (!submitted) throw new Error(`Rubric Builder ended without a validated ${moaToolNames.publishChecklist} call`);
 				rubric = `# MoA acceptance rubric\n\nTask: ${input.taskId}\nGeneration: ${generation}\n\n${submitted.rubric}`;
 				await publish(signal);
 				return submitted.tests_required;
@@ -1585,7 +1773,7 @@ function bindCompletion(host) {
 		if (mounted.has(agent)) return;
 		mounted.set(agent, () => {});
 		const off = agent.ctx.tools.register(defineTool({
-			name: "set_completion_criteria",
+			name: moaToolNames.review,
 			description: host.record(agent.id) && host.config.completionVerification === "on-demand" ? "Request independent outcome verification for the current task and bind concrete completion criteria plus an exact, natural completion statement for the final answer. Use your judgment when a separate acceptance check is valuable; ordinary chat need not activate it. The Builder derives its rubric from original human requirements, not these criteria." : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
 			parameters: {
 				criteria: {
@@ -1662,7 +1850,7 @@ function bindCompletion(host) {
 			sourceVersions: [],
 			attachments: []
 		};
-		const input = await capture(agent, base, human, signal);
+		const input = await retainTaskInputs(agent, base, human, signal);
 		await host.update(agent.id, (r) => ({
 			...r,
 			operations: {
@@ -1745,7 +1933,7 @@ function bindCompletion(host) {
 				if (exec.agent !== pair.verifier.agent || !shellKind(exec.name) || control.aborted) return;
 				if (result.isError) {
 					if (result.error?.info?.code === "READ_ONLY_PATH_UNSUPPORTED") {
-						capabilityFailure ??= new CompletionHelperFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
+						capabilityFailure ??= new ReviewAgentFailure(`MoA+ Outcome Verifier cannot run ${exec.name}: ${result.error.message}`);
 						if (testsRequired) {
 							if (!capabilityJoin) {
 								capabilityJoin = pair.verifier.agent.cancelAndJoin({ kind: "parent" });
@@ -1756,7 +1944,7 @@ function bindCompletion(host) {
 							capabilitySuppressions.push(pair.verifier.agent.ctx.tools.suppress({ deny: [exec.name] }));
 							if (!capabilityNotice) {
 								capabilityNotice = true;
-								pair.verifier.agent.inject(msg("The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and read_candidate. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag."));
+								pair.verifier.agent.inject(msg(`The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and ${moaToolNames.readDelivery}. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag.`));
 							}
 						}
 					}
@@ -1772,16 +1960,16 @@ function bindCompletion(host) {
 				if (call) successfulShell.add(call.seq);
 			});
 			candidateReview = pair.freezeCandidate(answer, control);
-			pair.verifier.agent.followup(msg(outcomeVerifierPrompt(pair.rubricPath)));
+			pair.verifier.agent.followup(msg(buildDeliveryReviewInstructions(pair.rubricPath)));
 			await waitForTurn(pair.verifier.agent.whenIdle(), control);
 			if (capabilityJoin) try {
 				await waitForTurn(capabilityJoin, control);
 			} catch (error) {
 				control.throwIfAborted();
-				throw new CompletionHelperFailure(`${capabilityFailure.message}; native cleanup failed`, { cause: error });
+				throw new ReviewAgentFailure(`${capabilityFailure.message}; native cleanup failed`, { cause: error });
 			}
 			if (capabilityFailure && testsRequired) throw capabilityFailure;
-			checkHelperFailure(pair.verifier.agent, "Outcome Verifier", offset);
+			assertReviewAgentHealthy(pair.verifier.agent, "Outcome Verifier", offset);
 			await pair.read(control);
 			control.throwIfAborted();
 			const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
@@ -1806,11 +1994,11 @@ function bindCompletion(host) {
 				}
 			} catch {
 				if (capabilityFailure) throw capabilityFailure;
-				agent.steer(msg("Outcome verification did not pass. Verifier must call submit_verdict or return a valid JSON verdict object, directly or in exactly one fenced JSON block."));
+				agent.steer(msg(`Outcome verification did not pass. Verifier must call ${moaToolNames.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block.`));
 				return;
 			}
 			if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || verdict.runtime_blocked === true)) throw capabilityFailure;
-			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === "read_rubric") || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== "read_rubric" && e.data.name !== "submit_verdict") || testsRequired && !passedShell) {
+			if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === moaToolNames.readChecklist) || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== moaToolNames.readChecklist && e.data.name !== moaToolNames.submitReview) || testsRequired && !passedShell) {
 				if (capabilityFailure && verdict.status === "Pass") throw capabilityFailure;
 				agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
 			}
@@ -1821,7 +2009,7 @@ function bindCompletion(host) {
 					helpers.delete(agent);
 					retire(active);
 				}
-				if (error instanceof CompletionHelperFailure) throw error;
+				if (error instanceof ReviewAgentFailure) throw error;
 				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
 			}
 		} finally {
@@ -1869,61 +2057,6 @@ function bindCompletion(host) {
 		helpers.clear();
 	});
 	return mount;
-}
-// \0@oxc-project+runtime@0.155.0/helpers/esm/usingCtx.js
-function _usingCtx() {
-	var r = "function" == typeof SuppressedError ? SuppressedError : function(r, e) {
-		var n = Error();
-		return n.name = "SuppressedError", n.error = r, n.suppressed = e, n;
-	}, e = {}, n = [];
-	function using(r, e) {
-		if (null != e) {
-			if (Object(e) !== e) throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");
-			if (r) var o = e[Symbol.asyncDispose || Symbol["for"]("Symbol.asyncDispose")];
-			if (void 0 === o && (o = e[Symbol.dispose || Symbol["for"]("Symbol.dispose")], r)) var t = o;
-			if ("function" != typeof o) throw new TypeError("Object is not disposable.");
-			t && (o = function o() {
-				try {
-					t.call(e);
-				} catch (r) {
-					return Promise.reject(r);
-				}
-			}), n.push({
-				v: e,
-				d: o,
-				a: r
-			});
-		} else r && n.push({
-			d: e,
-			a: r
-		});
-		return e;
-	}
-	return {
-		e,
-		u: using.bind(null, !1),
-		a: using.bind(null, !0),
-		d: function d() {
-			var o, t = this.e, s = 0;
-			function next() {
-				for (; o = n.pop();) try {
-					if (!o.a && 1 === s) return s = 0, n.push(o), Promise.resolve().then(next);
-					if (o.d) {
-						var r = o.d.call(o.v);
-						if (o.a) return s |= 2, Promise.resolve(r).then(next, err);
-					} else s |= 1;
-				} catch (r) {
-					return err(r);
-				}
-				if (1 === s) return t !== e ? Promise.reject(t) : Promise.resolve();
-				if (t !== e) throw t;
-			}
-			function err(n) {
-				return t = t !== e ? new r(n, t) : n, next();
-			}
-			return next();
-		}
-	};
 }
 // src/host/moa/residency.ts
 const residentChild = Symbol.for("dsh.subagent.withResidentChild");
@@ -1981,7 +2114,7 @@ function identityMessage(identity) {
 	return `Agent ID: ${identity.id}\nWorkdir: ${identity.workdir} (${identity.isolated ? "Isolated" : "Shared"})\nReport to: ${identity.reportTo}\nReporting instructions: ${identity.reportingInstructions}`;
 }
 function workerReportingInstructions(contextIndex, notes, archived) {
-	return `Use SendMessage to report results and request help when blocked. Shared context index: ${contextIndex}. Read that index before loading relevant context files. Maintain valuable reusable knowledge through ProjectContext. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
+	return `Use ${moaToolNames.message} to report results and request help when blocked. Shared context index: ${contextIndex}. Read that index before loading relevant context files. Maintain valuable reusable knowledge through ${moaToolNames.context}. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
 }
 // src/host/moa/workspaces.ts
 const exec = promisify(execFile);
@@ -2328,7 +2461,7 @@ var MoAWorkspaceManager = class {
 };
 // src/host/moa/agents.ts
 /** Native continuation manager reserves the child and owns activation. */
-function createForkProvider(loadSeed) {
+function createHistoryBranchProvider(loadSeed) {
 	return {
 		name: "moa-fork",
 		capabilities: {
@@ -2347,7 +2480,7 @@ function createForkProvider(loadSeed) {
 	};
 }
 /** The inclusive committed watermark is selected by the caller observing the source. */
-function prepareForkSeed(events, watermark) {
+function prepareHistoryBranch(events, watermark) {
 	if (!events.some((event) => event.seq === watermark)) throw new Error("moa/fork-watermark-unavailable");
 	return buildForkSeed(events, watermark);
 }
@@ -2356,7 +2489,7 @@ var MoAAgents = class {
 	host;
 	workers;
 	waiting = /* @__PURE__ */ new Set();
-	tasks = /* @__PURE__ */ new Map();
+	dispatches = /* @__PURE__ */ new Map();
 	unregisterFork;
 	dispose() {
 		this.unregisterFork?.();
@@ -2365,7 +2498,7 @@ var MoAAgents = class {
 	constructor(host, workers) {
 		this.host = host;
 		this.workers = workers;
-		if (!host.ctx.subagents.getProvider("moa-fork")) this.unregisterFork = host.ctx.subagents.registerProvider(createForkProvider((id) => {
+		if (!host.ctx.subagents.getProvider("moa-fork")) this.unregisterFork = host.ctx.subagents.registerProvider(createHistoryBranchProvider((id) => {
 			const descriptor = this.descriptor(id);
 			return (descriptor?.forkOperation ? host.owner(id)?.operations[descriptor.forkOperation] : void 0)?.seed;
 		}));
@@ -2408,17 +2541,17 @@ var MoAAgents = class {
 			subprocess: presets?.serviceFor(agent, "subprocess") ?? agent.ctx.get("subprocess")
 		});
 	}
-	task(agent, tasks, operationId, signal, seed) {
+	dispatch(agent, tasks, operationId, signal, seed) {
 		const key = JSON.stringify([agent.id, operationId]);
-		const pending = this.tasks.get(key);
+		const pending = this.dispatches.get(key);
 		if (pending) return pending;
-		const work = this.startTasks(agent, tasks, operationId, signal, seed).finally(() => {
-			if (this.tasks.get(key) === work) this.tasks.delete(key);
+		const work = this.startAssignments(agent, tasks, operationId, signal, seed).finally(() => {
+			if (this.dispatches.get(key) === work) this.dispatches.delete(key);
 		});
-		this.tasks.set(key, work);
+		this.dispatches.set(key, work);
 		return work;
 	}
-	async startTasks(agent, tasks, operationId, signal, seed) {
+	async startAssignments(agent, tasks, operationId, signal, seed) {
 		if (!tasks.length || tasks.length > 20) throw new Error("moa/invalid-task-batch-size");
 		const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
 		if (!record || record.project.mode !== "enabled" || this.host.ctx.agents.get(agent.id) !== agent) throw new Error("moa/not-member");
@@ -2555,7 +2688,7 @@ var MoAAgents = class {
 		}
 		return results;
 	}
-	async fork(agent, sourceId, item, operationId, signal) {
+	async branch(agent, sourceId, item, operationId, signal) {
 		const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
 		if (!record || record.project.mode !== "enabled" || this.host.ctx.agents.get(agent.id) !== agent) throw new Error("moa/not-member");
 		if (sourceId !== record.project.coordinatorSessionId && !record.workers.some((w) => w.id === sourceId && w.lifecycle === "active")) throw new Error("moa/not-member");
@@ -2569,7 +2702,7 @@ var MoAAgents = class {
 			stored = {
 				sourceId,
 				watermark: last?.seq ?? null,
-				seed: last ? prepareForkSeed(observed.events, last.seq) : []
+				seed: last ? prepareHistoryBranch(observed.events, last.seq) : []
 			};
 			await this.host.update(rootId, (r) => ({
 				...r,
@@ -2590,7 +2723,7 @@ var MoAAgents = class {
 			if (receipt) return receipt;
 			throw new Error("moa/fork-seed-unavailable");
 		}
-		const [result] = await this.task(agent, [item], operationId, signal, seed);
+		const [result] = await this.dispatch(agent, [item], operationId, signal, seed);
 		return result;
 	}
 	recoveryState(record) {
@@ -2654,7 +2787,7 @@ var MoAAgents = class {
 		if (!descriptors.length) return;
 		const manager = this.workspaceManager(agent);
 		const activePreparations = /* @__PURE__ */ new Set();
-		for (const key of this.tasks.keys()) {
+		for (const key of this.dispatches.keys()) {
 			const [creator, operation] = JSON.parse(key);
 			if ((this.host.record(SessionId(creator)) ?? this.host.owner(SessionId(creator)))?.project.coordinatorSessionId === rootId) for (const id of record.operations[`moa:task:${operation}`] ?? []) activePreparations.add(id);
 		}
@@ -2668,10 +2801,10 @@ var MoAAgents = class {
 			await this.clearWorkspace(rootId, `moa:agent:${descriptor.id}`);
 		}
 	}
-	async context(agent, input, signal) {
+	async sharedContext(agent, input, signal) {
 		return accessProjectContext(this.host, agent, input, signal);
 	}
-	async kill(agent, childId, signal, options = {}) {
+	async stopWork(agent, childId, signal, options = {}) {
 		const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
 		if (!record || record.project.mode !== "enabled" || this.host.ctx.agents.get(agent.id) !== agent || !record.workers.some((w) => w.id === childId && w.lifecycle !== "deleted")) throw new Error("moa/not-member");
 		if (!(await this.host.ctx.subagents.listChildren(agent.id, signal)).some((child) => child.id === childId)) throw new Error("moa/not-direct-child");
@@ -2745,7 +2878,7 @@ var MoAAgents = class {
 			this.host.notify();
 		}
 	}
-	async query(agent, input, signal) {
+	async observe(agent, input, signal) {
 		const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
 		if (!record || record.project.mode !== "enabled" || this.host.ctx.agents.get(agent.id) !== agent) throw new Error("moa/not-member");
 		if (input.wait === "selected" && !input.ids?.length) throw new Error("moa/selection-required");
@@ -2979,7 +3112,7 @@ function repairCapsuleOwnership(record, events) {
 	return JSON.stringify(repaired) === JSON.stringify(record) ? record : repaired;
 }
 // src/host/moa/messages.ts
-const sendMessageSchema = z.object({
+const peerMessageSchema = z.object({
 	target: z.string().min(1),
 	message: z.string().min(1),
 	mode: z.enum(["notify", "request"]).default("notify"),
@@ -3276,7 +3409,7 @@ function hasCommittedAnswer(events, route) {
 	if (events.some((event) => event.type === "user/message" && isAnswer(event.data, route))) return true;
 	const seq = nativeOperationSeq(route.operationId, route.senderId);
 	const call = events.find((event) => event.type === "tool/call" && event.seq === seq);
-	if (call?.type !== "tool/call" || call.data.name !== "SendMessage") return false;
+	if (call?.type !== "tool/call" || ![moaToolNames.message, "SendMessage"].includes(call.data.name)) return false;
 	return events.some((event) => {
 		if (event.type !== "tool/result" || event.data.turn !== call.data.turn || event.data.step !== call.data.step || event.data.message.toolCallId !== call.data.callId || event.data.message.isError) return false;
 		try {
@@ -3428,16 +3561,16 @@ const output = {
 		text: value
 	}]
 };
-const querySchema = z.object({
+const observationSchema = z.object({
 	ids: z.array(z.string().min(1)).optional(),
 	wait: z.enum(["all", "selected"]).optional(),
 	timeout_ms: z.number().int().positive().optional(),
 	history_offset: z.number().int().nonnegative().optional(),
 	history_limit: z.number().int().nonnegative().optional()
 }).refine((value) => value.history_offset === void 0 === (value.history_limit === void 0), "history_offset and history_limit must be supplied together");
-function createQueryAgentTool(agents) {
+function createTeamObserver(agents) {
 	return defineTool({
-		name: "QueryAgent",
+		name: moaToolNames.observe,
 		description: "Inspect direct child status, optionally read a newest-relative history window or wait for completion, input or timeout.",
 		parameters: {
 			ids: {
@@ -3466,8 +3599,8 @@ function createQueryAgentTool(agents) {
 		output,
 		async execute(args, exec) {
 			if (!exec.agent) throw new Error("moa/agent-required");
-			const input = querySchema.parse(args);
-			return JSON.stringify(await agents.query(exec.agent, {
+			const input = observationSchema.parse(args);
+			return JSON.stringify(await agents.observe(exec.agent, {
 				ids: input.ids,
 				wait: input.wait,
 				timeoutMs: input.timeout_ms,
@@ -3479,9 +3612,9 @@ function createQueryAgentTool(agents) {
 		}
 	});
 }
-function createKillAgentTool(agents) {
+function createWorkStopper(agents) {
 	return defineTool({
-		name: "KillAgent",
+		name: moaToolNames.stop,
 		description: "Stop and join a direct child, retaining history and workspace by default. continue_with changes direction after cleanup; destroy removes it from MoA and cleans its owned isolated workspace.",
 		parameters: {
 			id: {
@@ -3506,7 +3639,7 @@ function createKillAgentTool(agents) {
 				destroy: z.boolean().optional(),
 				continue_with: z.string().min(1).optional()
 			}).parse(args);
-			return JSON.stringify(await agents.kill(exec.agent, SessionId(input.id), exec.signal, {
+			return JSON.stringify(await agents.stopWork(exec.agent, SessionId(input.id), exec.signal, {
 				destroy: input.destroy,
 				continueWith: input.continue_with,
 				operationId: toolOperationId(exec)
@@ -3514,7 +3647,7 @@ function createKillAgentTool(agents) {
 		}
 	});
 }
-const taskSchema = z.object({ tasks: z.array(z.object({
+const assignmentSchema = z.object({ tasks: z.array(z.object({
 	name: z.string().min(1),
 	task: z.string().min(1),
 	role: z.enum([
@@ -3528,9 +3661,9 @@ const taskSchema = z.object({ tasks: z.array(z.object({
 	nested: z.boolean().optional()
 })).min(1).max(20) });
 const roleDescription = "Explorer and Planner use glob, grep and read (no Bash). Deep Research uses web_search and web_fetch. General-purpose retains native execution tools for running commands, editing files, builds and tests.";
-function createTaskTool(agents) {
+function createWorkDispatcher(agents) {
 	return defineTool({
-		name: "Task",
+		name: moaToolNames.dispatch,
 		description: "Start up to 20 clean-history agents. Isolated workspaces are the default; explicitly select shared when needed.",
 		parameters: { tasks: {
 			type: "array",
@@ -3564,7 +3697,7 @@ function createTaskTool(agents) {
 					},
 					reportTo: {
 						type: "string",
-						description: "Existing MoA session ID; omit to report to the creating Agent"
+						description: "Omit to report to the creating Agent. To change recipient, use an actual existing session ID, never a role label or null."
 					},
 					nested: { type: "boolean" }
 				},
@@ -3574,13 +3707,13 @@ function createTaskTool(agents) {
 		output,
 		async execute(args, exec) {
 			if (!exec.agent) throw new Error("moa/agent-required");
-			return JSON.stringify(await agents.task(exec.agent, taskSchema.parse(args).tasks, toolOperationId(exec), exec.signal));
+			return JSON.stringify(await agents.dispatch(exec.agent, assignmentSchema.parse(args).tasks, toolOperationId(exec), exec.signal));
 		}
 	});
 }
-function createForkTool(agents) {
+function createContextBrancher(agents) {
 	return defineTool({
-		name: "Fork",
+		name: moaToolNames.branch,
 		description: "Create a new agent from a selected project member's committed conversation history with a fresh identity.",
 		parameters: {
 			source: {
@@ -3613,7 +3746,7 @@ function createForkTool(agents) {
 			},
 			reportTo: {
 				type: "string",
-				description: "Existing MoA session ID; omit to report to the creating Agent"
+				description: "Omit to report to the creating Agent. To change recipient, use an actual existing session ID, never a role label or null."
 			},
 			nested: { type: "boolean" }
 		},
@@ -3622,15 +3755,15 @@ function createForkTool(agents) {
 			if (!exec.agent) throw new Error("moa/agent-required");
 			const { source, ...item } = z.object({
 				source: z.string().min(1),
-				...taskSchema.shape.tasks.element.shape
+				...assignmentSchema.shape.tasks.element.shape
 			}).parse(args);
-			return JSON.stringify(await agents.fork(exec.agent, SessionId(source), item, toolOperationId(exec), exec.signal));
+			return JSON.stringify(await agents.branch(exec.agent, SessionId(source), item, toolOperationId(exec), exec.signal));
 		}
 	});
 }
-function createProjectContextTool(agents) {
+function createSharedContextAccess(agents) {
 	return defineTool({
-		name: "ProjectContext",
+		name: moaToolNames.context,
 		description: "Read or write a reusable project context file. For updates, read its version first and supply that version; keep index.md current.",
 		parameters: {
 			action: {
@@ -3661,13 +3794,13 @@ function createProjectContextTool(agents) {
 				content: z.string().optional(),
 				version: z.string().min(1).optional()
 			}).parse(args);
-			return JSON.stringify(await agents.context(exec.agent, input, exec.signal));
+			return JSON.stringify(await agents.sharedContext(exec.agent, input, exec.signal));
 		}
 	});
 }
-function createSendMessageTool(broker) {
+function createPeerMessenger(broker) {
 	return defineTool({
-		name: "SendMessage",
+		name: moaToolNames.message,
 		nativeOnly: true,
 		description: "Send a notification or ask another MoA agent a question. Answer an existing request with mode=notify and reply_to, not a new request. Requests wait for an explicit answer, timeout, or priority input.",
 		parameters: {
@@ -3703,7 +3836,7 @@ function createSendMessageTool(broker) {
 		output,
 		execute: async (args, exec) => {
 			if (!exec.agent) throw new Error("moa/agent-required");
-			return JSON.stringify(await broker.send(exec.agent, sendMessageSchema.parse(args), toolOperationId(exec), exec.signal));
+			return JSON.stringify(await broker.send(exec.agent, peerMessageSchema.parse(args), toolOperationId(exec), exec.signal));
 		}
 	});
 }
@@ -4973,48 +5106,50 @@ const Config = z$1.object({
 	retryMaxAttempts: z$1.number().min(0).step(1).default(5)
 });
 // src/host/prompts/coordinator.ts
-/** Common orchestration policy; identities and current facts stay in dialogue. */
-const coordinatorPrompt = `You are the MoA+ coordinator (orchestrator) for a persistent team of native DSH agents. Use their collaboration to solve the user's goal, preserve useful knowledge and deliver a result with evidence. Speak to the user in their language.
+/** Team policy; identities and current facts stay in native dialogue. */
+const coordinatorPrompt = `You are the MoA+ coordinator for a persistent team of native DSH agents. Own the user's goal and final delivery. Speak to the user in their language.
 
 Your responsibility
-You own the overall goal, task decomposition, direction, review and final delivery. Choose whether existing workers should continue, a fresh specialist should investigate, or independent approaches should run in parallel. Delegate a coherent responsibility, with a goal, constraints, context references and expected deliverables, so the worker can carry it through. Clarification, coordination, synthesis, work records and small self-contained actions are natural coordinator work. Decide ownership for the whole task; a sequence of simple steps can still be a substantial assignment. Use your judgment rather than a fixed command count or task category.
-Give each workstream a clear owner. Pass existing findings and artifact references into an assignment so the worker can advance the remaining responsibility. While it runs, advance another part of the goal. An independent review should answer an unresolved question or check a concrete risk with a fresh perspective.
+Your ordinary execution tools remain available. You can carry a complete task through investigation, implementation, testing and delivery yourself. Choose collaboration when it adds useful parallel work, an independent perspective on a concrete uncertainty, or relief from substantial detail. A worker should take responsibility off your critical path; do not first perform its full investigation and then ask it to repeat the same work. Give each workstream a clear owner, requirements, existing findings, relevant file references and an expected deliverable. While workers run, advance another useful part of the goal.
+Reuse completed results and existing checks. Follow up on specific gaps or changed artifacts; a successful check does not need another identical run unless a change or unresolved concern justifies it. An independent review should answer an unresolved question or check a concrete risk. Once the requested deliverable and its required evidence are ready, finish; do not add audits, random tests or record maintenance merely to make a completed task more elaborate.
 Match effort to the actual human goal. When there is no actionable request and no ongoing task or team needing attention, a brief acknowledgement or a short clarification in the normal chat reply is a complete response. Respond only to that input; do not add unverified claims about workspace, system or runtime state. Do not inspect the workspace, run commands, update project files or delegate merely to acknowledge or clarify that input. Reserve ask_user_question for necessary structured decisions in concrete work; ordinary chat clarification should not block a turn on a question card.
 
 Memory
-You alone maintain notes.md and archived.md. notes.md records the current stage, todos, assignments, progress, blockers and links to key artifacts. Its full content is refreshed before each coordinator inference. If it grows beyond the soft character budget, archive concluded work and its results in archived.md, and move detailed reusable background into context. Preserve the result before removing its active entry.
-You and workers maintain the shared context knowledge base. When shared knowledge is relevant to an actual task, start from context/index.md (or the supplied existing index), then read relevant files on demand. Keep valuable reusable facts, decisions and methods there. Workers contribute findings; you primarily organize, consolidate and prune outdated or duplicate material. Keep routine progress in notes.md. ProjectContext accesses the actual shared directory even when a worker has an isolated worktree; read a file's version before replacing it and resolve a concurrent edit from the latest content.
+You alone maintain notes.md and archived.md. The current full notes are supplied for each inference. Keep useful ongoing goals, assignments, blockers and artifact references there; update them when the state changes, not as a ritual before each action. Above the soft character budget, preserve concluded results in archived.md and reusable detail in context.
+You and workers maintain reusable knowledge through the shared index at context/index.md (or the supplied existing index), loading relevant files on demand. Contribute confirmed facts, decisions and methods; organize and prune stale or duplicate knowledge. ${moaToolNames.context} accesses the shared directory from isolated worktrees too. Read a file's version before replacing it and resolve concurrent edits from the latest content.
 
 Control and communication
-- QueryAgent inspects current direct-child states. When a new user message concerns an ongoing task or existing workers, check workers first: users may have changed a worker's instructions directly. Request only the human/AI history window needed, using history_offset and history_limit. To wait, set wait="all" or wait="selected" with ids, and supply timeout_ms; omitting wait makes an immediate query. An incoming next-step message interrupts the wait so you can respond.
-- Task creates clean-history workers, up to 20 in one call. Explorer and Planner have glob, grep and read, with no Bash; Deep Research has web_search and web_fetch. Choose General-purpose when the responsibility needs running commands, builds or tests, even for a read-only check. Isolated is the default workspace; choose shared deliberately when the task should modify the common working directory. A worker normally reports to its creator; reportTo can designate another team member.
-- Fork creates a new identity from a selected member's committed history. Use it when that memory is useful for a branch or an independent approach; use Task when a fresh perspective should not inherit earlier reasoning. A Fork source is not its reporting authority.
-- SendMessage reuses an existing worker, supplies context or answers a question. delivery steer reaches the next safe step; queue leaves the input for the next turn. notify returns after acceptance. request asks a new question, keeps the tool call open for its answer and requires timeout_ms. Answer an existing question with mode=notify and its explicit request ID in reply_to. An interrupted or timed-out request can receive its late answer through the inbox. Read the returned state before deciding the next action.
-- KillAgent stops a worker's current run and waits for native cleanup, preserving its conversation and workspace for later SendMessage. Use its explicit continuation option to change direction after the old run exits. Destruction/removal is a separate explicit choice; it removes the managed worker and cleans only its owned isolated workspace.
+- ${moaToolNames.observe} inspects direct children. For user input concerning ongoing work, check workers first: users may have guided them directly. Read only the needed history_offset/history_limit window. To wait, set wait="all" or wait="selected" with ids and timeout_ms; omitting wait queries immediately. Incoming next-step input interrupts waits.
+- ${moaToolNames.dispatch} creates up to 20 clean-history workers. Explorer/Planner read files; Deep Research has web tools. Choose General-purpose for running commands, builds or tests, even for read-only checks. Isolated is default; choose shared to modify the common directory. Omit reportTo to report to yourself; an explicit value must be a real existing session ID, never a role label.
+- ${moaToolNames.branch} creates a fresh identity from a member's committed history when that memory helps. Its source is not its reporting authority.
+- ${moaToolNames.message} continues an existing worker, shares findings or asks a question. delivery steer reaches the next safe step; queue leaves input for the next turn. notify returns after acceptance; request asks a new question and waits with timeout_ms. Answer an existing request with mode=notify and its request ID in reply_to, not another request. Read returned state and later inbox replies before acting.
+- ${moaToolNames.stop} stops and joins a worker, retaining history/workspace for reuse. Its continuation option changes direction after cleanup. Explicit destruction is separate and cleans only the owned isolated workspace.
 Workers have communication and shared-context access. They cannot create a further team unless nested delegation was explicitly enabled. Your ordinary native execution tools remain available; MoA controls replace the alternative native delegation tools.
 
 Working flow
-For an actionable goal that needs project work, orient from notes and the shared index, inspect workers, and dispatch or reuse workers before doing their assigned investigation yourself. Update notes with responsibilities, dependencies and next steps. Use adaptive orchestration by default: prefer SendMessage to continue with a familiar worker; then Fork when a new branch benefits from useful committed history; choose Task for a clean independent context, including a review that should not inherit earlier reasoning.
-Dispatch independent ready work in parallel within native capacity; keep work with unmet dependencies pending. As a result or incoming input arrives, update the plan and unlock downstream work whose prerequisites are now satisfied. While workers run, advance another part of the goal and respond to user input. When waiting is the useful next step, use QueryAgent's native wait instead of repeated immediate queries. On a QueryAgent timeout, consider a reasonable task duration and observed progress; a timeout alone is not failure. If work is substantially overdue or progress is unclear, use SendMessage mode=request to ask for the blocker and ETA. Use KillAgent only when evidence establishes a stuck execution or a need to stop a wrong direction, and await cleanup before revising the assignment.
+Use the supplied notes and sampled worker state to orient; investigate only what is needed to choose ownership. Prefer ${moaToolNames.message} to continue with a familiar worker; then ${moaToolNames.branch} when a new branch benefits from useful committed history; choose ${moaToolNames.dispatch} for a clean independent context when it adds value. Useful small self-contained actions can stay with you, as can a larger coherent task you can complete efficiently.
+Dispatch independent ready work in parallel within native capacity; keep work with unmet dependencies pending and unlock downstream work as evidence arrives. While workers run, advance another part of the goal and respond to user input. When waiting is useful, use ${moaToolNames.observe}'s native wait instead of repeated immediate queries. On a timeout, consider a reasonable task duration and observed progress; a timeout alone is not failure. If progress is unclear or substantially overdue, use ${moaToolNames.message} mode=request to ask for the blocker and ETA. Use ${moaToolNames.stop} to stop a stuck execution, change direction, or cancel a branch whose result is no longer needed. Await native cleanup before revising its assignment or final delivery.
 A worker's ended turn automatically returns its complete final AI message, including an empty result when none was committed; inspect its history or ask it to continue when the result is insufficient. You do not need to poll for completion.
-Review results and actual artifacts against the goal. Reuse completed results and existing checks; follow up on specific gaps. Use independent review when it benefits the task, passing requirements and evidence rather than an author's reasoning when independence matters. Combine accepted results, maintain memory and report outcomes. Relevant work and returned results must be handled before normal final delivery.
+Review actual artifacts against the goal, resolve concrete gaps, and handle relevant work and returned results before normal final delivery. For independent checks, pass requirements and evidence without anchoring the reviewer to the author's reasoning.
 
 Execution and completion
-Notify is a soft insertion; it does not cancel an active tool. Slow tools can move to native background jobs. query_background_tool reads progress or waits; cancel_background_tool cancels an owned job. AfterSeconds may return control within the same turn; a message-driven handoff ends the old turn and opens the new incoming-message turn. Real background results return automatically and can wake an idle agent.
-When independent acceptance would add value for the current task and verification is available, request it with set_completion_criteria. Make that decision from the user's goal and the remaining uncertainty, without asking the user to toggle configuration. Use concrete criteria and a natural completion statement as the exact promise; include it only when its criteria are met. Routine acknowledgements do not need a review. The independent rubric/verifier gate may return concrete gaps for rework. Preserve native permissions, approvals, Stop, queue semantics and tool-result pairing. Do not report completion merely because dispatch or cancellation was accepted. Exact workspace paths are supplied in the session's project facts.`;
+Notify is a soft insertion; it does not cancel an active tool. Slow tools can move to native background jobs. ${moaToolNames.jobStatus} reads progress or waits; ${moaToolNames.jobStop} cancels an owned job. AfterSeconds may return control within the same turn; a message-driven handoff ends the old turn and opens the new incoming-message turn. Real background results return automatically and can wake an idle agent.
+Decide whether independent acceptance adds value from the goal, existing evidence and remaining uncertainty. Request it with ${moaToolNames.review} when useful and available; the user does not need to toggle configuration. An already adequate independent check may be enough: do not routinely stack full self-checks, worker reviews and another acceptance pass. Plan useful independent checks with the responsibility instead of adding them ceremonially after all evidence is sufficient. Use concrete criteria and a short natural completion statement as the exact promise; include it only when its criteria are met. The independent rubric/verifier gate preserves original requirements and may return concrete gaps for rework. Preserve native permissions, approvals, Stop, queue semantics and tool-result pairing. Do not report completion merely because dispatch or cancellation was accepted. Exact workspace paths are supplied in the session's project facts.`;
 // src/host/prompts/worker.ts
 /** Shared worker policy; concrete identity is injected in conversation history. */
-const workerPrompt = `You are a MoA+ worker or specialist. Complete your assigned responsibility and return a result that helps your reporting agent decide the next step. Your identity declaration in the conversation states your actual ID, work directory, workspace isolation, reportTo and shared project paths. A Fork inherits another agent's history, not its identity or authority.
+const workerPrompt = `You are a MoA+ worker or specialist. Complete your assigned responsibility and return a result that helps your reporting agent decide the next step. Your identity declaration in the conversation states your actual ID, work directory, workspace isolation, reportTo and shared project paths. A ${moaToolNames.branch} inherits another agent's history, not its identity or authority.
 
-Start with the shared index of context, then load only the files relevant to the assignment. Work from the current goal, constraints and latest instructions. Users can guide your conversation directly. Your role's native tools and delegated permissions determine what you can do; a workspace or tool boundary does not grant extra authority.
+Use the current goal, constraints, latest instructions and existing findings. Read the shared index when relevant, then only the files needed for your responsibility. Reuse confirmed evidence and completed checks; investigate remaining gaps instead of repeating the owner's whole investigation. Users can guide your conversation directly. Your native tools and delegated permissions determine your authority.
 
-Carry the investigation or execution through to a useful result. SendMessage notify reports progress, shares a reusable finding or informs a teammate without blocking. For a decision or fact you need before proceeding, use request with timeout_ms: it waits within the current tool call. Reply with mode=notify and the explicit request ID in reply_to. If a wait returns early for new input or times out, read that result and the incoming messages; a later answer is delivered through the inbox. Do not invent the missing answer. A notification does not require a ceremonial acknowledgement.
+${moaToolNames.message} notify shares useful progress or findings. For a missing fact or decision, request with timeout_ms waits inside the tool call. Reply with mode=notify and the explicit request ID in reply_to. After interruption or timeout, read returned state and incoming messages; a late answer can arrive through the inbox. Do not invent it. Notifications need no ceremonial acknowledgement.
 
-Steer inserts an instruction at the next safe step; queue belongs to a later turn. A slow native tool may move to a background job to let you respond. Use query_background_tool for actual progress or a repeatable result and cancel_background_tool when the operation should be abandoned. The real result returns automatically. Respect native cancellation and approvals. Nested delegation is off unless explicitly enabled; use the tools actually available to you.
+steer reaches the next safe step; queue belongs to a later turn. Slow tools can move to background jobs: ${moaToolNames.jobStatus} reads progress/results and ${moaToolNames.jobStop} cancels unwanted work. Actual results return automatically. Respect native cancellation, approvals and tool boundaries. Nested delegation is off unless explicitly enabled.
 
-Only contribute knowledge when it is confirmed, useful to future work and allowed by the assignment's write constraints. Keep task-local derivations and checklists in the requested deliverables or final result; link existing knowledge instead of copying it. When there is no new reusable finding, finish without writing Context. For a useful contribution, use ProjectContext and update its index with a path and short description. It reaches the shared knowledge base from isolated worktrees too. Read the current version before replacing a file and reconcile concurrent edits from the latest content. The coordinator organizes, consolidates and prunes knowledge. notes.md and archived.md are its work records: read them when useful and leave their maintenance to it.
+Only contribute knowledge when it is confirmed, useful to future work and allowed by the assignment's write constraints. Keep task-local derivations in requested deliverables; link existing knowledge. When there is no new reusable finding, finish without writing Context. ${moaToolNames.context} reaches the shared directory even from isolated worktrees. Read current versions before replacing files, reconcile concurrent edits, and keep the index current. notes.md and archived.md belong to the coordinator; read them when useful and leave their maintenance to it.
 
-End with a self-contained AI message describing what you did, the result and evidence, files or artifacts, and unresolved issues. Mention reusable knowledge if you contributed any. Your complete final AI message for that turn returns automatically to reportTo; you do not need to send a duplicate copy. An empty final message is still an ended turn, so make your result useful. Report blockers or ask for decisions while working rather than presenting unfinished work as success. If you bound a completion promise with set_completion_criteria, include that exact promise only when its criteria are fulfilled.`;
+Perform the checks required for your responsibility and inspect their results. Once the deliverable meets the requirements and those checks pass, return it. Do not extend a completed assignment with repeated suites, random tests or extra audits without a specific unresolved concern or intervening change. Adapt failed commands to the actual environment and reuse known environment facts instead of repeatedly probing unavailable tools.
+
+End with a self-contained AI message: result, evidence, files/artifacts and unresolved issues. Your complete final message returns automatically to reportTo; no duplicate send is needed. Report blockers while working. Mention knowledge only if contributed. If you bound a completion promise with ${moaToolNames.review}, include it only after its criteria are fulfilled.`;
 // src/host/worker-activity.ts
 /** Read native committed messages and the native Inbox; no shadow task queue. */
 async function readWorkerActivity(host, workerId, signal, previewChars = host.config.progressTextMaxChars) {
@@ -5403,18 +5538,18 @@ let ProjectMode = (() => {
 			this.workers = new WorkerOperations(this.access);
 			this.moa = new MoAAgents(this.access, this.workers);
 			this.moaTools = [
-				createTaskTool(this.moa),
-				createForkTool(this.moa),
-				createQueryAgentTool(this.moa),
-				createKillAgentTool(this.moa)
+				createWorkDispatcher(this.moa),
+				createContextBrancher(this.moa),
+				createTeamObserver(this.moa),
+				createWorkStopper(this.moa)
 			];
-			this.contextTool = createProjectContextTool(this.moa);
+			this.contextTool = createSharedContextAccess(this.moa);
 			this.turns = new TurnCoordination(this.access);
 			this.messages = createNativeMessageBroker(this.access, (agent, messages, description, signal) => judgeInterrupt(this.ctx, agent, messages, {
 				kind: "request",
 				description
 			}, signal));
-			this.messageTool = createSendMessageTool(this.messages);
+			this.messageTool = createPeerMessenger(this.messages);
 			this.lifecycle = new ProjectLifecycle(this.access, {
 				put: (id, record) => this.domain.table("projects").put(id, record),
 				attach: (agent) => this.prepareAgent(agent),
@@ -5481,7 +5616,7 @@ let ProjectMode = (() => {
 				this.memoryBindings.get(agent)?.dispose();
 				this.memoryBindings.delete(agent);
 			});
-			if (this.config.completionVerification !== false) this.completionAttach = bindCompletion(this.access);
+			if (this.config.completionVerification !== false) this.completionAttach = bindDeliveryReview(this.access);
 			this.ctx.effect(() => async () => {
 				this.available = false;
 				this.closing.abort();
@@ -5666,7 +5801,7 @@ let ProjectMode = (() => {
 		roleText(agent) {
 			const own = this.record(agent.id);
 			if (own?.project.mode === "enabled") {
-				const completion = this.config.completionVerification === true ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery." : this.config.completionVerification === "on-demand" ? "Independent outcome verification is available on demand. Decide whether the current task benefits from a separate acceptance check. When it does, call set_completion_criteria to request verification for this task, using concrete criteria and a short, natural completion statement as the exact promise. The independently authored rubric still comes only from original human requirements and source snapshots, not your criteria or implementation. No Builder or Verifier is created unless you request verification; ordinary acknowledgements and work that does not benefit from independent review can finish directly. Once requested, complete the work and include the promise only when its criteria are met; the verifier may return evidence-backed gaps for rework. A completed task does not enable verification for the next task." : "Automatic outcome verification is not enabled in this runtime.";
+				const completion = this.config.completionVerification === true ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery." : this.config.completionVerification === "on-demand" ? `Independent acceptance is available on demand through ${moaToolNames.review}. Request it when a separate check adds value for this task. Until then, no Builder or Verifier is created. The original human requirements and source snapshots remain authoritative. Once requested, meet the criteria and include the short natural completion promise; concrete review gaps return for rework. Completion clears the binding for the next task.` : "Automatic outcome verification is not enabled in this runtime.";
 				return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({
 					...own.project.paths,
 					contextIndex: contextIndexPath(own.project.paths)
@@ -5724,7 +5859,7 @@ let ProjectMode = (() => {
 			if (this.worker(record, request.worker_id).lifecycle !== "deleted") {
 				const descriptor = this.moa.descriptor(request.worker_id);
 				const creatorId = SessionId(descriptor.creatorId);
-				const destroy = (creator) => this.moa.kill(creator, request.worker_id, signal, {
+				const destroy = (creator) => this.moa.stopWork(creator, request.worker_id, signal, {
 					destroy: true,
 					operationId
 				});

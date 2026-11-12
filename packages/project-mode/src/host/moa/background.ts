@@ -1,3 +1,4 @@
+import { moaToolNames } from "../../shared/tool-names.ts";
 import type { Context } from "@deepseek-ai/cordis";
 import { appendPluginRecord, pluginRecordOf } from "@deepseek-ai/dsh-session";
 import type { Agent, BackgroundReceipt, ToolActivityStarted } from "@deepseek-ai/dsh-agent";
@@ -190,12 +191,12 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
   }
   const parameters = { type: "object", properties: { tool_call_id: { type: "string" }, wait_timeout: { type: "number", minimum: 0 } }, required: ["tool_call_id"], additionalProperties: false };
   disposers.push(agent.ctx.tools.register({
-    name: "query_background_tool", description: "Read the full repeatable result or actual native job progress. wait_timeout is seconds (maximum 300).",
+    name: moaToolNames.jobStatus, description: "Read the full repeatable result or actual native job progress. wait_timeout is seconds (maximum 300).",
     parameters, output: { schema: { type: "object" }, render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }] },
     async execute(raw, exec) { const args = raw as { tool_call_id: string; wait_timeout?: number }; return query(args.tool_call_id, args.wait_timeout ?? 0, exec.signal); },
   }));
   disposers.push(agent.ctx.tools.register({
-    name: "cancel_background_tool", description: "Request cancellation of an owned background tool. Stopping remains visible until actual resource exit.",
+    name: moaToolNames.jobStop, description: "Request cancellation of an owned background tool. Stopping remains visible until actual resource exit.",
     parameters: { ...parameters, properties: { tool_call_id: { type: "string" } } },
     output: { schema: { type: "object" }, render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }] },
     async execute(raw) { const { tool_call_id } = raw as { tool_call_id: string }; const receipt = resolveHandle(tool_call_id); const result = jobs!.kill(receipt.jobId, agent.id, "model requested cancellation"); return { result, state: jobs!.get(receipt.jobId, agent.id) }; },
@@ -234,8 +235,8 @@ export async function bindBackground(ctx: Context, agent: Agent, config: Pick<Co
 function watchActivity(ctx: Context, agent: Agent, activity: ToolActivityStarted, config: Pick<Config, "backgroundStrategy" | "backgroundAfterSeconds">): () => void {
   // Protocol waits own their timeout, inbox interruption and final Tool Result.
   const args = activity.execution.arguments as { mode?: unknown; wait?: unknown } | undefined;
-  if ((activity.execution.name === "SendMessage" && args?.mode === "request") ||
-      (activity.execution.name === "QueryAgent" && (args?.wait === "all" || args?.wait === "selected"))) return () => {};
+  if (([moaToolNames.message, "SendMessage"].includes(activity.execution.name) && args?.mode === "request") ||
+      ([moaToolNames.observe, "QueryAgent"].includes(activity.execution.name) && (args?.wait === "all" || args?.wait === "selected"))) return () => {};
   const started = Date.now();
   const abort = new AbortController();
   const signal = AbortSignal.any([activity.execution.signal, abort.signal]);

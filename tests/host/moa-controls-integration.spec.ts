@@ -25,7 +25,7 @@ it("delivers the full result only to reportTo, waking its cold native conversati
     const host = (f.ctx.projectMode as any).access;
     const controls: MoAAgents = (f.ctx.projectMode as any).moa;
     f.adapter.handler = () => response("leader output");
-    const [leader] = await controls.task(
+    const [leader] = await controls.dispatch(
       root,
       [
         {
@@ -50,7 +50,7 @@ it("delivers the full result only to reportTo, waking its cold native conversati
             ? "leader reviewed"
             : "FULL SPECIALIST RESULT",
       );
-    const [child] = await controls.task(
+    const [child] = await controls.dispatch(
       root,
       [
         {
@@ -104,7 +104,7 @@ it("delivers the full result only to reportTo, waking its cold native conversati
   }
 });
 
-it("keeps explicit next-turn messages queued while QueryAgent waits, and interrupts for steer", async () => {
+it("keeps explicit next-turn messages queued while moa_observe waits, and interrupts for steer", async () => {
   const f = await fixture();
   const release = Promise.withResolvers<void>();
   try {
@@ -114,7 +114,7 @@ it("keeps explicit next-turn messages queued while QueryAgent waits, and interru
       return response("done");
     };
     const controls: MoAAgents = (f.ctx.projectMode as any).moa;
-    await controls.task(
+    await controls.dispatch(
       root,
       [
         {
@@ -137,7 +137,7 @@ it("keeps explicit next-turn messages queued while QueryAgent waits, and interru
     );
     let settled = false;
     const wait = controls
-      .query(root, { wait: "all", timeoutMs: 1000 }, signal())
+      .observe(root, { wait: "all", timeoutMs: 1000 }, signal())
       .then((result) => {
         settled = true;
         return result;
@@ -171,7 +171,7 @@ it("derives Idle and Zombie from native turn history and preserves Worker contro
       if (options.sessionId !== root.id) await release.promise;
       return response("done");
     };
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       root,
       [
         {
@@ -186,10 +186,10 @@ it("derives Idle and Zombie from native turn history and preserves Worker contro
     );
     const worker = f.ctx.agents.get(SessionId(receipt.workerId))!;
     expect(controls.lifecycle(worker)).toBe("Running");
-    expect(f.ctx.tools.get("SendMessage", worker)).toBeDefined();
-    expect(f.ctx.tools.get("ProjectContext", worker)).toBeDefined();
-    expect(f.ctx.tools.get("Task", worker)).toBeUndefined();
-    expect(f.ctx.tools.get("Fork", worker)).toBeUndefined();
+    expect(f.ctx.tools.get("moa_message", worker)).toBeDefined();
+    expect(f.ctx.tools.get("moa_context", worker)).toBeDefined();
+    expect(f.ctx.tools.get("moa_dispatch", worker)).toBeUndefined();
+    expect(f.ctx.tools.get("moa_branch", worker)).toBeUndefined();
     expect(f.ctx.tools.get("subagent", worker)).toBeUndefined();
     release.resolve();
     await worker.whenIdle();
@@ -200,7 +200,7 @@ it("derives Idle and Zombie from native turn history and preserves Worker contro
   }
 });
 
-it("destroys only the deleted Worker's owned isolated worktree and removes it from QueryAgent", async () => {
+it("destroys only the deleted Worker's owned isolated worktree and removes it from moa_observe", async () => {
   const f = await fixture();
   const release = Promise.withResolvers<void>();
   try {
@@ -218,7 +218,7 @@ it("destroys only the deleted Worker's owned isolated worktree and removes it fr
       return response("done");
     };
     const controls: MoAAgents = (f.ctx.projectMode as any).moa;
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       root,
       [{ name: "isolated", task: "work", role: "General-purpose" }],
       "isolated",
@@ -251,7 +251,7 @@ it("destroys only the deleted Worker's owned isolated worktree and removes it fr
     await expect(stat(workspace.directory)).rejects.toMatchObject({
       code: "ENOENT",
     });
-    expect((await controls.query(root, {}, signal())).children).toHaveLength(0);
+    expect((await controls.observe(root, {}, signal())).children).toHaveLength(0);
     expect((await stat(join(f.root, "keep.txt"))).isFile()).toBe(true);
   } finally {
     release.resolve();
@@ -330,7 +330,7 @@ it("does not report a message-driven handoff as completion and settles its origi
             : response("FULL FINAL RESULT");
     const controls: MoAAgents = (f.ctx.projectMode as any).moa;
     const host = (f.ctx.projectMode as any).access;
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       root,
       [
         {
@@ -404,7 +404,7 @@ it("shows native approval wait as Waiting, while ordinary model work remains Run
       return response("done");
     };
     const controls: MoAAgents = (f.ctx.projectMode as any).moa;
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       root,
       [
         {
@@ -439,7 +439,7 @@ it("shows native approval wait as Waiting, while ordinary model work remains Run
   }
 });
 
-it("runs KillAgent hard continuation through the model tool, waits for cleanup, and records the new turn's update capsule", async () => {
+it("runs moa_stop hard continuation through the model tool, waits for cleanup, and records the new turn's update capsule", async () => {
   const f = await fixture();
   const cleanup = Promise.withResolvers<void>();
   try {
@@ -500,7 +500,7 @@ it("runs KillAgent hard continuation through the model tool, waits for cleanup, 
       options.sessionId === root.id
         ? ++rootSteps === 1
           ? call(
-              "KillAgent",
+              "moa_stop",
               JSON.stringify({
                 id: childId,
                 continue_with: "replacement direction",
@@ -511,7 +511,7 @@ it("runs KillAgent hard continuation through the model tool, waits for cleanup, 
           ? call("held_for_kill", "{}")
           : response("replacement finished");
     const controls: MoAAgents = (f.ctx.projectMode as any).moa;
-    const [receipt] = await controls.task(
+    const [receipt] = await controls.dispatch(
       root,
       [
         {

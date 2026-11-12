@@ -1,6 +1,6 @@
 # Run MoA+ in an isolated DSH Web runtime
 
-Set up **MoA+ v0.2.7** in a separate local Web environment. Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. Its explicit manifest extends **22 native packages across 50 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
+Set up **MoA+ v0.2.8** in a separate local Web environment. Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. Its explicit manifest extends **22 native packages across 50 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
 The same release also provides an audited **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** profile. The launcher here remains pinned to rc.3; use the separate [native compatibility instructions](native-compatibility.md) to prepare Desktop Next with a full application backup.
 
@@ -9,7 +9,7 @@ The same release also provides an audited **DSH 0.2.2-rc.1 / DSH Next 2.0.22-nex
 Choose a new empty directory outside this checkout and your ordinary DSH home. Replace `/absolute/empty-moa-runtime` below and reuse the same `--dir` for setup, doctor, and start.
 
 ```sh
-git clone --branch v0.2.7 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.8 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -46,7 +46,7 @@ The default location, `~/.dsh-project-mode/rc3`, and the profile/package names r
 
 ## Give the team its first task
 
-Use a Git workspace for default isolated Workers. Give the Coordinator a complete goal and observable expected result. It can create specialists with `Task`, branch useful history with `Fork`, or continue existing Workers with `SendMessage`. To work directly in the parent's directory, choose `workspace: "shared"` explicitly. See the [Tool API](tool-api.md) for current calls.
+Use a Git workspace for default isolated Workers. Give the Coordinator a complete goal and observable expected result. It can create specialists with `moa_dispatch`, branch useful history with `moa_branch`, or continue existing Workers with `moa_message`. To work directly in the parent's directory, choose `workspace: "shared"` explicitly. See the [Tool API](tool-api.md) for current calls.
 
 The [Note Bundle starter](../examples/note-bundle) is a small task fixture with one intentionally failing feature test. Copy it to a new workspace, initialize Git if using isolated Workers, and follow its feature request.
 

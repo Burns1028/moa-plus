@@ -18,7 +18,7 @@ import {
 import type { SubagentProvider } from "@deepseek-ai/dsh-subagent";
 
 /** Native continuation manager reserves the child and owns activation. */
-export function createForkProvider(
+export function createHistoryBranchProvider(
   loadSeed: (id: SessionId) => readonly SessionEvent[] | undefined,
 ): SubagentProvider {
   return {
@@ -40,7 +40,7 @@ export function createForkProvider(
 }
 
 /** The inclusive committed watermark is selected by the caller observing the source. */
-export function prepareForkSeed(
+export function prepareHistoryBranch(
   events: readonly SessionEvent[],
   watermark: SessionSeq,
 ): SessionEvent[] {
@@ -53,7 +53,7 @@ import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { HostAccess } from "../host-access.ts";
 import type { WorkerOperations } from "../worker-operations.ts";
 
-export interface TaskInput {
+export interface WorkAssignment {
   name: string;
   task: string;
   role: "Explorer" | "Planner" | "Deep Research" | "General-purpose";
@@ -65,7 +65,7 @@ export interface AgentDescriptor {
   id: string;
   creatorId: string;
   reportTo: string;
-  role: TaskInput["role"];
+  role: WorkAssignment["role"];
   nested: boolean;
   sourceDirectory: string;
   workspaceMode: "shared" | "isolated";
@@ -73,7 +73,7 @@ export interface AgentDescriptor {
   forkOperation?: string;
   workspaceIncomplete?: boolean;
 }
-export interface QueryAgentsInput {
+export interface TeamObservation {
   ids?: string[];
   wait?: "all" | "selected";
   timeoutMs?: number;
@@ -83,9 +83,9 @@ export interface QueryAgentsInput {
 /** Views are derived from native Agents and Project membership; no agent loop is duplicated. */
 export class MoAAgents {
   private waiting = new Set<string>();
-  private tasks = new Map<
+  private dispatches = new Map<
     string,
-    Promise<Awaited<ReturnType<MoAAgents["startTasks"]>>>
+    Promise<Awaited<ReturnType<MoAAgents["startAssignments"]>>>
   >();
   private unregisterFork?: () => void;
   dispose() {
@@ -98,7 +98,7 @@ export class MoAAgents {
   ) {
     if (!host.ctx.subagents.getProvider("moa-fork"))
       this.unregisterFork = host.ctx.subagents.registerProvider(
-        createForkProvider((id) => {
+        createHistoryBranchProvider((id) => {
           const descriptor = this.descriptor(id);
           const fork = descriptor?.forkOperation
             ? (host.owner(id)?.operations[
@@ -165,31 +165,31 @@ export class MoAAgents {
       subprocess: presets?.serviceFor(agent, "subprocess") ?? agent.ctx.get("subprocess"),
     });
   }
-  task(
+  dispatch(
     agent: Agent,
-    tasks: TaskInput[],
+    tasks: WorkAssignment[],
     operationId: string,
     signal: AbortSignal,
     seed?: readonly SessionEvent[],
   ) {
     const key = JSON.stringify([agent.id, operationId]);
-    const pending = this.tasks.get(key);
+    const pending = this.dispatches.get(key);
     if (pending) return pending;
-    const work = this.startTasks(
+    const work = this.startAssignments(
       agent,
       tasks,
       operationId,
       signal,
       seed,
     ).finally(() => {
-      if (this.tasks.get(key) === work) this.tasks.delete(key);
+      if (this.dispatches.get(key) === work) this.dispatches.delete(key);
     });
-    this.tasks.set(key, work);
+    this.dispatches.set(key, work);
     return work;
   }
-  private async startTasks(
+  private async startAssignments(
     agent: Agent,
-    tasks: TaskInput[],
+    tasks: WorkAssignment[],
     operationId: string,
     signal: AbortSignal,
     seed?: readonly SessionEvent[],
@@ -382,10 +382,10 @@ export class MoAAgents {
     }
     return results;
   }
-  async fork(
+  async branch(
     agent: Agent,
     sourceId: SessionId,
-    item: TaskInput,
+    item: WorkAssignment,
     operationId: string,
     signal: AbortSignal,
   ) {
@@ -412,7 +412,7 @@ export class MoAAgents {
       stored = {
         sourceId,
         watermark: last?.seq ?? null,
-        seed: last ? prepareForkSeed(observed.events, last.seq) : [],
+        seed: last ? prepareHistoryBranch(observed.events, last.seq) : [],
       };
       await this.host.update(rootId, (r) => ({
         ...r,
@@ -430,7 +430,7 @@ export class MoAAgents {
       if (receipt) return receipt;
       throw new Error("moa/fork-seed-unavailable");
     }
-    const [result] = await this.task(agent, [item], operationId, signal, seed);
+    const [result] = await this.dispatch(agent, [item], operationId, signal, seed);
     return result;
   }
   private recoveryState(record: import("../state.ts").RecordState) {
@@ -526,7 +526,7 @@ export class MoAAgents {
     if (!descriptors.length) return;
     const manager = this.workspaceManager(agent);
     const activePreparations = new Set<string>();
-    for (const key of this.tasks.keys()) {
+    for (const key of this.dispatches.keys()) {
       const [creator, operation] = JSON.parse(key);
       const owner =
         this.host.record(SessionId(creator)) ??
@@ -562,14 +562,14 @@ export class MoAAgents {
       await this.clearWorkspace(rootId, `moa:agent:${descriptor.id}`);
     }
   }
-  async context(
+  async sharedContext(
     agent: Agent,
     input: ProjectContextInput,
     signal: AbortSignal,
   ) {
     return accessProjectContext(this.host, agent, input, signal);
   }
-  async kill(
+  async stopWork(
     agent: Agent,
     childId: SessionId,
     signal: AbortSignal,
@@ -688,7 +688,7 @@ export class MoAAgents {
       this.host.notify();
     }
   }
-  async query(agent: Agent, input: QueryAgentsInput, signal: AbortSignal) {
+  async observe(agent: Agent, input: TeamObservation, signal: AbortSignal) {
     const record = this.host.record(agent.id) ?? this.host.owner(agent.id);
     if (
       !record ||

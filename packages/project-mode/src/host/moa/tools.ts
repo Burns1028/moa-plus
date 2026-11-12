@@ -1,9 +1,10 @@
+import { moaToolNames } from "../../shared/tool-names.ts";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { z } from "zod";
 import type { MoAAgents } from "./agents.ts";
 import { toolOperationId } from "../native.ts";
-import { sendMessageSchema, type MoAMessageBroker } from "./messages.ts";
+import { peerMessageSchema, type MoAMessageBroker } from "./messages.ts";
 
 const output = {
   schema: { type: "string" as const },
@@ -11,7 +12,7 @@ const output = {
     { type: "text" as const, text: value },
   ],
 };
-const querySchema = z
+const observationSchema = z
   .object({
     ids: z.array(z.string().min(1)).optional(),
     wait: z.enum(["all", "selected"]).optional(),
@@ -25,9 +26,9 @@ const querySchema = z
       (value.history_limit === undefined),
     "history_offset and history_limit must be supplied together",
   );
-export function createQueryAgentTool(agents: MoAAgents) {
+export function createTeamObserver(agents: MoAAgents) {
   return defineTool({
-    name: "QueryAgent",
+    name: moaToolNames.observe,
     description:
       "Inspect direct child status, optionally read a newest-relative history window or wait for completion, input or timeout.",
     parameters: {
@@ -59,9 +60,9 @@ export function createQueryAgentTool(agents: MoAAgents) {
     output,
     async execute(args, exec) {
       if (!exec.agent) throw new Error("moa/agent-required");
-      const input = querySchema.parse(args);
+      const input = observationSchema.parse(args);
       return JSON.stringify(
-        await agents.query(
+        await agents.observe(
           exec.agent,
           {
             ids: input.ids,
@@ -82,9 +83,9 @@ export function createQueryAgentTool(agents: MoAAgents) {
     },
   });
 }
-export function createKillAgentTool(agents: MoAAgents) {
+export function createWorkStopper(agents: MoAAgents) {
   return defineTool({
-    name: "KillAgent",
+    name: moaToolNames.stop,
     description:
       "Stop and join a direct child, retaining history and workspace by default. continue_with changes direction after cleanup; destroy removes it from MoA and cleans its owned isolated workspace.",
     parameters: {
@@ -110,7 +111,7 @@ export function createKillAgentTool(agents: MoAAgents) {
         })
         .parse(args);
       return JSON.stringify(
-        await agents.kill(exec.agent, SessionId(input.id), exec.signal, {
+        await agents.stopWork(exec.agent, SessionId(input.id), exec.signal, {
           destroy: input.destroy,
           continueWith: input.continue_with,
           operationId: toolOperationId(exec),
@@ -120,7 +121,7 @@ export function createKillAgentTool(agents: MoAAgents) {
   });
 }
 
-const taskSchema = z.object({
+const assignmentSchema = z.object({
   tasks: z
     .array(
       z.object({
@@ -142,9 +143,9 @@ const taskSchema = z.object({
 });
 const roleDescription =
   "Explorer and Planner use glob, grep and read (no Bash). Deep Research uses web_search and web_fetch. General-purpose retains native execution tools for running commands, editing files, builds and tests.";
-export function createTaskTool(agents: MoAAgents) {
+export function createWorkDispatcher(agents: MoAAgents) {
   return defineTool({
-    name: "Task",
+    name: moaToolNames.dispatch,
     description:
       "Start up to 20 clean-history agents. Isolated workspaces are the default; explicitly select shared when needed.",
     parameters: {
@@ -166,7 +167,7 @@ export function createTaskTool(agents: MoAAgents) {
             workspace: { type: "string", enum: ["shared", "isolated"] },
             reportTo: {
               type: "string",
-              description: "Existing MoA session ID; omit to report to the creating Agent",
+              description: "Omit to report to the creating Agent. To change recipient, use an actual existing session ID, never a role label or null.",
             },
             nested: { type: "boolean" },
           },
@@ -178,9 +179,9 @@ export function createTaskTool(agents: MoAAgents) {
     async execute(args, exec) {
       if (!exec.agent) throw new Error("moa/agent-required");
       return JSON.stringify(
-        await agents.task(
+        await agents.dispatch(
           exec.agent,
-          taskSchema.parse(args).tasks,
+          assignmentSchema.parse(args).tasks,
           toolOperationId(exec),
           exec.signal,
         ),
@@ -189,9 +190,9 @@ export function createTaskTool(agents: MoAAgents) {
   });
 }
 
-export function createForkTool(agents: MoAAgents) {
+export function createContextBrancher(agents: MoAAgents) {
   return defineTool({
-    name: "Fork",
+    name: moaToolNames.branch,
     description:
       "Create a new agent from a selected project member's committed conversation history with a fresh identity.",
     parameters: {
@@ -211,7 +212,7 @@ export function createForkTool(agents: MoAAgents) {
       workspace: { type: "string", enum: ["shared", "isolated"] },
       reportTo: {
         type: "string",
-        description: "Existing MoA session ID; omit to report to the creating Agent",
+        description: "Omit to report to the creating Agent. To change recipient, use an actual existing session ID, never a role label or null.",
       },
       nested: { type: "boolean" },
     },
@@ -221,11 +222,11 @@ export function createForkTool(agents: MoAAgents) {
       const { source, ...item } = z
         .object({
           source: z.string().min(1),
-          ...taskSchema.shape.tasks.element.shape,
+          ...assignmentSchema.shape.tasks.element.shape,
         })
         .parse(args);
       return JSON.stringify(
-        await agents.fork(
+        await agents.branch(
           exec.agent,
           SessionId(source),
           item,
@@ -237,9 +238,9 @@ export function createForkTool(agents: MoAAgents) {
   });
 }
 
-export function createProjectContextTool(agents: MoAAgents) {
+export function createSharedContextAccess(agents: MoAAgents) {
   return defineTool({
-    name: "ProjectContext",
+    name: moaToolNames.context,
     description:
       "Read or write a reusable project context file. For updates, read its version first and supply that version; keep index.md current.",
     parameters: {
@@ -270,15 +271,15 @@ export function createProjectContextTool(agents: MoAAgents) {
         })
         .parse(args);
       return JSON.stringify(
-        await agents.context(exec.agent, input, exec.signal),
+        await agents.sharedContext(exec.agent, input, exec.signal),
       );
     },
   });
 }
 
-export function createSendMessageTool(broker: MoAMessageBroker) {
+export function createPeerMessenger(broker: MoAMessageBroker) {
   return defineTool({
-    name: "SendMessage",
+    name: moaToolNames.message,
     nativeOnly: true,
     description:
       "Send a notification or ask another MoA agent a question. Answer an existing request with mode=notify and reply_to, not a new request. Requests wait for an explicit answer, timeout, or priority input.",
@@ -315,7 +316,7 @@ export function createSendMessageTool(broker: MoAMessageBroker) {
       return JSON.stringify(
         await broker.send(
           exec.agent,
-          sendMessageSchema.parse(args),
+          peerMessageSchema.parse(args),
           toolOperationId(exec),
           exec.signal,
         ),

@@ -57,7 +57,7 @@ it("removes coordinator workflow delegation, preserves worker tools, and restore
       (receipt as { workerId: ReturnType<typeof SessionId> }).workerId,
     )!;
     expect(f.ctx.tools.get("workflow", worker)).toBeUndefined();
-    expect(f.ctx.tools.get("Task", worker)).toBeUndefined();
+    expect(f.ctx.tools.get("moa_dispatch", worker)).toBeUndefined();
     gate.resolve();
     await worker.whenIdle();
     await f.ctx.projectMode.snapshot(agent.id);

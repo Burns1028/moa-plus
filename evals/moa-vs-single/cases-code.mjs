@@ -5,7 +5,7 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
-async function gradeCode(project, source) {
+export async function gradeCode(project, source) {
   const script = `
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

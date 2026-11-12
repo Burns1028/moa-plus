@@ -17,7 +17,7 @@ function call(name: string, args: object = {}): StreamChunk[] {
     { type: "finish", reason: { kind: "tool-calls" } },
   ];
 }
-const rubric = () => call("submit_rubric", { rubric: "- Deliver the report in the final answer [human requirement]", tests_required: false });
+const rubric = () => call("moa_publish_checklist", { rubric: "- Deliver the report in the final answer [human requirement]", tests_required: false });
 
 it.each(["DELIVERABLE-ONLY-SECRET: the complete requested report", ""])("lets the Verifier inspect a frozen final-answer deliverable without Bash (%j)", async candidate => {
   const f = await fixture(undefined, { completionVerification: true });
@@ -32,8 +32,8 @@ it.each(["DELIVERABLE-ONLY-SECRET: the complete requested report", ""])("lets th
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) { builderInput = JSON.stringify(options.messages); return rubric(); }
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric");
-        if (verifier === 2) return call("read_candidate");
+        if (++verifier === 1) return call("moa_read_checklist");
+        if (verifier === 2) return call("moa_read_delivery");
         const result = options.messages.findLast(message => message.role === "tool");
         inspected = result?.role === "tool" && !result.isError;
         candidateResult = result?.content.filter(block => block.type === "text").map(block => block.text).join("\n");
@@ -63,8 +63,8 @@ it("gives each rework attempt its own frozen candidate and requires new inspecti
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) return rubric();
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier % 3 === 1) return call("read_rubric");
-        if (verifier % 3 === 2) return call("read_candidate");
+        if (++verifier % 3 === 1) return call("moa_read_checklist");
+        if (verifier % 3 === 2) return call("moa_read_delivery");
         const result = options.messages.findLast(message => message.role === "tool");
         if (result?.role === "tool" && !result.isError) inspected.push(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"));
         return response(JSON.stringify({ status: verifier === 3 ? "Partial" : "Pass", issues: verifier === 3 ? ["Add the conclusion"] : [] }));
@@ -97,7 +97,7 @@ it.each([false, true])("versions an explicitly revised specification while prese
       if (id.startsWith("moa-verifier-")) {
         if (first) { first = false; entered.resolve(); await release.promise; }
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
-        if (count === 1) return call("read_rubric");
+        if (count === 1) return call("moa_read_checklist");
         if (count === 2) return call("inspect_artifact");
         return response('{"status":"Pass","issues":[]}');
       }
@@ -144,8 +144,8 @@ it("retains captured specifications across file changes and excludes internal no
       if (id.startsWith("moa-verifier-")) {
         if (first) { first = false; entered.resolve(); await release.promise; }
         const count = (counts.get(id) ?? 0) + 1; counts.set(id, count);
-        if (count === 1) return call("read_rubric");
-        if (count === 2) return call("read_candidate");
+        if (count === 1) return call("moa_read_checklist");
+        if (count === 2) return call("moa_read_delivery");
         return response('{"status":"Pass","issues":[]}');
       }
       return response("candidate");
@@ -172,10 +172,10 @@ it("requires actual build or test evidence even after inspecting the candidate a
     let main = 0, verifier = 0;
     f.adapter.handler = options => {
       const id = String(options.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Run required tests [human requirement]", tests_required: true });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Run required tests [human requirement]", tests_required: true });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifier === 1) return call("read_rubric");
-        if (verifier === 2) return call("read_candidate");
+        if (++verifier === 1) return call("moa_read_checklist");
+        if (verifier === 2) return call("moa_read_delivery");
         return response('{"status":"Pass","issues":[]}');
       }
       if (++main === 2) agent.cancel({ kind: "user" });

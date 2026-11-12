@@ -54,8 +54,8 @@ export declare const assignmentSchema: z.ZodObject<{
     segmentStartSeq: z.ZodOptional<z.ZodNumber>;
     participationSeq: z.ZodOptional<z.ZodNumber>;
     participationKind: z.ZodOptional<z.ZodEnum<{
-        send: "send";
         spawn: "spawn";
+        send: "send";
     }>>;
     delivery: z.ZodEnum<{
         steer: "steer";
@@ -64,9 +64,9 @@ export declare const assignmentSchema: z.ZodObject<{
     messageId: z.ZodOptional<z.ZodString>;
     admission: z.ZodEnum<{
         unknown: "unknown";
-        rejected: "rejected";
         prepared: "prepared";
         accepted: "accepted";
+        rejected: "rejected";
     }>;
     rejection: z.ZodOptional<z.ZodObject<{
         code: z.ZodString;
@@ -134,8 +134,8 @@ export declare const membershipSchema: z.ZodObject<{
     segmentStartSeq: z.ZodOptional<z.ZodNumber>;
     participationSeq: z.ZodOptional<z.ZodNumber>;
     participationKind: z.ZodOptional<z.ZodEnum<{
-        send: "send";
         spawn: "spawn";
+        send: "send";
         result: "result";
     }>>;
     completionIds: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -150,8 +150,8 @@ export declare const outcomeSchema: z.ZodObject<{
     segmentStartSeq: z.ZodOptional<z.ZodNumber>;
     workerId: z.ZodString;
     status: z.ZodEnum<{
-        completed: "completed";
         deleted: "deleted";
+        completed: "completed";
         failed: "failed";
         stopped: "stopped";
         continued: "continued";
@@ -208,8 +208,8 @@ export declare const recordSchema: z.ZodObject<{
         segmentStartSeq: z.ZodOptional<z.ZodNumber>;
         participationSeq: z.ZodOptional<z.ZodNumber>;
         participationKind: z.ZodOptional<z.ZodEnum<{
-            send: "send";
             spawn: "spawn";
+            send: "send";
         }>>;
         delivery: z.ZodEnum<{
             steer: "steer";
@@ -218,9 +218,9 @@ export declare const recordSchema: z.ZodObject<{
         messageId: z.ZodOptional<z.ZodString>;
         admission: z.ZodEnum<{
             unknown: "unknown";
-            rejected: "rejected";
             prepared: "prepared";
             accepted: "accepted";
+            rejected: "rejected";
         }>;
         rejection: z.ZodOptional<z.ZodObject<{
             code: z.ZodString;
@@ -274,8 +274,8 @@ export declare const recordSchema: z.ZodObject<{
         segmentStartSeq: z.ZodOptional<z.ZodNumber>;
         participationSeq: z.ZodOptional<z.ZodNumber>;
         participationKind: z.ZodOptional<z.ZodEnum<{
-            send: "send";
             spawn: "spawn";
+            send: "send";
             result: "result";
         }>>;
         completionIds: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -290,8 +290,8 @@ export declare const recordSchema: z.ZodObject<{
         segmentStartSeq: z.ZodOptional<z.ZodNumber>;
         workerId: z.ZodString;
         status: z.ZodEnum<{
-            completed: "completed";
             deleted: "deleted";
+            completed: "completed";
             failed: "failed";
             stopped: "stopped";
             continued: "continued";
@@ -351,10 +351,10 @@ export declare const domainSpec: {
                 workerId: string;
                 coordinatorTurn: number;
                 delivery: "steer" | "queue";
-                admission: "unknown" | "rejected" | "prepared" | "accepted";
+                admission: "unknown" | "prepared" | "accepted" | "rejected";
                 segmentStartSeq?: number | undefined;
                 participationSeq?: number | undefined;
-                participationKind?: "send" | "spawn" | undefined;
+                participationKind?: "spawn" | "send" | undefined;
                 messageId?: string | undefined;
                 rejection?: {
                     code: string;
@@ -400,14 +400,14 @@ export declare const domainSpec: {
                 order: number;
                 segmentStartSeq?: number | undefined;
                 participationSeq?: number | undefined;
-                participationKind?: "send" | "spawn" | "result" | undefined;
+                participationKind?: "spawn" | "send" | "result" | undefined;
                 completionIds?: string[] | undefined;
             }[];
             outcomes: {
                 coordinatorSessionId: string;
                 coordinatorTurn: number;
                 workerId: string;
-                status: "completed" | "deleted" | "failed" | "stopped" | "continued";
+                status: "deleted" | "completed" | "failed" | "stopped" | "continued";
                 completionIds: string[];
                 segmentStartSeq?: number | undefined;
                 lastResultMessageId?: string | undefined;

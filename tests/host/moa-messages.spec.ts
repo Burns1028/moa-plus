@@ -3,7 +3,7 @@ import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { fixture } from "./fixture.ts";
 
-it("exposes SendMessage only to MoA participants", async () => {
+it("exposes moa_message only to MoA participants", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
@@ -15,8 +15,8 @@ it("exposes SendMessage only to MoA participants", async () => {
       meta: { cwd: f.root },
     });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
-    expect(f.ctx.tools.get("SendMessage", agent)).toBeDefined();
-    expect(f.ctx.tools.get("SendMessage", ordinary)).toBeUndefined();
+    expect(f.ctx.tools.get("moa_message", agent)).toBeDefined();
+    expect(f.ctx.tools.get("moa_message", ordinary)).toBeUndefined();
   } finally {
     await f.dispose();
   }
@@ -79,7 +79,7 @@ it.each(["native", "ptc"])("keeps a %s-composed protocol call open until its exp
     await new Promise(resolve => setTimeout(resolve, 40));
     expect(f.ctx.agents.get(SessionId(workerId))?.status).toBe("running");
     expect(workerCalls).toBe(1);
-    expect(f.adapter.requests.find(options => options.sessionId === workerId)?.tools?.map(tool => tool.name)).toContain("SendMessage");
+    expect(f.adapter.requests.find(options => options.sessionId === workerId)?.tools?.map(tool => tool.name)).toContain("moa_message");
     release.resolve();
     await f.ctx.agents.get(SessionId(workerId))!.whenIdle();
     expect(workerCalls).toBe(2);
@@ -106,7 +106,7 @@ it("wakes a cold sender for a saved but uncommitted answer once without inventin
     const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("answer-recovery-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     const host = f.ctx.projectMode as any;
-    const [worker] = await host.moa.task(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
+    const [worker] = await host.moa.dispatch(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
     const workerId = SessionId(worker.workerId);
     await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
     await root.whenIdle();
@@ -145,7 +145,7 @@ it("reclaims an answer lost after inbox claim into the next explicit wake before
     const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("claim-answer-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     const host = f.ctx.projectMode as any;
-    const [worker] = await host.moa.task(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
+    const [worker] = await host.moa.dispatch(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
     const workerId = SessionId(worker.workerId);
     await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
     await root.whenIdle();
@@ -179,7 +179,7 @@ it("reclaims an answer lost after inbox claim into the next explicit wake before
       }
       return response("recovered");
     };
-    await host.messages.send(root, sendMessageSchema.parse({ target: workerId, message: "resume explicitly" }), "resume", signal);
+    await host.messages.send(root, peerMessageSchema.parse({ target: workerId, message: "resume explicitly" }), "resume", signal);
     await expect.poll(() => calls).toBe(1);
     await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
     await broker.recover(root.id);
@@ -197,7 +197,7 @@ it("restores a saved answer through the actual Host restart path without repeati
     const { agent: root } = await f.ctx.agents.create({ sessionId: SessionId("restart-answer-root"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(root.id, true, 0, "enable");
     const host = f.ctx.projectMode as any;
-    const [worker] = await host.moa.task(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
+    const [worker] = await host.moa.dispatch(root, [{ name: "sender", task: "initial work", role: "General-purpose", workspace: "shared" }], "initial", signal);
     const workerId = SessionId(worker.workerId);
     await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
     await root.whenIdle();
@@ -221,7 +221,7 @@ it("restores a saved answer through the actual Host restart path without repeati
     await expect.poll(() => f.ctx.agents.get(workerId)).toBeUndefined();
     using observed = await f.ctx.sessionQuery.observeSession(workerId);
     expect(observed.events.filter(event => event.type === "user/message" && event.data.source.kind === "moa-message" && event.data.source.replyTo === "restart-request")).toHaveLength(1);
-    expect(observed.events.filter(event => event.type === "tool/call" && event.data.name === "SendMessage")).toHaveLength(0);
+    expect(observed.events.filter(event => event.type === "tool/call" && event.data.name === "moa_message")).toHaveLength(0);
   } finally { await f.dispose(); }
 });
 
@@ -235,13 +235,13 @@ function call(id: string, input: object): StreamChunk[] {
       type: "tool-call-delta",
       index: 0,
       id,
-      name: "SendMessage",
+      name: "moa_message",
       argumentsDelta: args,
     },
     {
       type: "block-end",
       index: 0,
-      block: { type: "tool-call", id, name: "SendMessage", arguments: args },
+      block: { type: "tool-call", id, name: "moa_message", arguments: args },
     },
     { type: "finish", reason: { kind: "tool-calls" } },
   ];
@@ -265,7 +265,9 @@ it("hands control back for human input and delivers a late reply to the native i
     f.adapter.handler = async (options) => {
       if (options.sessionId !== agent.id) {
         workerId = options.sessionId;
-        const content = JSON.stringify(options.messages);
+        const content = JSON.stringify(options.messages.filter(message =>
+          message.role === "tool" || message.source.kind === "moa-message",
+        ));
         if (content.includes("late answer")) {
           late.resolve();
           return response("read late answer");
@@ -400,7 +402,7 @@ it.each(["native", "ptc"])("keeps Request interruption in its original native tu
 
 import {
   MoAMessageBroker,
-  sendMessageSchema,
+  peerMessageSchema,
   type MessagePorts,
   type MoAMessageEnvelope,
   type RequestRoute,
@@ -451,7 +453,7 @@ it("downgrades the closing wait-cycle edge and retains late reply routing", asyn
   const signal = new AbortController().signal;
   const waiting = f.broker.send(
     a,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "b",
       message: "question",
       mode: "request",
@@ -463,7 +465,7 @@ it("downgrades the closing wait-cycle edge and retains late reply routing", asyn
   await vi.waitFor(() => expect(f.deliveries).toHaveLength(1));
   const closing = await f.broker.send(
     b,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "a",
       message: "other question",
       mode: "request",
@@ -475,7 +477,7 @@ it("downgrades the closing wait-cycle edge and retains late reply routing", asyn
   expect(closing).toMatchObject({ status: "downgraded" });
   await f.broker.send(
     b,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "a",
       message: "answer",
       reply_to: "a-request",
@@ -497,7 +499,7 @@ it("rejudges the full unread batch as it grows without consuming it", async () =
   const a = f.agent("a");
   const pending = f.broker.send(
     a,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "b",
       message: "question",
       mode: "request",
@@ -557,7 +559,7 @@ it("honors the deadline even while the judge is pending", async () => {
   );
   const result = await f.broker.send(
     a,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "b",
       message: "question",
       mode: "request",
@@ -645,7 +647,7 @@ it("reconciles a native inbox admission after a missing operation receipt", asyn
     const childId = (created as { workerId: string }).workerId;
     const host = (f.ctx.projectMode as unknown as { access: HostAccess })
       .access;
-    const input = sendMessageSchema.parse({ target: childId, message: "once" });
+    const input = peerMessageSchema.parse({ target: childId, message: "once" });
     const signal = new AbortController().signal;
     const first = createNativeMessageBroker(host, async () => false);
     const receipt = await first.send(agent, input, "stable-operation", signal);
@@ -698,7 +700,7 @@ it("reuses an admitted peer message when a later unrelated input equals its oper
     ) as { workerId: SessionId };
     const sender = f.ctx.agents.get(created.workerId)!;
     const host = (f.ctx.projectMode as unknown as { access: HostAccess }).access;
-    const input = sendMessageSchema.parse({ target: root.id, message: "deliver once" });
+    const input = peerMessageSchema.parse({ target: root.id, message: "deliver once" });
     const operationId = "stable-peer-operation";
     const signal = new AbortController().signal;
     const first = createNativeMessageBroker(host, async () => false);
@@ -738,7 +740,7 @@ it("preserves late reply routing after cancellation and broker restart", async (
   const controller = new AbortController();
   const pending = f.broker.send(
     a,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "b",
       message: "question",
       mode: "request",
@@ -772,7 +774,7 @@ it("preserves late reply routing after cancellation and broker restart", async (
   await newBroker.recover("root");
   await newBroker.send(
     b,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "a",
       message: "late",
       reply_to: "request",
@@ -798,7 +800,7 @@ it("does not treat a queued notification as a priority next-step interruption", 
   );
   const result = await f.broker.send(
     a,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "b",
       message: "question",
       mode: "request",
@@ -818,7 +820,7 @@ it("does not duplicate an explicit answer, while unknown replies remain ordinary
   const signal = new AbortController().signal;
   const pending = f.broker.send(
     a,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "b",
       message: "question",
       mode: "request",
@@ -831,7 +833,7 @@ it("does not duplicate an explicit answer, while unknown replies remain ordinary
   await Promise.all([
     f.broker.send(
       b,
-      sendMessageSchema.parse({
+      peerMessageSchema.parse({
         target: "a",
         message: "answer",
         reply_to: "request",
@@ -841,7 +843,7 @@ it("does not duplicate an explicit answer, while unknown replies remain ordinary
     ),
     f.broker.send(
       b,
-      sendMessageSchema.parse({
+      peerMessageSchema.parse({
         target: "a",
         message: "answer again",
         reply_to: "request",
@@ -854,7 +856,7 @@ it("does not duplicate an explicit answer, while unknown replies remain ordinary
   expect(f.deliveries).toHaveLength(1);
   await f.broker.send(
     b,
-    sendMessageSchema.parse({
+    peerMessageSchema.parse({
       target: "a",
       message: "unmatched",
       reply_to: "unknown",

@@ -12,7 +12,7 @@ const repository = resolve(here, '../..');
 const args = process.argv.slice(2);
 const option = (name, fallback) => { const at = args.indexOf(name); return at < 0 ? fallback : args[at + 1]; };
 const hash = value => createHash('sha256').update(value).digest('hex');
-const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'run.mjs', 'run-case.mjs', 'report.mjs'];
+const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'cases-hard.mjs', 'run.mjs', 'run-case.mjs', 'report.mjs'];
 const fingerprints = async () => Object.fromEntries(await Promise.all(sourceFiles.map(async name => [name, hash(await readFile(join(here, name)))])));
 const planPath = resolve(option('--plan', join(option('--output', '.'), 'manifest.json')));
 
@@ -28,29 +28,35 @@ async function prepare() {
   await mkdir(join(output, 'runs'));
   const repetitions = Number(option('--repetitions', 2));
   assert.ok(Number.isInteger(repetitions) && repetitions >= 1 && repetitions <= 10);
+  const suite = option('--suite', 'basic');
+  assert.ok(['basic', 'hard', 'all'].includes(suite), '--suite is basic, hard, or all');
+  const selectedCases = cases.filter(task => suite === 'all' || (task.difficulty === 'hard') === (suite === 'hard'));
+  const maxRequests = Number(option('--max-requests', 64));
+  const maxTotalTokens = Number(option('--max-total-tokens', 500000));
+  assert.ok(Number.isSafeInteger(maxRequests) && maxRequests > 0 && Number.isSafeInteger(maxTotalTokens) && maxTotalTokens > 0, 'Budgets must be positive safe integers');
   const runs = [];
   for (let repetition = 1; repetition <= repetitions; repetition++) {
     // Reverse the task order and each task's arm order on the second repetition.
-    const ordered = repetition % 2 ? cases : [...cases].reverse();
+    const ordered = repetition % 2 ? selectedCases : [...selectedCases].reverse();
     for (let index = 0; index < ordered.length; index++) {
       const task = ordered[index];
-      const arms = (cases.findIndex(item => item.id === task.id) + repetition) % 2 ? ['single', 'moa'] : ['moa', 'single'];
+      const arms = (selectedCases.findIndex(item => item.id === task.id) + repetition) % 2 ? ['single', 'moa'] : ['moa', 'single'];
       for (const arm of arms) runs.push({ id: `${String(runs.length + 1).padStart(2, '0')}-${task.id}-${repetition}-${arm}`, caseId: task.id, repetition, arm });
     }
   }
-  const manifest = { version: 1, preparedAt: new Date().toISOString(), repetitions, concurrency: 2,
+  const manifest = { version: 1, preparedAt: new Date().toISOString(), suite, repetitions, concurrency: 2,
     model: { provider: option('--provider', 'deepseek-official'), model: option('--model', 'deepseek-flash'), reasoningEffort: option('--reasoning', 'high') },
-    limits: { maxRequests: 64, maxTotalTokens: 500000 },
+    limits: { maxRequests, maxTotalTokens },
     candidate: { commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8' }).trim(),
       hostSha256: hash(await readFile(join(repository, 'packages/project-mode/lib/index.js'))),
       clientSha256: hash(await readFile(join(repository, 'packages/project-mode/lib/client.js'))),
       version: JSON.parse(await readFile(join(repository, 'package.json'), 'utf8')).version },
     sources: await fingerprints(),
-    cases: cases.map(task => ({ id: task.id, title: task.title, category: task.category, prompt: task.prompt,
+    cases: selectedCases.map(task => ({ id: task.id, title: task.title, category: task.category, difficulty: task.difficulty ?? 'basic', prompt: task.prompt,
       timeoutSeconds: task.timeoutSeconds, inputSha256: hash(JSON.stringify(task.files)) })),
     local: { repository, runtime, credentials, engine }, runs };
   await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.log(JSON.stringify({ prepared: true, plan: join(output, 'manifest.json'), cases: cases.length, runs: runs.length, modelStarted: false }));
+  console.log(JSON.stringify({ prepared: true, plan: join(output, 'manifest.json'), cases: selectedCases.length, runs: runs.length, modelStarted: false }));
 }
 
 async function dispatch(manifest, entry, bootOnly = false) {

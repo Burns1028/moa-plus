@@ -94,8 +94,8 @@ it.each([false, true])(
       expect(request).toBeDefined();
       const schemas = f.ctx.tools.schemas(agent).map((tool) => tool.name);
       const routedNames = request.tools?.map((tool) => tool.name) ?? [];
-      expect(schemas).toContain("Task");
-      expect(routedNames).toContain("Task");
+      expect(schemas).toContain("moa_dispatch");
+      expect(routedNames).toContain("moa_dispatch");
       for (const name of names) {
         expect.soft(schemas, `native schemas: ${name}`).not.toContain(name);
         expect
@@ -135,7 +135,7 @@ it.each([false, true])(
         expect(f.ctx.tools.get(name, agent), `unloaded ${name}`).toBe(
           before.get(name),
         );
-      expect(f.ctx.tools.get("Task", agent)).toBeUndefined();
+      expect(f.ctx.tools.get("moa_dispatch", agent)).toBeUndefined();
     } finally {
       release();
       await f.dispose();

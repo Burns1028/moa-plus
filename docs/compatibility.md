@@ -1,6 +1,6 @@
 # Compatibility
 
-MoA+ **v0.2.7** supplies audited profiles for **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.8** supplies audited profiles for **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next**, with **Node 24.9+**.
 Every installation needs the matching explicit native extensions from the same
 release. These are local compatibility extensions, not claims of upstream
@@ -17,7 +17,7 @@ Read [native compatibility profiles](native-compatibility.md) and the rc.2
 
 The historical **v0.2.0** tag uses its earlier **19-package / 43-path** rc.3
 manifest and does not include Worker ordinary-file uploads or attachment-aware
-query views. Do not combine v0.2.7 with that older prepared runtime.
+query views. Do not combine v0.2.8 with that older prepared runtime.
 
 The historical **v0.1.23** tag used three earlier extensions: Agent-local tool suppression, per-session steer submission, and native sidebar branches. It does not include the current Agent/background/residency runtime. Keep a plugin checkout, runtime template/lockfile, and compatibility manifest from the same revision.
 
@@ -81,7 +81,7 @@ does not implement it and retains the platform requirements above.
 
 When shell execution is optional, an independent Verifier can remove a tool that
 reports the native unsupported-protection error for the current review and
-continue through available filesystem tools or `read_candidate`. Passing still
+continue through available filesystem tools or `moa_read_delivery`. Passing still
 requires the rubric, actual inspection, and a valid independent verdict. Genuine
 deliverable gaps remain ordinary review findings. A required command, failed
 helper, or explicitly reported runtime block does not become a pass: it reports

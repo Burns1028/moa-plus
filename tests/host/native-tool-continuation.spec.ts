@@ -12,7 +12,7 @@ function toolCalls(id: string, actions: object[]): StreamChunk[] {
     ...actions.flatMap((action, index): StreamChunk[] => {
       const callId = `${id}-${index}`;
       const input = action as { action: string; name?: string; task?: string; worker_id?: string; message?: string; delivery?: string };
-      const name = input.action === "spawn" ? "Task" : "SendMessage";
+      const name = input.action === "spawn" ? "moa_dispatch" : "moa_message";
       const args = JSON.stringify(input.action === "spawn"
         ? { tasks: [{ name: input.name, task: input.task, role: "General-purpose", workspace: "shared" }] }
         : { target: input.worker_id, message: input.message, delivery: input.delivery });

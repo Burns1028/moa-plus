@@ -75,7 +75,7 @@ it.skipIf(process.platform !== "darwin")(
         return response("done");
       };
       const controls: MoAAgents = (f.ctx.projectMode as any).moa;
-      const [leader] = await controls.task(
+      const [leader] = await controls.dispatch(
         root,
         [
           {
@@ -93,7 +93,7 @@ it.skipIf(process.platform !== "darwin")(
         session: leaderAgent.session,
       });
       expect(nativePolicy.workspaceRoot).toBe(leaderAgent.session.header.cwd);
-      const [child] = await controls.task(
+      const [child] = await controls.dispatch(
         leaderAgent,
         [{ name: "nested", task: "work", role: "General-purpose" }],
         "nested",
@@ -152,7 +152,7 @@ it.skipIf(process.platform !== "darwin")(
       expect(await readFile(join(external, "tracked.txt"), "utf8")).toBe(
         "original",
       );
-      const deleting = controls.kill(
+      const deleting = controls.stopWork(
         root,
         SessionId(leader.workerId),
         new AbortController().signal,

@@ -73,7 +73,7 @@ export async function makeReport(manifestPath) {
     '|---|---:|---|---:|---|---:|---:|---:|---:|---:|---|',
     ...rows.map(row => `| ${row.title} | ${row.repetition} | ${row.arm} | ${row.grade.score} | ${row.completed ? '是' : '否'} | ${format(seconds(row))} | ${tokenLabel(row)} | ${row.modelRequestCount ?? '—'} | ${row.agents?.filter(agent => agent.kind === 'worker').length ?? 0} | ${row.agents?.filter(agent => ['builder', 'verifier'].includes(agent.kind)).length ?? 0} | ${row.stopReason ?? '—'} |`), '',
     '## 解释范围', '',
-    '- 仅使用这一模型、版本和 8 类任务；两次重复不足以判断统计显著性或所有真实任务的效果。',
+    `- 仅使用这一模型、版本和 ${manifest.cases.length} 类任务；${manifest.repetitions} 次重复不足以判断统计显著性或所有真实任务的效果。`,
     '- 并发度固定为 2，实际执行顺序在 manifest.json 中；服务负载和跨请求缓存会影响耗时及 token 缓存比例。',
     '- 总 token 上限在请求入口与 usage 返回时检查，已并行在途的请求可能超出上限；每次超额量均记录。',
     '- 任务工作区和两个 Agent 配置根目录各自独立；评分源码没有提供给模型。此安排不等同于操作系统强制禁止读取工作区之外。',

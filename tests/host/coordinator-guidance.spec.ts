@@ -59,10 +59,10 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
     let verifierStep = 0;
     f.adapter.handler = (request) => {
       const id = String(request.sessionId);
-      if (id.startsWith("moa-builder-")) return call("submit_rubric", { rubric: "- Deliver the requested report [human requirement]", tests_required: false });
+      if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver the requested report [human requirement]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
-        if (++verifierStep === 1) return call("read_rubric", {});
-        if (verifierStep === 2) return call("read_candidate", {});
+        if (++verifierStep === 1) return call("moa_read_checklist", {});
+        if (verifierStep === 2) return call("moa_read_delivery", {});
         return response('{"status":"Pass","issues":[]}');
       }
       return response("The completed report");
@@ -77,7 +77,7 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
     await agent.whenIdle();
     const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
     const facts = runtimeText(request);
-    expect(request.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
+    expect(request.tools?.map(tool => tool.name)).not.toContain("moa_submit_review");
     if (completionVerification === true) {
       expect(facts).toContain("MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots");
       expect(facts).toContain("automatically runs an independent tool-backed Outcome Verifier");
@@ -94,14 +94,14 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
     } else if (completionVerification === false) {
       expect(facts).toContain("Automatic outcome verification is not enabled in this runtime");
       expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
-      expect(request.tools?.map(tool => tool.name)).not.toContain("set_completion_criteria");
+      expect(request.tools?.map(tool => tool.name)).not.toContain("moa_review");
       expect(f.adapter.requests.some((entry) => String(entry.sessionId).startsWith("moa-"))).toBe(false);
     } else {
       expect(facts).toMatch(/on[- ]demand/i);
-      expect(facts).toContain("set_completion_criteria");
+      expect(facts).toContain("moa_review");
       expect(facts).not.toContain("Automatic outcome verification is not enabled");
       expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
-      expect(request.tools?.map(tool => tool.name)).toContain("set_completion_criteria");
+      expect(request.tools?.map(tool => tool.name)).toContain("moa_review");
       expect(verifierStep).toBe(0);
       expect(f.adapter.requests.some((entry) => String(entry.sessionId).startsWith("moa-"))).toBe(false);
     }
@@ -115,7 +115,7 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
     await agent.whenIdle();
     const worker = f.adapter.requests.find((entry) => entry.sessionId === receipt.workerId)!;
     expect(worker).toBeDefined();
-    expect(worker.tools?.map(tool => tool.name)).not.toContain("submit_verdict");
+    expect(worker.tools?.map(tool => tool.name)).not.toContain("moa_submit_review");
     const workerFacts = `${systemText(worker)}\n${runtimeText(worker)}`;
     expect(workerFacts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
     expect(workerFacts).not.toContain("Automatic outcome verification is not enabled");
@@ -181,14 +181,14 @@ it("explains role execution capabilities and explicit reply syntax in native too
     agent.followup(prompt("Assign an independent check that can run the required commands."));
     await agent.whenIdle();
     const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
-    for (const name of ["Task", "Fork"]) {
+    for (const name of ["moa_dispatch", "moa_branch"]) {
       const schema = JSON.stringify(request.tools!.find((tool) => tool.name === name));
       expect(schema).toContain("glob, grep and read");
       expect(schema).toContain("no Bash");
       expect(schema).toContain("General-purpose");
       expect(schema).toContain("running commands");
     }
-    const send = JSON.stringify(request.tools!.find((tool) => tool.name === "SendMessage"));
+    const send = JSON.stringify(request.tools!.find((tool) => tool.name === "moa_message"));
     expect(send).toContain("mode=notify");
     expect(send).toContain("reply_to");
     expect(send).toContain("not a new request");
@@ -211,14 +211,14 @@ it("assembles adaptive scheduling guidance with native wait and history contract
     const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
     const policy = `${systemText(request)}\n${runtimeText(request)}`;
     expect(policyCopies(request)).toBe(1);
-    expect(policy).toMatch(/prefer SendMessage.*familiar worker/);
-    expect(policy).toMatch(/then Fork.*useful committed history/);
-    expect(policy).toMatch(/Task.*clean independent context/);
+    expect(policy).toMatch(/prefer moa_message.*familiar worker/i);
+    expect(policy).toMatch(/then moa_branch.*useful committed history/);
+    expect(policy).toMatch(/moa_dispatch.*clean independent context/);
     expect(policy).toContain("ready work in parallel");
     expect(policy).toContain("unlock downstream");
     expect(policy).toContain("small self-contained actions");
 
-    const query = request.tools!.find((tool) => tool.name === "QueryAgent");
+    const query = request.tools!.find((tool) => tool.name === "moa_observe");
     expect(query?.parameters).toMatchObject({
       properties: {
         wait: { enum: ["all", "selected"] },
@@ -238,7 +238,12 @@ it("assembles adaptive scheduling guidance with native wait and history contract
     expect(policy).toContain("timeout alone is not failure");
     expect(policy).toMatch(/reasonable.*duration.*progress/);
     expect(policy).toMatch(/request.*blocker.*ETA/);
-    expect(policy).toMatch(/KillAgent only.*evidence/);
+    expect(policy).toContain("carry a complete task through investigation, implementation, testing and delivery yourself");
+    expect(policy).toContain("take responsibility off your critical path");
+    expect(policy).not.toContain("dispatch or reuse workers before doing their assigned investigation yourself");
+    expect(policy).toContain("already adequate independent check may be enough");
+    expect(policy).toMatch(/moa_stop.*cancel a branch whose result is no longer needed/);
+    expect(policy).toContain("Await native cleanup before revising its assignment or final delivery");
   } finally {
     await f.dispose();
   }
@@ -263,12 +268,12 @@ it("puts coordinator policy in the actual system message and removes it on plugi
     agent.followup(prompt("盘点磁盘使用情况，分类给我"));
     await agent.whenIdle();
     const first = f.adapter.requests[0];
-    expect(first.tools?.some((tool) => tool.name === "Task")).toBe(
+    expect(first.tools?.some((tool) => tool.name === "moa_dispatch")).toBe(
       true,
     );
     const system = systemText(first);
     expect(system).toContain("MoA+ coordinator");
-    expect(system).toContain("Task");
+    expect(system).toContain("moa_dispatch");
     expect(system).toContain(coordinatorPrompt);
     expect(system).toContain("shared index");
     expect(system).toContain("existing worker");

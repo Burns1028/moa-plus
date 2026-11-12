@@ -1,14 +1,14 @@
 # 自适应协调与可选编排
 
-This guide covers **MoA+ v0.2.7**. MoA+ uses **自适应协调** as its default Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
+This guide covers **MoA+ v0.2.8**. MoA+ uses **自适应协调** as its default Coordinator policy and five optional bundled prompt texts with Chinese display names, all over the existing [native collaboration tools](tool-api.md).
 
 ## 默认自适应协调
 
-The Coordinator keeps simple work direct. When delegation helps, it first considers reusing a suitable Worker's retained context with `SendMessage`, then `Fork` when committed history is useful to a new branch, then a clean `Task` when the history is irrelevant or an independent judgment matters. These choices depend on the responsibility and available context.
+The Coordinator keeps simple work direct. When delegation helps, it first considers reusing a suitable Worker's retained context with `moa_message`, then `moa_branch` when committed history is useful to a new branch, then a clean `moa_dispatch` when the history is irrelevant or an independent judgment matters. These choices depend on the responsibility and available context.
 
 When no actionable goal or unfinished concrete work exists, a brief acknowledgement or an ordinary chat clarification is a complete response. Tools, memory changes, worker checks, and structured user questions should advance an actual goal rather than become a ritual for every message. A necessary decision within a concrete task can still use the native question tool. Independent acceptance continues to judge the actual requested deliverable.
 
-The Coordinator starts independent ready branches within native capacity, keeps work with unmet dependencies pending, and updates the plan as results or questions arrive. It can advance another useful responsibility while Workers run. When waiting is the useful next step, it uses `QueryAgent` rather than repeatedly querying unchanged state. A timeout prompts a progress assessment; it is not by itself evidence that a Worker has failed. A substantially overdue or unclear run can be asked for its blocker and ETA through `SendMessage` in request mode before deciding whether it must be stopped.
+The Coordinator starts independent ready branches within native capacity, keeps work with unmet dependencies pending, and updates the plan as results or questions arrive. It can advance another useful responsibility while Workers run. When waiting is the useful next step, it uses `moa_observe` rather than repeatedly querying unchanged state. A timeout prompts a progress assessment; it is not by itself evidence that a Worker has failed. A substantially overdue or unclear run can be asked for its blocker and ETA through `moa_message` in request mode before deciding whether it must be stopped.
 
 ## Use a bundled `@` prompt
 
@@ -34,13 +34,13 @@ Selecting or expanding a pack does not create a team. It inserts instructions fo
 
 ### Independent slices and reviews
 
-并行攻坚 requires slices whose changes do not invalidate one another. Confirm this from real files and state, cover the whole responsibility without gaps, and keep mutable slice work separate. Gather actual artifacts and evidence before integrating. Give an independent verifier the integrated artifact and claims to check, without the Coordinator's reasoning or expected answer. Return concrete failures to the original Worker through `SendMessage` so it can refine its retained work.
+并行攻坚 requires slices whose changes do not invalidate one another. Confirm this from real files and state, cover the whole responsibility without gaps, and keep mutable slice work separate. Gather actual artifacts and evidence before integrating. Give an independent verifier the integrated artifact and claims to check, without the Coordinator's reasoning or expected answer. Return concrete failures to the original Worker through `moa_message` so it can refine its retained work.
 
 In 迭代精修, each fresh Critic receives only the full current artifact and fixed acceptance criteria. It returns `APPROVED` or `NEEDS_REVISION` with locatable issues. Reuse the Actor, pass issues unchanged, and create a new Critic for the next version. Ordinary objective checks remain appropriate when they settle the task without a critique cycle. After the third failed review, report the unresolved issues; a fundamental direction error or contradictory requirement ends the loop earlier.
 
 ### 多方会审 preserves real disagreement
 
-Each Panelist judges the whole decision through its own lens, using the same minimal evidence and no preferred answer from the Coordinator. Panelists do not communicate with each other. Each returns a judgment or ranking, key evidence, and the strongest counterargument to its own position. The Lead uses `SendMessage` to resolve missing information with the relevant Panelists, then returns conditional recommendations, consensus, retained disagreements, and important risks. The Lead does not choose the user's values.
+Each Panelist judges the whole decision through its own lens, using the same minimal evidence and no preferred answer from the Coordinator. Panelists do not communicate with each other. Each returns a judgment or ranking, key evidence, and the strongest counterargument to its own position. The Lead uses `moa_message` to resolve missing information with the relevant Panelists, then returns conditional recommendations, consensus, retained disagreements, and important risks. The Lead does not choose the user's values.
 
 ### 协同探索 keeps findings visible
 
@@ -56,7 +56,7 @@ Specialists read the board and peer findings, record visible `CLAIM`s before cos
 
 Patterns do not add tools or role presets. Lead, Keeper, Panelist, Specialist, Actor, and Critic are responsibilities expressed in `name` and `task`. The `role` field remains one of `Explorer`, `Planner`, `Deep Research`, or `General-purpose`. Explorer and Planner have no Bash; file writes, commands, builds, and tests require an appropriate execution role such as General-purpose, with the existing native permissions.
 
-`Task` takes a `tasks` array of up to 20 items. Put each member's own assignment in `tasks[].task`, including boundaries, accessible artifact paths, and reporting instructions. Give it only the context it needs. For a panel, first create its Lead:
+`moa_dispatch` takes a `tasks` array of up to 20 items. Put each member's own assignment in `tasks[].task`, including boundaries, accessible artifact paths, and reporting instructions. Give it only the context it needs. For a panel, first create its Lead:
 
 ```json
 {"tasks":[{"name":"Lead","task":"Host the panel and synthesize its evidence and retained disagreements; await the member roster.","role":"General-purpose","workspace":"shared"}]}
@@ -68,9 +68,9 @@ After obtaining the Lead's actual accepted Agent ID, create Panelists with that 
 {"tasks":[{"name":"Correctness Panelist","task":"Assess the entire decision through correctness; return judgment, evidence, and the strongest counterargument. Do not contact other Panelists.","role":"General-purpose","workspace":"shared","reportTo":"<actual-lead-id>"}]}
 ```
 
-Use the same ordering for a Keeper and its Specialists. A reporting target must already exist; do not invent an ID while creating all members in one batch. `reportTo` routes final results and does not change the native creator. `QueryAgent` and `KillAgent` manage the caller's direct children; sibling Lead/Panelist or Keeper/Specialist communication uses `SendMessage`. Enable `nested` only when a member must create and manage its own children.
+Use the same ordering for a Keeper and its Specialists. A reporting target must already exist; do not invent an ID while creating all members in one batch. `reportTo` routes final results and does not change the native creator. `moa_observe` and `moa_stop` manage the caller's direct children; sibling Lead/Panelist or Keeper/Specialist communication uses `moa_message`. Enable `nested` only when a member must create and manage its own children.
 
-Wait with the actual `QueryAgent` fields:
+Wait with the actual `moa_observe` fields:
 
 ```json
 {"wait":"all","timeout_ms":30000}

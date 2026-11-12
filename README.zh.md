@@ -20,7 +20,7 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-MoA+ **v0.2.7** 支持经过审查的 **DSH 0.2.1-rc.3** 与
+MoA+ **v0.2.8** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 兼容配置。rc.3 清单扩展了
 **22 个原生包、50 个文件路径**。插件与对应兼容配置必须来自同一版本，
 原版或其他版本准备的运行时不能替代。桌面准备步骤和精确支持范围见
@@ -30,12 +30,12 @@ MoA+ **v0.2.7** 支持经过审查的 **DSH 0.2.1-rc.3** 与
 
 更新后的 rc.2 Desktop Next 配置支持 Windows 受保护 Worker 使用原生非持久 PowerShell，以及已安装的 Bash。Coordinator 原子更新现有记录时，保护持续生效，进程必须由原生 Windows Job 管理。持久终端和未适配生命周期的进程提供者仍拒绝受保护调用。rc.3 配置仍需 macOS Seatbelt 或 Linux bubblewrap，尚未加入这项 Windows 扩展。支持的策略与文件范围见[后端要求][compatibility]。
 
-下方命令使用 v0.2.7 checkout。跟进开发版本时，将克隆分支改为 `main`。
+下方命令使用 v0.2.8 checkout。跟进开发版本时，将克隆分支改为 `main`。
 
 克隆项目，准备独立的 Web 运行环境：
 
 ```sh
-git clone --branch v0.2.7 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.8 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -57,15 +57,15 @@ node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 
 ### 独立执行，直接通信
 
-Coordinator 与 Workers 使用同一套原生 Agent Loop，由身份、工具与继承权限形成不同职责。`Task` 以干净上下文启动专家；`Fork` 派生选定成员已提交的历史。独立 Git worktree 隔离并行修改，也可以显式选择共享工作区，直接在父目录工作。
+Coordinator 与 Workers 使用同一套原生 Agent Loop，由身份、工具与继承权限形成不同职责。`moa_dispatch` 以干净上下文启动专家；`moa_branch` 派生选定成员已提交的历史。独立 Git worktree 隔离并行修改，也可以显式选择共享工作区，直接在父目录工作。
 
-`SendMessage` 支持通知同伴、引导工作、排队追加指令，或提出需要明确答复的阻塞问题。`QueryAgent` 查看状态与指定范围的历史，或等待进展。`KillAgent` 停止执行，并等待资源退出。慢工具可以转入后台，完成后自动回传结果。
+`moa_message` 支持通知同伴、引导工作、排队追加指令，或提出需要明确答复的阻塞问题。`moa_observe` 查看状态与指定范围的历史，或等待进展。`moa_stop` 停止执行，并等待资源退出。慢工具可以转入后台，完成后自动回传结果。
 
 Worker 每轮工作结束时，系统把**本轮最后一条完整 AI 消息**送给指定汇报对象。Coordinator 可以审阅结果、沿用这个 Worker，或调整方向。保留的会话与工作区让团队能够继续下一轮分工。
 
 ### 自适应协调与可选编排
 
-自适应指引保留简单任务直接完成的方式。需要分工时，Coordinator 优先用 `SendMessage` 复用合适的 Worker；新分支需要已有历史时用 `Fork`；需要干净上下文时用 `Task`。它在原生容量内并行派发已就绪的独立分支，结果到达后继续解锁后续工作，需要等待时使用原生 `QueryAgent` 等待。没有明确行动目标或未完成的具体工作时，简短回应或普通聊天澄清本身就是完整答复，不需要仪式化调用工具、更新记忆或阻塞等待提问。
+自适应指引保留简单任务直接完成的方式。需要分工时，Coordinator 优先用 `moa_message` 复用合适的 Worker；新分支需要已有历史时用 `moa_branch`；需要干净上下文时用 `moa_dispatch`。它在原生容量内并行派发已就绪的独立分支，结果到达后继续解锁后续工作，需要等待时使用原生 `moa_observe` 等待。没有明确行动目标或未完成的具体工作时，简短回应或普通聊天澄清本身就是完整答复，不需要仪式化调用工具、更新记忆或阻塞等待提问。
 
 已启用 MoA+ 的 Coordinator 还提供五个内置 `@` 提示：**并行攻坚**用于独立切片，**多方会审**用于争议决策，**协同探索**用于交织探索，**迭代精修**用于制品迭代审阅，**统筹推进**用于多阶段协作。输入 `@` 后，点击中文候选项或按 Enter、Tab 选择。提示会展开为可编辑的输入框文本，补充任务后照常发送。Worker 和普通会话不提供这些提示。
 
@@ -73,7 +73,7 @@ Worker 每轮工作结束时，系统把**本轮最后一条完整 AI 消息**�
 
 ### 共享知识，独立审阅
 
-Coordinator 维护 `notes.md` 和 `archived.md`，Host 在它每次推理前完整刷新 notes。Coordinator 与 Workers 通过 `context/index.md` 共同积累可复用发现，再按需读取相关文件。隔离 Worker 也能访问同一份共享知识，让后续工作沿用已经确认的发现，执行细节则留在各自的上下文中。
+Coordinator 维护 `notes.md` 和 `archived.md`，每次推理只携带一份当前完整 notes。旧快照保留为审计历史，不再累积进模型输入。Coordinator 与 Workers 通过 `context/index.md` 共同积累可复用发现，再按需读取相关文件。隔离 Worker 也能访问同一份共享知识，让后续工作沿用已经确认的发现，执行细节则留在各自的上下文中。
 
 默认由主 Agent 判断任务是否值得独立验收，需要时主动请求，不用用户手动开配置。普通对话可直接完成，不创建验收助手，也不为判断另加一次模型调用。请求后，Rubric Builder 根据原始需求制定标准，Outcome Verifier 使用原生工具检查实际产物。验收只绑定当前任务，完成后下一任务重新按需判断。完整契约见[角色与常见流程][roles]、[代码架构][architecture]和[工具 API][tools]。
 

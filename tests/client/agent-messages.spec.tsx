@@ -212,7 +212,7 @@ it.each([
     input(3, source, `${kind === "moa-message" ? "From: parent\n" : ""}### Assigned task\n\n**Keep this request visible.**`),
     event("assistant/message", 4, { turn: 1, step: 1, message: {
       id: "answer", role: "assistant", source: { kind: "model", provider: "fixture", model: "fixture" },
-      content: [{ type: "text", text: "Task completed." }],
+      content: [{ type: "text", text: "moa_dispatch completed." }],
     }, stream: [] }),
     event("step/end", 5, { turn: 1, step: 1 }), event("turn/end", 6, { turn: 1, reason: { kind: reason } }),
   ], false);

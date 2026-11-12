@@ -1,5 +1,6 @@
 import { codeCases } from './cases-code.mjs';
 import { analysisCases } from './cases-analysis.mjs';
+import { hardCases } from './cases-hard.mjs';
 
 const simpleCases = [
   {
@@ -27,5 +28,5 @@ const simpleCases = [
   },
 ];
 
-export const cases = [...simpleCases, ...codeCases, ...analysisCases];
+export const cases = [...simpleCases, ...codeCases, ...analysisCases, ...hardCases];
 if (new Set(cases.map(item => item.id)).size !== cases.length) throw new Error('Duplicate evaluation case id');

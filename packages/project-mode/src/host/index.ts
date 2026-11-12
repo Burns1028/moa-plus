@@ -1,15 +1,15 @@
 import { bindAgentEvents } from "./agent-events.ts";
 import { judgeInterrupt } from "./moa/judge.ts";
 import { bindBackground } from "./moa/background.ts";
-import { bindCompletion } from "./moa/completion.ts";
+import { bindDeliveryReview } from "./moa/completion.ts";
 import { MoAAgents, type AgentDescriptor } from "./moa/agents.ts";
 import {
-  createTaskTool,
-  createForkTool,
-  createQueryAgentTool,
-  createKillAgentTool,
-  createProjectContextTool,
-  createSendMessageTool,
+  createWorkDispatcher,
+  createContextBrancher,
+  createTeamObserver,
+  createWorkStopper,
+  createSharedContextAccess,
+  createPeerMessenger,
 } from "./moa/tools.ts";
 import { applyRoleRestrictions } from "./moa/roles.ts";
 import { bindWorkerMemoryPolicy, type WorkerMemoryPolicyBinding } from "./moa/worker-memory-policy.ts";
@@ -49,6 +49,7 @@ import type {} from "@deepseek-ai/dsh-api-remote-access";
 import type {} from "@deepseek-ai/dsh-working-directory";
 import type {} from "@deepseek-ai/dsh-sandbox-policy";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import { moaToolNames } from "../shared/tool-names.ts";
 import { randomUUID } from "node:crypto";
 import { Config } from "./config.ts";
 import { coordinatorPrompt } from "./prompts/coordinator.ts";
@@ -131,9 +132,9 @@ export default class ProjectMode extends TypertRemoteService {
   private messages!: MoAMessageBroker;
   private moa!: MoAAgents;
   private moaTools!: ReturnType<typeof defineTool>[];
-  private contextTool!: ReturnType<typeof createProjectContextTool>;
+  private contextTool!: ReturnType<typeof createSharedContextAccess>;
   private completionAttach?: (agent: Agent) => void;
-  private messageTool!: ReturnType<typeof createSendMessageTool>;
+  private messageTool!: ReturnType<typeof createPeerMessenger>;
   private lifecycle!: ProjectLifecycle;
   private get access(): HostAccess {
     return {
@@ -201,12 +202,12 @@ export default class ProjectMode extends TypertRemoteService {
     this.workers = new WorkerOperations(this.access);
     this.moa = new MoAAgents(this.access, this.workers);
     this.moaTools = [
-      createTaskTool(this.moa),
-      createForkTool(this.moa),
-      createQueryAgentTool(this.moa),
-      createKillAgentTool(this.moa),
+      createWorkDispatcher(this.moa),
+      createContextBrancher(this.moa),
+      createTeamObserver(this.moa),
+      createWorkStopper(this.moa),
     ];
-    this.contextTool = createProjectContextTool(this.moa);
+    this.contextTool = createSharedContextAccess(this.moa);
     this.turns = new TurnCoordination(this.access);
     this.messages = createNativeMessageBroker(
       this.access,
@@ -219,7 +220,7 @@ export default class ProjectMode extends TypertRemoteService {
           signal,
         ),
     );
-    this.messageTool = createSendMessageTool(this.messages);
+    this.messageTool = createPeerMessenger(this.messages);
     this.lifecycle = new ProjectLifecycle(this.access, {
       put: (id, record) => this.domain.table("projects").put(id, record),
       attach: (agent) => this.prepareAgent(agent),
@@ -323,7 +324,7 @@ export default class ProjectMode extends TypertRemoteService {
       this.memoryBindings.delete(agent);
       return undefined;
     });
-    if (this.config.completionVerification !== false) this.completionAttach = bindCompletion(this.access);
+    if (this.config.completionVerification !== false) this.completionAttach = bindDeliveryReview(this.access);
     this.ctx.effect(
       () => async () => {
         this.available = false;
@@ -558,7 +559,7 @@ export default class ProjectMode extends TypertRemoteService {
       const completion = this.config.completionVerification === true
         ? "MoA+ prepares the project's host-managed rubrics.md from human requirements and explicitly referenced specification snapshots. Before normal completion of your human-assigned task, MoA+ automatically runs an independent tool-backed Outcome Verifier that inspects the actual candidate answer and artifacts and runs required checks. Review gaps return to you for continued work before final delivery."
         : this.config.completionVerification === "on-demand"
-          ? "Independent outcome verification is available on demand. Decide whether the current task benefits from a separate acceptance check. When it does, call set_completion_criteria to request verification for this task, using concrete criteria and a short, natural completion statement as the exact promise. The independently authored rubric still comes only from original human requirements and source snapshots, not your criteria or implementation. No Builder or Verifier is created unless you request verification; ordinary acknowledgements and work that does not benefit from independent review can finish directly. Once requested, complete the work and include the promise only when its criteria are met; the verifier may return evidence-backed gaps for rework. A completed task does not enable verification for the next task."
+          ? `Independent acceptance is available on demand through ${moaToolNames.review}. Request it when a separate check adds value for this task. Until then, no Builder or Verifier is created. The original human requirements and source snapshots remain authoritative. Once requested, meet the criteria and include the short natural completion promise; concrete review gaps return for rework. Completion clears the binding for the next task.`
           : "Automatic outcome verification is not enabled in this runtime.";
       return `${this.coordinatorContextPolicy.has(agent) ? `${coordinatorPrompt}\n` : ""}Paths: ${JSON.stringify({ ...own.project.paths, contextIndex: contextIndexPath(own.project.paths) })}\n${completion}`;
     }
@@ -634,7 +635,7 @@ export default class ProjectMode extends TypertRemoteService {
     if (worker.lifecycle !== "deleted") {
       const descriptor = this.moa.descriptor(request.worker_id)!;
       const creatorId = SessionId(descriptor.creatorId);
-      const destroy = (creator: Agent) => this.moa.kill(creator, request.worker_id, signal, { destroy: true, operationId });
+      const destroy = (creator: Agent) => this.moa.stopWork(creator, request.worker_id, signal, { destroy: true, operationId });
       if (creatorId === agent.id) await destroy(agent);
       else await withManagedAgent(this.access, creatorId, signal, destroy);
     }

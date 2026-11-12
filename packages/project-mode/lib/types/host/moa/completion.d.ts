@@ -10,4 +10,4 @@ declare module "@deepseek-ai/dsh-llm" {
     }
 }
 /** Bind to native pre-step and candidate-end events after the existing turn guard. */
-export declare function bindCompletion(host: HostAccess): (agent: Agent) => void;
+export declare function bindDeliveryReview(host: HostAccess): (agent: Agent) => void;

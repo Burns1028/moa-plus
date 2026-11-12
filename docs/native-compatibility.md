@@ -38,10 +38,10 @@ PTC uses the existing native pipeline. `nativeOnly` tools appear as direct model
 schemas, have no SDK or runtime program binding, and are rejected as nested
 calls. Ordinary tools remain SDK-only under PTC. Rejection receives the resolved
 definition from the same native scope/ToolSet as execution, preserving per-Agent
-visibility. This preserves SendMessage Request/Reply lifetime without a separate
+visibility. This preserves moa_message Request/Reply lifetime without a separate
 executor or message loop.
 
-Isolated Task/Fork preparation and owned cleanup execute fixed Git/Node argv
+Isolated moa_dispatch/moa_branch preparation and owned cleanup execute fixed Git/Node argv
 through the acting Session's native sandbox policy. They accept the provider's
 declared `full` or `partial` enforcement, matching the stock native worktree
 service; missing or unknown enforcement is refused. Windows keeps its documented
@@ -76,7 +76,7 @@ The Verifier treats native structured `READ_ONLY_PATH_UNSUPPORTED` as an
 unavailable capability. Required execution cancels and joins the native helper,
 then reports the error to the parent turn. When execution is not required, the
 failed tool is suppressed only for this review and one native notice directs the
-Verifier to available file tools and `read_candidate`; actual inspection remains
+Verifier to available file tools and `moa_read_delivery`; actual inspection remains
 mandatory. If those tools cannot establish the requirements, the Verifier can
 submit `runtime_blocked: true`, which ends the parent with the observed capability
 error. Ordinary `Partial` and `Block` verdicts retain their concrete rework issues.

@@ -123,8 +123,10 @@ try {
       void stop('aggregate-budget-exceeded');
       throw new Error('Evaluation aggregate request/token budget reached');
     }
+    const notes = (options.messages ?? []).filter(message => message.role === 'user' && message.source?.kind === 'moa-notes');
     const request = { sessionId: options.sessionId, provider: options.provider, model: options.model,
-      reasoningEffort: options.reasoningEffort, startedAt: Date.now(), toolNames: (options.tools ?? []).map(tool => tool.name) };
+      reasoningEffort: options.reasoningEffort, startedAt: Date.now(), toolNames: (options.tools ?? []).map(tool => tool.name),
+      notesSnapshotCount: notes.length, notesSnapshotCharacters: notes.reduce((sum, message) => sum + textOf(message).length, 0) };
     requests.push(request);
     const upstream = next();
     return (async function* () {

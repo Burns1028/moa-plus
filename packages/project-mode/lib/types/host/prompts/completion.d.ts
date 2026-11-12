@@ -1,3 +1,3 @@
-/** Helper instructions only; requirements, attachments and review state stay with the completion gate. */
-export declare function rubricBuilderPrompt(requirementsJson: string): string;
-export declare function outcomeVerifierPrompt(rubricPath: string): string;
+/** Helper instructions only; original inputs and review state stay with the gate. */
+export declare function buildChecklistInstructions(requirementsJson: string): string;
+export declare function buildDeliveryReviewInstructions(rubricPath: string): string;

@@ -1,3 +1,4 @@
+import { moaToolNames } from "../../shared/tool-names.ts";
 import { createHash } from "node:crypto";
 import { freezeMessage, MessageId } from "@deepseek-ai/dsh-llm";
 import { SessionId, type SessionEvent } from "@deepseek-ai/dsh-session";
@@ -12,7 +13,7 @@ import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
 import { z } from "zod";
 
-export const sendMessageSchema = z
+export const peerMessageSchema = z
   .object({
     target: z.string().min(1),
     message: z.string().min(1),
@@ -25,7 +26,7 @@ export const sendMessageSchema = z
     (v) => v.mode !== "request" || (!!v.timeout_ms && !v.reply_to),
     "Request requires timeout_ms and cannot be a reply",
   );
-export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type PeerMessageInput = z.infer<typeof peerMessageSchema>;
 export type MoAMessageEnvelope = {
   rootId: string;
   senderId: string;
@@ -96,7 +97,7 @@ export class MoAMessageBroker {
   }
   send(
     actor: Agent,
-    input: SendMessageInput,
+    input: PeerMessageInput,
     operationId: string,
     signal: AbortSignal,
   ): Promise<unknown> {
@@ -158,7 +159,7 @@ export class MoAMessageBroker {
   }
   private async run(
     actor: Agent,
-    input: SendMessageInput,
+    input: PeerMessageInput,
     operationId: string,
     rootId: string,
     signal: AbortSignal,
@@ -428,7 +429,7 @@ function hasCommittedAnswer(events: readonly SessionEvent[], route: RequestRoute
   if (events.some(event => event.type === "user/message" && isAnswer(event.data, route))) return true;
   const seq = nativeOperationSeq(route.operationId, route.senderId);
   const call = events.find(event => event.type === "tool/call" && event.seq === seq);
-  if (call?.type !== "tool/call" || call.data.name !== "SendMessage") return false;
+  if (call?.type !== "tool/call" || ![moaToolNames.message, "SendMessage"].includes(call.data.name)) return false;
   return events.some(event => {
     if (event.type !== "tool/result" || event.data.turn !== call.data.turn || event.data.step !== call.data.step || event.data.message.toolCallId !== call.data.callId || event.data.message.isError) return false;
     try {

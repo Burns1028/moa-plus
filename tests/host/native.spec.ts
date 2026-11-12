@@ -28,7 +28,7 @@ it("restricts only coordinator tools and restores them on disable", async () => 
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
     expect(f.ctx.tools.get("subagent", agent)).toBeUndefined();
     expect(f.ctx.tools.get("subagent", ordinary)).toBeDefined();
-    expect(f.ctx.tools.get("Task", agent)).toBeDefined();
+    expect(f.ctx.tools.get("moa_dispatch", agent)).toBeDefined();
     expect(f.ctx.tools.get("control_workers", agent)).toBeUndefined();
     await f.ctx.projectMode.setEnabled(agent.id, false, 1, "disable");
     expect(f.ctx.tools.get("subagent", agent)).toBeDefined();
@@ -275,9 +275,9 @@ it("keeps preset tools on workers and restores coordinator tools on draft disabl
       expect(f.ctx.tools.get(name, child), name).toBeUndefined();
       expect(f.ctx.tools.get(name, ordinary), name).toBeDefined();
     }
-    expect(f.ctx.tools.get("SendMessage", agent)).toBeDefined();
-    expect(f.ctx.tools.get("SendMessage", child)).toBeDefined();
-    expect(f.ctx.tools.get("SendMessage", ordinary)).toBeUndefined();
+    expect(f.ctx.tools.get("moa_message", agent)).toBeDefined();
+    expect(f.ctx.tools.get("moa_message", child)).toBeDefined();
+    expect(f.ctx.tools.get("moa_message", ordinary)).toBeUndefined();
     expect(f.ctx.tools.get("control_workers", child)).toBeUndefined();
     release();
     await child.whenIdle();
@@ -1158,7 +1158,7 @@ it("treats a reused provider tool call ID in distinct native turns as distinct d
       const block = {
         type: "tool-call" as const,
         id: ToolCallId("provider-reuses-id"),
-        name: "Task",
+        name: "moa_dispatch",
         arguments: JSON.stringify({
           tasks: [{ name: "worker", task: "work", role: "General-purpose", workspace: "shared" }],
         }),

@@ -20,7 +20,7 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-MoA+ **v0.2.7** supports the audited **DSH 0.2.1-rc.3** and
+MoA+ **v0.2.8** supports the audited **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
 profile extends **22 native packages across 50 file paths**. Keep the plugin
 and its matching profile from the same release; a stock or differently prepared
@@ -31,12 +31,12 @@ Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares 
 
 The updated rc.2 Desktop Next profile supports protected Workers through native nonpersistent PowerShell, and Bash where installed, on Windows. It preserves existing records across Coordinator atomic updates and requires native Windows Job containment. Persistent terminals and unadapted process providers still refuse protected use. The rc.3 profile retains its macOS Seatbelt/Linux bubblewrap requirement; it does not include this Windows extension. See [backend requirements][compatibility] for the supported policy and filesystem scope.
 
-The commands below use the v0.2.7 checkout. Use `main` instead to follow development.
+The commands below use the v0.2.8 checkout. Use `main` instead to follow development.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.7 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.8 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -58,15 +58,15 @@ For the earlier published Project Mode, follow the [v0.1.23 installation instruc
 
 ### Independent work, direct communication
 
-Coordinator and Workers use the same native Agent Loop, with different identities, tools, and delegated permissions. `Task` starts a specialist with a fresh context; `Fork` branches selected committed history. Independent Git worktrees separate parallel changes, while an explicit shared workspace lets Workers use the parent's directory.
+Coordinator and Workers use the same native Agent Loop, with different identities, tools, and delegated permissions. `moa_dispatch` starts a specialist with a fresh context; `moa_branch` branches selected committed history. Independent Git worktrees separate parallel changes, while an explicit shared workspace lets Workers use the parent's directory.
 
-`SendMessage` lets agents notify peers, steer work, queue instructions, or ask a blocking question that waits for an explicit reply. `QueryAgent` inspects state and selected history, or waits for progress. `KillAgent` stops execution and waits for resources to exit. Slow tools can run in the background and return their results automatically.
+`moa_message` lets agents notify peers, steer work, queue instructions, or ask a blocking question that waits for an explicit reply. `moa_observe` inspects state and selected history, or waits for progress. `moa_stop` stops execution and waits for resources to exit. Slow tools can run in the background and return their results automatically.
 
 When a Worker turn finishes, its **complete final AI message** returns automatically to its designated reporting Agent. The Coordinator can review the result, continue with that Worker, or change direction. Retained conversations and workspaces let the team continue across assignments.
 
 ### 自适应协调与可选编排
 
-The default Coordinator guidance keeps simple work direct. For delegated work, the Coordinator prefers `SendMessage` to reuse a suitable Worker, `Fork` when committed history helps a new branch, and a fresh `Task` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `QueryAgent` waits when waiting is useful. When no actionable goal or unfinished concrete work exists, a brief acknowledgement or ordinary chat clarification can complete the response without ceremonial tools, memory updates, or blocking questions.
+The default Coordinator guidance keeps simple work direct. For delegated work, the Coordinator prefers `moa_message` to reuse a suitable Worker, `moa_branch` when committed history helps a new branch, and a fresh `moa_dispatch` when clean context matters. It starts independent ready branches within native capacity, unlocks dependent work as results arrive, and uses native `moa_observe` waits when waiting is useful. When no actionable goal or unfinished concrete work exists, a brief acknowledgement or ordinary chat clarification can complete the response without ceremonial tools, memory updates, or blocking questions.
 
 An enabled MoA+ Coordinator also offers five bundled `@` prompts: **并行攻坚** for independent slices, **多方会审** for a disputed decision, **协同探索** for tangled exploration, **迭代精修** for iterative artifact review, and **统筹推进** for a task with several collaboration phases. Type `@` and select the Chinese-named candidate by click, Enter, or Tab. The prompt expands into editable composer text; add the task and send normally. Workers and ordinary conversations do not offer these packs.
 
@@ -74,7 +74,7 @@ These are local prompt texts using the existing tools and role presets. Native s
 
 ### Shared knowledge, independent review
 
-The Coordinator maintains `notes.md` and `archived.md`; the Host refreshes full notes before each Coordinator inference. Coordinator and Workers contribute reusable findings through `context/index.md`, then read relevant files as needed. Isolated Workers access the same shared knowledge, so later work can build on confirmed findings without copying every execution detail into the main conversation.
+The Coordinator maintains `notes.md` and `archived.md`; each inference receives one current full notes snapshot. Superseded copies stay in audit history without accumulating in model input. Coordinator and Workers contribute reusable findings through `context/index.md`, then read relevant files as needed. Isolated Workers access the same shared knowledge, so later work can build on confirmed findings without copying every execution detail into the main conversation.
 
 By default, the Coordinator decides whether a task benefits from independent acceptance and requests it when useful. Ordinary conversation can finish directly, without creating acceptance helpers or making an extra model call just to classify the task. Once requested, a Rubric Builder derives criteria from original requirements and an Outcome Verifier checks actual deliverables with native tools. Verification is bound to that task; the next task starts on demand again. See [roles and common flows][roles], the [code architecture][architecture], and the [Tool API][tools] for the full contracts.
 

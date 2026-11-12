@@ -14,7 +14,7 @@ function call(name: string, args: object): StreamChunk[] {
 }
 async function setup(mode: "native" | "ptc") {
   const ctx = new Context();
-  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true, systemPrompt: { toolOrder: ["SendMessage", "<unlisted-tools>"] } });
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true, systemPrompt: { toolOrder: ["moa_message", "<unlisted-tools>"] } });
   await ctx.plugin(AgentLoop, { agents: [] });
   await ctx.plugin((await import("@deepseek-ai/dsh-subprocess-local")).default);
   await ctx.plugin((await import("@deepseek-ai/dsh-sandbox-policy")).default, { mode: "danger-full-access" });
@@ -22,7 +22,7 @@ async function setup(mode: "native" | "ptc") {
   await ctx.plugin((await import("@deepseek-ai/dsh-ptc-runtime-node")).default);
   const adapter = new Adapter(); ctx.llm.registerAdapter(["test"], adapter);
   let protocolCalls = 0, ordinaryCalls = 0;
-  const protocol = defineTool({ name: "SendMessage", nativeOnly: true, description: "Native protocol operation", parameters: {}, output, execute: async () => { protocolCalls++; return "protocol answer"; } });
+  const protocol = defineTool({ name: "moa_message", nativeOnly: true, description: "Native protocol operation", parameters: {}, output, execute: async () => { protocolCalls++; return "protocol answer"; } });
   ctx.tools.register(protocol);
   ctx.tools.register(defineTool({ name: "ordinary", description: "Ordinary program capability", parameters: {}, output, execute: async () => { ordinaryCalls++; return "ordinary value"; } }));
   const { agent } = await ctx.agents.create({ sessionId: SessionId(`protocol-${mode}`), agentOptions: { provider: "test", model: "test" }, setup: agentCtx => { agentCtx.tools.presentAs(mode); } });
@@ -41,14 +41,14 @@ it.each(["native", "ptc"] as const)("publishes and executes a native-only protoc
   try {
     expect(f.protocol.nativeOnly).toBe(true);
     const wire = f.ctx.tools.wireSchemas(f.agent);
-    expect(wire.schemas.map(schema => schema.name)).toContain("SendMessage");
-    expect(wire.schemas.find(schema => schema.name === "SendMessage")).not.toHaveProperty("nativeOnly");
-    expect(wire.knownNames).toContain("SendMessage");
-    expect(f.ctx.tools.sdkSchemas(f.agent).map(schema => schema.name)).not.toContain("SendMessage");
-    f.adapter.handler = () => f.adapter.requests.length === 1 ? call("SendMessage", {}) : response("done");
+    expect(wire.schemas.map(schema => schema.name)).toContain("moa_message");
+    expect(wire.schemas.find(schema => schema.name === "moa_message")).not.toHaveProperty("nativeOnly");
+    expect(wire.knownNames).toContain("moa_message");
+    expect(f.ctx.tools.sdkSchemas(f.agent).map(schema => schema.name)).not.toContain("moa_message");
+    f.adapter.handler = () => f.adapter.requests.length === 1 ? call("moa_message", {}) : response("done");
     f.agent.followup(user()); await f.agent.whenIdle();
     expect(f.counts().protocolCalls).toBe(1);
-    expect(f.adapter.requests[0].tools?.map(schema => schema.name)).toContain("SendMessage");
+    expect(f.adapter.requests[0].tools?.map(schema => schema.name)).toContain("moa_message");
     expect(f.agent.session.snapshotEvents().filter(event => event.type === "turn/start")).toHaveLength(1);
   } finally { await f.dispose(); }
 });
@@ -56,12 +56,12 @@ it.each(["native", "ptc"] as const)("publishes and executes a native-only protoc
 it("omits native-only capabilities from actual PTC bindings and rejects forged nested dispatch", async () => {
   const f = await setup("ptc");
   try {
-    f.adapter.handler = () => f.adapter.requests.length === 1 ? call("run_code", { code: "return { protocol: typeof tools.SendMessage, ordinary: await tools.ordinary({}) };", description: "Use the ordinary program SDK" }) : response("done");
+    f.adapter.handler = () => f.adapter.requests.length === 1 ? call("run_code", { code: "return { protocol: typeof tools.moa_message, ordinary: await tools.ordinary({}) };", description: "Use the ordinary program SDK" }) : response("done");
     f.agent.followup(user()); await f.agent.whenIdle();
     expect(f.counts()).toEqual({ protocolCalls: 0, ordinaryCalls: 1 });
     const result = f.agent.session.snapshotEvents().find(event => event.type === "tool/result" && event.data.message.toolCallId === "protocol-call");
     expect(JSON.stringify(result)).toContain("undefined");
-    const nested = await f.ctx.tools.execute({ agent: f.agent, name: "SendMessage", callId: "forged-nested" as any, parent: Symbol("old-binding") as any, signal: new AbortController().signal, arguments: {} });
+    const nested = await f.ctx.tools.execute({ agent: f.agent, name: "moa_message", callId: "forged-nested" as any, parent: Symbol("old-binding") as any, signal: new AbortController().signal, arguments: {} });
     expect(nested.isError).toBe(true);
     expect(nested.error?.info.code).toBe("UNKNOWN_TOOL");
     expect(JSON.stringify(nested)).toContain("directly");
@@ -74,16 +74,16 @@ it("keeps known native-only ordering valid when hidden and respects an ordinary 
   try {
     const unrestrict = f.agent.ctx.tools.restrict({ allow: [] });
     expect((await f.ctx.systemPrompt.assemble({ scope: f.agent })).tools.map(tool => tool.name)).toEqual(["run_code"]);
-    expect(f.ctx.tools.wireSchemas(f.agent).knownNames).toContain("SendMessage");
+    expect(f.ctx.tools.wireSchemas(f.agent).knownNames).toContain("moa_message");
     unrestrict();
-    const unsuppress = f.agent.ctx.tools.suppress({ deny: ["SendMessage"] });
-    expect((await f.ctx.systemPrompt.assemble({ scope: f.agent })).tools.map(tool => tool.name)).not.toContain("SendMessage");
-    expect(f.ctx.tools.wireSchemas(f.agent).knownNames).toContain("SendMessage");
+    const unsuppress = f.agent.ctx.tools.suppress({ deny: ["moa_message"] });
+    expect((await f.ctx.systemPrompt.assemble({ scope: f.agent })).tools.map(tool => tool.name)).not.toContain("moa_message");
+    expect(f.ctx.tools.wireSchemas(f.agent).knownNames).toContain("moa_message");
     unsuppress();
     const shadow = f.agent.ctx.tools.register({ ...f.protocol, nativeOnly: false } as any);
-    expect(f.ctx.tools.wireSchemas(f.agent).knownNames).not.toContain("SendMessage");
-    await expect(f.ctx.systemPrompt.assemble({ scope: f.agent })).rejects.toThrow(/toolOrder lists unregistered tool.*SendMessage/);
+    expect(f.ctx.tools.wireSchemas(f.agent).knownNames).not.toContain("moa_message");
+    await expect(f.ctx.systemPrompt.assemble({ scope: f.agent })).rejects.toThrow(/toolOrder lists unregistered tool.*moa_message/);
     shadow();
-    expect((await f.ctx.systemPrompt.assemble({ scope: f.agent })).tools.map(tool => tool.name)).toContain("SendMessage");
+    expect((await f.ctx.systemPrompt.assemble({ scope: f.agent })).tools.map(tool => tool.name)).toContain("moa_message");
   } finally { await f.dispose(); }
 });
