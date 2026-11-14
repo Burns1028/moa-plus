@@ -36,6 +36,7 @@ jobs:
           tests/host/moa-completion.spec.ts
           tests/host/completion-helper-failure.spec.ts
           tests/host/completion-context.spec.ts
+          tests/host/verifier-workflow.spec.ts
           tests/host/orchestration-prompts.spec.ts
           tests/client/orchestration-input.spec.ts
           tests/native-contract/orchestration-input.spec.tsx --maxWorkers=1

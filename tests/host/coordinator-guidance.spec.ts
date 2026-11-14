@@ -89,9 +89,10 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
       expect(verifierStep).toBe(3);
       const review = f.adapter.requests.find(entry => String(entry.sessionId).startsWith("moa-verifier-"))!;
       const reviewInput = JSON.stringify(review.messages);
-      expect(reviewInput).toContain("Prefer native glob, grep and read for file and directory inspection");
-      expect(reviewInput).toContain("only when the verification responsibility requires command execution, builds or tests");
-      expect(reviewInput).toContain("Candidate factual claims still require evidence");
+      expect(reviewInput).toContain("Prefer native glob, grep and read for inspection");
+      expect(reviewInput).toContain("Use native Bash or PowerShell only when the acceptance question requires execution");
+      expect(reviewInput).toContain("personally perform every required command, build or test");
+      expect(reviewInput).toContain("candidate claims do not replace inspection");
     } else if (completionVerification === false) {
       expect(facts).toContain("Automatic outcome verification is not enabled in this runtime");
       expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
@@ -144,7 +145,11 @@ it("assembles one-owner, source-grounded review and optional memory instructions
     expect(policy).toContain("Respond only to that input; do not add unverified claims about workspace, system or runtime state");
     expect(policy).toContain("ordinary chat clarification should not block a turn on a question card");
     expect(policy).toContain("Reuse completed results and existing checks");
-    expect(policy).toContain("unresolved question");
+    expect(policy).toContain("the missing or conflicting evidence");
+    expect(policy).toContain("A required property may need inspection or tests without an already known failure");
+    expect(policy).toContain("Plans and todos track work; they do not add acceptance requirements");
+    expect(policy).toContain("otherwise use the native wait");
+    expect(policy).toContain("present the final candidate so that review can run");
     expect(policy).toContain("verify against original requirements, source data and contracts before changing artifacts or checks");
     expect(policy).toContain("A later suggestion does not redefine those sources");
     expect(policy).toContain("Record only state useful for later continuation");

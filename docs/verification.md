@@ -1,5 +1,11 @@
 # Verification
 
+## Unreleased 0.2.8: requirement-driven closeout — 2026-11-14
+
+Coordinator guidance now connects follow-up investigation and review to an unfinished human requirement and a specific evidence gap. Self-authored plans do not add acceptance obligations; when no other unfinished work is available, the Coordinator uses native waiting. Verifier guidance orders the existing workflow from current rubric/candidate through criterion-specific inspection to its existing verdict tool. Initial necessary checks, independent inspection, required execution and the selected high effort remain intact. This is model guidance, with no automatic Pass, fixed step limit or second scheduler.
+
+Build and both typechecks passed. Host, Client, integration and native-contract checks passed **501 tests**, with **37 tests and one file skipped**. Combined launcher and offline-evaluator checks passed **30**, with three explicit skips. The matching Desktop Electron / DSH 0.2.2-rc.1 completion suite passed **13/13**. The new native-loop fixture checks actual Verifier instruction assembly at high effort, current-candidate inspection and verdict submission ending the turn without another model response; scripted responses do not prove natural closeout improvement. Real-model performance requires the separate frozen comparison.
+
 ## Unreleased 0.2.8: task text after native compaction — 2026-11-14
 
 In default on-demand mode, an active native checkpoint restores the unfinished task's captured human text and explicit text-source snapshots to required runtime context. It does not request acceptance, create helpers, reread implementation-modified specifications, or restore a finished task. Rich attachments and binary content retain native compaction semantics. The plugin does not change production compaction thresholds.
