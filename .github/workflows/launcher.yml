@@ -37,6 +37,7 @@ jobs:
           tests/host/completion-helper-failure.spec.ts
           tests/host/completion-context.spec.ts
           tests/host/review-protocol.spec.ts
+          tests/host/completion-outbox-stop.spec.ts
           tests/host/moa-observe-history.spec.ts
           tests/host/orchestration-prompts.spec.ts
           tests/client/orchestration-input.spec.ts
