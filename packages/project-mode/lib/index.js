@@ -2067,7 +2067,7 @@ function bindDeliveryReview(host) {
 				agent.steer(msg(`Outcome verification did not pass. Verifier must call ${moaToolNames.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block.`));
 				return;
 			}
-			if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || missingVerdictGap(verdict) || verdict.runtime_blocked === true)) throw capabilityFailure;
+			if (capabilityFailure && (missingVerdictGap(verdict) || verdict.runtime_blocked === true)) throw capabilityFailure;
 			if (verdict.status !== "Pass" || missingReviewEvidence(facts).length) {
 				if (capabilityFailure && verdict.status === "Pass") throw capabilityFailure;
 				agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(verdict.issues.length ? verdict.issues : missingReviewEvidence(facts))}`));
