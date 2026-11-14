@@ -73,12 +73,57 @@ function lastText(agent: Agent, from = 0): string {
   return event?.type === "assistant/message" ? text(event.data.message) : "";
 }
 class ReviewAgentFailure extends Error {}
+interface ReviewEvidence {
+  rubricRead: boolean;
+  inspectionRecorded: boolean;
+  testsRequired: boolean;
+  successfulNativeExecution: boolean;
+  capabilityUnavailable: boolean;
+}
+interface ReviewAttempt {
+  evidence(): ReviewEvidence;
+  protocolIssue(submitted?: Verdict): Promise<string | undefined>;
+}
+function missingVerdictGap(verdict: Verdict): boolean {
+  return verdict.status !== "Pass" && !verdict.issues.some(issue => issue.trim().length > 0);
+}
+/** The context and final gate derive facts from the same attempt-local tool events. */
+function collectReviewEvidence(agent: Agent, offset: number, testsRequired: boolean, successfulShell: ReadonlySet<number>, capabilityUnavailable: boolean): ReviewEvidence {
+  const events = agent.session.snapshotEvents().slice(offset);
+  const calls = events.filter(event => event.type === "tool/call");
+  const results = events.filter(event => event.type === "tool/result" && !event.data.message.isError);
+  const successfulCalls = calls.filter(call => results.some(result => result.type === "tool/result" && result.data.step === call.data.step && result.data.message.toolCallId === call.data.callId));
+  return {
+    rubricRead: successfulCalls.some(call => call.data.name === tools.readChecklist),
+    inspectionRecorded: successfulCalls.some(call => call.data.name !== tools.readChecklist && call.data.name !== tools.submitReview),
+    testsRequired,
+    successfulNativeExecution: successfulCalls.some(call => successfulShell.has(call.seq)) || events.some(event => event.type === "job/settled" && ["bash", "pwsh"].includes(event.data.kind.toLowerCase()) && event.data.owner === agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId)),
+    capabilityUnavailable,
+  };
+}
+function missingReviewEvidence(evidence: ReviewEvidence): string[] {
+  return [
+    ...evidence.rubricRead ? [] : [`Read the current rubric with ${tools.readChecklist}.`],
+    ...evidence.inspectionRecorded ? [] : [`Inspect the actual deliverable with tools; use ${tools.readDelivery} for the frozen chat answer.`],
+    ...!evidence.testsRequired || evidence.successfulNativeExecution ? [] : ["Personally perform the required execution using native Bash or PowerShell with confirmed successful exit; console success text alone does not count."],
+  ];
+}
+function readReviewVerdict(submitted: Verdict | undefined, body: string): Verdict {
+  if (submitted) return submitted;
+  let value: unknown;
+  try { value = JSON.parse(body.trim().replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch {
+    const fenced = body.trim().split("```");
+    if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
+    value = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
+  }
+  return verdictSchema.parse(value);
+}
 function assertReviewAgentHealthy(agent: Agent, role: string, from = 0): void {
   const end = agent.session.snapshotEvents().slice(from).findLast(event => event.type === "turn/end");
   if (end?.type === "turn/end" && end.data.reason.kind === "error")
     throw new ReviewAgentFailure(`MoA+ ${role} failed: ${end.data.reason.error.message}`);
 }
-interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal): { readVerdict(): Verdict | undefined; dispose(): void } }
+interface Helpers { builder: AgentHandle; verifier: AgentHandle; verifierMemoryPolicy: WorkerMemoryPolicyBinding; build: Promise<boolean>; rubricPath: string; publish(signal: AbortSignal): Promise<void>; read(signal: AbortSignal): Promise<string>; freezeCandidate(answer: string, signal: AbortSignal, attempt: ReviewAttempt): { readVerdict(): Verdict | undefined; dispose(): void } }
 
 /** New native loops record selection before preparing a step; legacy loops use request hooks. */
 function hasNativeModelSelection(agent: Agent): agent is Agent & { model: {
@@ -194,9 +239,9 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
     generations.set(parent, generation);
     let rubric: string | undefined;
     let submitted: z.infer<typeof rubricSchema> | undefined;
-    let candidate: { answer: string; signal: AbortSignal; verdict?: Verdict } | undefined;
-    const freezeCandidate = (answer: string, signal: AbortSignal) => {
-      const snapshot: NonNullable<typeof candidate> = { answer, signal };
+    let candidate: { answer: string; signal: AbortSignal; attempt: ReviewAttempt; verdict?: Verdict } | undefined;
+    const freezeCandidate = (answer: string, signal: AbortSignal, attempt: ReviewAttempt) => {
+      const snapshot: NonNullable<typeof candidate> = { answer, signal, attempt };
       candidate = snapshot;
       return {
         readVerdict: () => snapshot.verdict,
@@ -272,6 +317,22 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
           }));
           ctx.tools.guard(exec => exec.name === tools.publishChecklist ? undefined : "Rubric Builder cannot access execution tools or implementation outputs");
         } else {
+          ctx.systemPrompt.context({
+            name: "project-mode:review-evidence", order: 665, required: true, interpolate: false,
+            text: () => !candidate || candidate.signal.aborted ? "" :
+              `Host prerequisites recorded for this frozen candidate only; these are not a verdict or proof that the rubric is satisfied. inspectionRecorded means another tool succeeded, not that its result establishes a requirement. successfulNativeExecution means confirmed native exit zero, not that the right tests were chosen or passed semantically. Judge the actual evidence against every rubric obligation.\n${JSON.stringify(candidate.attempt.evidence())}`,
+          });
+          // Native completion runs after the whole tool batch, including a
+          // submit/read/shell batch. Repair protocol evidence within this same
+          // review turn, without asking the author to rework sound artifacts.
+          ctx.on("agent/turn-stopping", async ({ agent: stopping, signal }) => {
+            const current = candidate;
+            if (stopping !== agent || !current || current.signal.aborted || signal.aborted) return;
+            const problem = await current.attempt.protocolIssue(current.verdict);
+            if (!problem || candidate !== current || current.signal.aborted || signal.aborted) return;
+            current.verdict = undefined;
+            agent.steer(msg(problem));
+          });
           ctx.tools.register(defineTool({ name: tools.readChecklist, description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
           ctx.tools.register(defineTool({ name: tools.readDelivery, description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.", parameters: {}, output, execute: async () => {
             if (!candidate) throw new Error("No active candidate review");
@@ -280,7 +341,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
           } }));
           ctx.tools.register(defineTool({
             name: tools.submitReview,
-            description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables. This ends the review; submission alone is not inspection or required test evidence.",
+            description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables, requesting native completion. Missing protocol or Host prerequisites are corrected in this same review before closure; submission alone is not inspection or required test evidence.",
             parameters: {
               status: { type: "string", required: true, enum: ["Pass", "Partial", "Block"] },
               issues: { type: "array", required: true, items: { type: "string" }, description: "Concrete remaining gaps; empty when no issues remain" },
@@ -469,7 +530,27 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
         const call = pair.verifier.agent.session.snapshotEvents().filter(event => event.type === "tool/call" && event.data.callId === exec.callId && event.data.name === exec.name).at(-1);
         if (call) successfulShell.add(call.seq);
       });
-      candidateReview = pair.freezeCandidate(answer, control);
+      const evidence = () => collectReviewEvidence(pair.verifier.agent, offset, testsRequired, successfulShell, capabilityFailure !== undefined);
+      candidateReview = pair.freezeCandidate(answer, control, {
+        evidence,
+        async protocolIssue(submitted) {
+          // Existing capability failure handling owns the infrastructure path.
+          if (control.aborted || capabilityFailure) return;
+          // An unavailable/superseded authoritative rubric needs the existing
+          // parent re-verification/republish path, not a Verifier read loop.
+          try { await pair.read(control); } catch { return; }
+          if (control.aborted) return;
+          let verdict: Verdict;
+          try { verdict = readReviewVerdict(submitted, lastText(pair.verifier.agent, offset)); }
+          catch {
+            return `Review protocol incomplete for this frozen candidate: call ${tools.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block, with status Pass, Partial or Block and an issues string array. Continue this same review; this is not a defect in the author's deliverable.`;
+          }
+          if (missingVerdictGap(verdict)) return "Review protocol incomplete for this frozen candidate: a Partial or Block verdict needs a concrete anchored defect, ambiguity or missing evidence in its issues array. Do not invent a defect to fill the array. If every rubric obligation is supported, submit Pass instead.";
+          if (verdict.status !== "Pass") return;
+          const missing = missingReviewEvidence(evidence());
+          if (missing.length) return `Review protocol incomplete for this frozen candidate. Missing Host prerequisites: ${missing.join(" ")} Reuse evidence already recorded in this attempt and submit a fresh verdict after resolving these gaps. If the available tools cannot verify a concrete requirement, submit Partial or Block with that gap. Do not request artifact rework merely because this review omitted its own evidence.`;
+        },
+      });
       pair.verifier.agent.followup(msg(buildDeliveryReviewInstructions(pair.rubricPath)));
       await waitForTurn(pair.verifier.agent.whenIdle(), control);
       if (capabilityJoin) {
@@ -483,33 +564,19 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
       assertReviewAgentHealthy(pair.verifier.agent, "Outcome Verifier", offset);
       await pair.read(control);
       control.throwIfAborted();
-      const events = pair.verifier.agent.session.snapshotEvents().slice(offset);
-      const calls = events.filter((e) => e.type === "tool/call");
-      const results = events.filter((e) => e.type === "tool/result" && !e.data.message.isError);
-      const successfulCalls = calls.filter((e) => e.type === "tool/call" && results.some((result) => result.type === "tool/result" && result.data.step === e.data.step && result.data.message.toolCallId === e.data.callId));
-      const passedShell = successfulCalls.some(call => successfulShell.has(call.seq)) || events.some(event => event.type === "job/settled" && shellKind(event.data.kind) && event.data.owner === pair.verifier.agent.id && event.data.producerReported && event.data.status === "completed" && /^exit code: 0(?:;|$)/.test(event.data.detail ?? "") && successfulCalls.some(call => call.type === "tool/call" && call.data.name.toLowerCase() === event.data.kind && call.data.callId === event.data.toolCall?.rootCallId));
-      let verdict: { status?: string; issues?: unknown; runtime_blocked?: unknown };
+      const facts = evidence();
+      let verdict: Verdict;
       try {
-        const submittedVerdict = candidateReview.readVerdict();
-        if (submittedVerdict) verdict = submittedVerdict;
-        else {
-          const body = lastText(pair.verifier.agent, offset).trim();
-          try { verdict = JSON.parse(body.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch {
-            const fenced = body.split("```");
-            if (fenced.length !== 3) throw new Error("Missing or ambiguous JSON verdict");
-            verdict = JSON.parse(fenced[1].replace(/^\s*json\b/i, ""));
-          }
-          if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("Expected a verdict object");
-        }
+        verdict = readReviewVerdict(candidateReview.readVerdict(), lastText(pair.verifier.agent, offset));
       } catch {
         if (capabilityFailure) throw capabilityFailure;
         agent.steer(msg(`Outcome verification did not pass. Verifier must call ${tools.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block.`));
         return;
       }
-      if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || verdict.runtime_blocked === true)) throw capabilityFailure;
-      if (verdict.status !== "Pass" || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name === tools.readChecklist) || !successfulCalls.some((e) => e.type === "tool/call" && e.data.name !== tools.readChecklist && e.data.name !== tools.submitReview) || (testsRequired && !passedShell)) {
+      if (capabilityFailure && (!verdictSchema.safeParse(verdict).success || missingVerdictGap(verdict) || verdict.runtime_blocked === true)) throw capabilityFailure;
+      if (verdict.status !== "Pass" || missingReviewEvidence(facts).length) {
         if (capabilityFailure && verdict.status === "Pass") throw capabilityFailure;
-        agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : ["Verifier must read the rubric, inspect actual results using tools, and perform required tests."])}`));
+        agent.steer(msg(`Outcome verification did not pass. ${JSON.stringify(verdict.issues.length ? verdict.issues : missingReviewEvidence(facts))}`));
       }
     } catch (error) {
       signal.throwIfAborted();

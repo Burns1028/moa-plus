@@ -52,9 +52,9 @@ export declare class MoAAgents {
     private workspaceManager;
     dispatch(agent: Agent, tasks: WorkAssignment[], operationId: string, signal: AbortSignal, seed?: readonly SessionEvent[]): Promise<(import("../index.ts").ControlReceipt | import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage)[]>;
     private startAssignments;
-    branch(agent: Agent, sourceId: SessionId, item: WorkAssignment, operationId: string, signal: AbortSignal): Promise<string | number | true | import("../index.ts").ControlReceipt | import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage | import("zod").JSONType[] | {
+    branch(agent: Agent, sourceId: SessionId, item: WorkAssignment, operationId: string, signal: AbortSignal): Promise<string | number | true | import("zod").JSONType[] | {
         [key: string]: import("zod").JSONType;
-    }>;
+    } | import("../index.ts").ControlReceipt | import("../index.ts").WorkerView | import("../index.ts").WorkerHistoryPage>;
     private recoveryState;
     needsRecovery(record: import("../state.ts").RecordState): boolean;
     private clearWorkspace;
@@ -95,25 +95,9 @@ export declare class MoAAgents {
             updatedAt: number;
             activity?: import("../index.ts").WorkerActivity | null;
         }[];
-        reason?: undefined;
     } | {
-        children: {
-            lifecycleState: "Idle" | "Waiting" | "Running" | "Aborting" | "Zombie";
-            workerId: SessionId;
-            parentSessionId?: SessionId;
-            name: string;
-            lifecycle: "provisioning" | "active" | "deleting" | "deleted" | "provision-failed";
-            status: "busy" | "idle" | null;
-            availability: "live" | "cold" | "unavailable";
-            queueLength: number | null;
-            pendingSteerCount: number | null;
-            phase: "starting" | "working" | "waiting-user" | "stopping" | "idle" | "failed" | "stopped" | "disconnected";
-            progressText?: string;
-            updatedAt: number;
-            activity?: import("../index.ts").WorkerActivity | null;
-        }[];
         reason: "interrupted";
-    } | {
+        history?: import("../index.ts").WorkerHistoryPage[] | undefined;
         children: {
             lifecycleState: "Idle" | "Waiting" | "Running" | "Aborting" | "Zombie";
             workerId: SessionId;
@@ -129,8 +113,9 @@ export declare class MoAAgents {
             updatedAt: number;
             activity?: import("../index.ts").WorkerActivity | null;
         }[];
+    } | {
         reason: "done";
-    } | {
+        history?: import("../index.ts").WorkerHistoryPage[] | undefined;
         children: {
             lifecycleState: "Idle" | "Waiting" | "Running" | "Aborting" | "Zombie";
             workerId: SessionId;
@@ -146,6 +131,23 @@ export declare class MoAAgents {
             updatedAt: number;
             activity?: import("../index.ts").WorkerActivity | null;
         }[];
+    } | {
         reason: "timeout";
+        history?: import("../index.ts").WorkerHistoryPage[] | undefined;
+        children: {
+            lifecycleState: "Idle" | "Waiting" | "Running" | "Aborting" | "Zombie";
+            workerId: SessionId;
+            parentSessionId?: SessionId;
+            name: string;
+            lifecycle: "provisioning" | "active" | "deleting" | "deleted" | "provision-failed";
+            status: "busy" | "idle" | null;
+            availability: "live" | "cold" | "unavailable";
+            queueLength: number | null;
+            pendingSteerCount: number | null;
+            phase: "starting" | "working" | "waiting-user" | "stopping" | "idle" | "failed" | "stopped" | "disconnected";
+            progressText?: string;
+            updatedAt: number;
+            activity?: import("../index.ts").WorkerActivity | null;
+        }[];
     }>;
 }
