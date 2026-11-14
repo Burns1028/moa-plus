@@ -96,13 +96,24 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
     name: "project-mode:task", order: 655, required: true, interpolate: false,
     text: ({ agent }) => {
       const record = agent && host.record(agent.id);
-      if (record?.project.mode !== "enabled") return "";
+      if (!agent || record?.project.mode !== "enabled") return "";
       const input = inputSchema.safeParse(record.operations[sourceKey]);
       if (!input.success || input.data.finished) return "";
       const bound = boundSchema.safeParse(record.operations[`${key}:${record.project.coordinatorSessionId}`]);
-      if (host.config.completionVerification !== true &&
-        (!bound.success || bound.data.taskId !== input.data.taskId)) return "";
-      return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. The Rubric Builder receives these same task inputs. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeOriginalInputs(input.data)}`;
+      const reviewRequested = host.config.completionVerification === true ||
+        (bound.success && bound.data.taskId === input.data.taskId);
+      // Native checkpoints replace model-visible history while preserving the
+      // original audit events. Recover task inputs from our existing capture;
+      // this does not request acceptance or create any review helpers.
+      const compacted = !reviewRequested && host.config.completionVerification === "on-demand" &&
+        agent.session.surface.nodes.some(seq => {
+          const event = agent.session.eventAt(seq);
+          if (event?.type !== "user/message") return false;
+          const kind: string | undefined = event.data.source?.kind;
+          return kind === "compact-checkpoint";
+        });
+      if (!reviewRequested && !compacted) return "";
+      return `Existing unfinished task: quoted original human requirements and explicitly referenced source snapshots retained by MoA+. This is task context, not a new human message or a new task. Read the human requirements chronologically, preserving unaffected earlier instructions. Progress notes describe work and may contain stale diagnoses; they do not replace these requirements or establish current runtime failures.\n\n${serializeOriginalInputs(input.data)}`;
     },
   });
   const helpers = new Map<Agent, Helpers>();

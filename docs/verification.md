@@ -1,5 +1,11 @@
 # Verification
 
+## Unreleased 0.2.8: task text after native compaction — 2026-11-14
+
+In default on-demand mode, an active native checkpoint restores the unfinished task's captured human text and explicit text-source snapshots to required runtime context. It does not request acceptance, create helpers, reread implementation-modified specifications, or restore a finished task. Rich attachments and binary content retain native compaction semantics. The plugin does not change production compaction thresholds.
+
+Build and both typechecks passed. Host, Client, integration and native-contract checks passed **500 tests**, with **37 tests and one file skipped**. Three new native-loop cases cover chronological and legacy source snapshots, completed-task isolation, a later independent task, no helper creation, unchanged audit events and balanced tool pairs. Launcher checks passed **17**, with three explicit skips. Under the matching Desktop Electron / DSH 0.2.2-rc.1 runtime, **17 scripted native checks** passed, including four real compaction-engine cases for early pressure, notes refresh, summary failure and cancellation. These scripted checks do not establish real-model performance or every permission mode; the rc.3 backend was not installed for the compaction-engine fixture.
+
 ## MoA+ 0.2.7 Agent-selected acceptance — 2026-11-12
 
 Default configuration is now `on-demand`: the Coordinator's normal inference chooses whether to request acceptance through `set_completion_criteria`. No separate task classifier or acceptance Agent runs before that request. Explicit `true` preserves automatic verification and `false` preserves complete disabling. The existing task binding owns activation; no additional registry or scheduler is introduced. Original human/spec snapshots are retained before implementation, including when activation happens later.
