@@ -302,6 +302,8 @@ export class CompletionOutbox {
       )
         continue;
       try {
+        // Automatic results remain owed until an explicit resume clears native Stop.
+        if (agent.moaStopped) return;
         // Identity is durable before this admission. Replays reuse the exact message.
         if (agent.status === "running") agent.steer(freezeMessage(d.message));
         else agent.followup(freezeMessage(d.message));

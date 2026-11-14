@@ -4388,6 +4388,7 @@ var CompletionOutbox = class {
 			if (this.claimed.get(targetId)?.has(d.message.id)) continue;
 			if ([...agent.inbox.nextStep, ...agent.inbox.nextTurn].some((m) => m.id === d.message.id)) continue;
 			try {
+				if (agent.moaStopped) return;
 				if (agent.status === "running") agent.steer(freezeMessage(d.message));
 				else agent.followup(freezeMessage(d.message));
 				await this.host.ctx.sessions.flush(agent.session);

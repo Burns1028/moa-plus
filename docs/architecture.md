@@ -125,6 +125,8 @@ An empty final AI result is delivered as empty; an earlier turn's reply is never
 
 Normal Coordinator closure considers its own project queue, remaining assignments, actual Worker/background activity, and unconsumed results. Incoming next-step input and native Stop interrupt the wait. Historical errors on consumed/suppressed results do not block another project or later closure. Recovery reconciles durable acceptance, receipts, deletion, worktree ownership, and capsule anchors.
 
+Automatic Worker results respect the receiving Agent's native joined Stop. The outbox retains the full pending result without waking that Agent; an explicit resume permits normal delivery and consumption of the same identified result.
+
 ## Six control flows
 
 | Flow | Implementation boundary |
