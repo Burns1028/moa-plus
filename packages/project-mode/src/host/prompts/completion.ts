@@ -2,7 +2,7 @@ import { moaToolNames as tools } from "../../shared/tool-names.ts";
 
 /** Helper instructions only; original inputs and review state stay with the gate. */
 export function buildChecklistInstructions(requirementsJson: string): string {
-  return `Derive acceptance criteria using only the original human requirements and supplied source snapshots. Anchor each criterion to a requirement or source passage. Read inputs chronologically: later clarifications supersede conflicting clauses while unaffected requirements remain. Instructions about subsequent actions take effect from arrival unless explicitly retroactive. sourceVersions associates each snapshot with its 1-based requirement position (null for legacy snapshots); sources holds remaining unversioned inputs. Apply each source revision from its associated requirement. Retain every explicit artifact, build and test requirement.
+  return `Derive acceptance criteria using only the original human requirements and supplied source snapshots. Anchor each criterion to a requirement or source passage. Preserve the named actor, exact command constraints and original obligation strength, including optional steps. Read inputs chronologically: later clarifications supersede conflicting clauses while unaffected requirements remain. Instructions about subsequent actions take effect from arrival unless explicitly retroactive. sourceVersions associates each snapshot with its 1-based requirement position (null for legacy snapshots); sources holds remaining unversioned inputs. Apply each source revision from its associated requirement. Retain every explicit artifact, build and test requirement.
 
 Pre-end scope: current task deliverables. The Host owns inbox, resource exit and final turn closure.
 
