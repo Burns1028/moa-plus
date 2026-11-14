@@ -1,4 +1,3 @@
-import { moaToolNames as tools } from "../../shared/tool-names.ts";
 import { isAbsolute } from "node:path";
 
 export interface MoAIdentity {
@@ -21,5 +20,5 @@ export function workerReportingInstructions(
   notes: string,
   archived: string,
 ): string {
-  return `Your complete final AI message returns automatically to reportTo; no duplicate send is needed. Use ${tools.message} for useful mid-task findings or blockers. Shared context index: ${contextIndex}; read it when relevant, before opening needed context files. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
+  return `Shared context index: ${contextIndex}. Notes: ${notes}; archive: ${archived} (Coordinator-owned, read-only).`;
 }

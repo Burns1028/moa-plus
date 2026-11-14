@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.2.8 — Unreleased
+## 0.2.8 — 2026-11-15
+
+- Streamline role, acceptance and Chinese collaboration prompts around responsibilities, evidence and delivery. Keep shared Worker policy in its role instructions and actual identity/path facts in its identity message.
+- Keep automatic Worker results pending after native joined Stop and deliver them once when the recipient explicitly resumes.
+- Return requested Worker history when moa_observe finishes, times out or yields to a new message.
+- Expose native job wait outcome, elapsed time, output size and cursor progress within the existing output limit.
+- Repair incomplete review submissions in the current Verifier attempt while preserving independent evidence, rubric ownership and cancellation.
 
 - Report artifact scores separately from budget completion, and retain native ending and candidate-text metadata without changing evaluation limits or grading.
 - Identify an invalid dispatch `reportTo` field and explain the default recipient, without admitting a partial batch or accepting role labels as session IDs.

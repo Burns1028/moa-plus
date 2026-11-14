@@ -105,7 +105,7 @@ function missingReviewEvidence(evidence: ReviewEvidence): string[] {
   return [
     ...evidence.rubricRead ? [] : [`Read the current rubric with ${tools.readChecklist}.`],
     ...evidence.inspectionRecorded ? [] : [`Inspect the actual deliverable with tools; use ${tools.readDelivery} for the frozen chat answer.`],
-    ...!evidence.testsRequired || evidence.successfulNativeExecution ? [] : ["Personally perform the required execution using native Bash or PowerShell with confirmed successful exit; console success text alone does not count."],
+    ...!evidence.testsRequired || evidence.successfulNativeExecution ? [] : ["Personally perform the required execution using native Bash or PowerShell with confirmed successful exit."],
   ];
 }
 function readReviewVerdict(submitted: Verdict | undefined, body: string): Verdict {
@@ -303,7 +303,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
           ctx.tools.restrict({ allow: [] });
           ctx.tools.register(defineTool({
             name: tools.publishChecklist,
-            description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots. This completes rubric building without reading implementation outputs.",
+            description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots, completing rubric building.",
             parameters: {
               rubric: { type: "string", required: true, description: "Markdown acceptance criteria with original requirement/source anchors" },
               tests_required: { type: "boolean", required: true, description: "True whenever the original requirements or specifications require build or test execution" },
@@ -320,7 +320,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
           ctx.systemPrompt.context({
             name: "project-mode:review-evidence", order: 665, required: true, interpolate: false,
             text: () => !candidate || candidate.signal.aborted ? "" :
-              `Host prerequisites recorded for this frozen candidate only; these are not a verdict or proof that the rubric is satisfied. inspectionRecorded means another tool succeeded, not that its result establishes a requirement. successfulNativeExecution means confirmed native exit zero, not that the right tests were chosen or passed semantically. Judge the actual evidence against every rubric obligation.\n${JSON.stringify(candidate.attempt.evidence())}`,
+              `Host progress facts for this frozen candidate. inspectionRecorded records another successful tool call; successfulNativeExecution records a confirmed native exit zero. Determine whether each rubric obligation is satisfied from the actual tool results.\n${JSON.stringify(candidate.attempt.evidence())}`,
           });
           // Native completion runs after the whole tool batch, including a
           // submit/read/shell batch. Repair protocol evidence within this same
@@ -334,14 +334,14 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
             agent.steer(msg(problem));
           });
           ctx.tools.register(defineTool({ name: tools.readChecklist, description: "Read this task's independently authored rubric from disk. A superseded rubric requires fresh verification.", parameters: {}, output, execute: async (_args, exec) => read(exec.signal) }));
-          ctx.tools.register(defineTool({ name: tools.readDelivery, description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.", parameters: {}, output, execute: async () => {
+          ctx.tools.register(defineTool({ name: tools.readDelivery, description: "Read this review attempt's complete frozen final answer, including an empty answer. Inspect file or test claims through native artifact or execution tools.", parameters: {}, output, execute: async () => {
             if (!candidate) throw new Error("No active candidate review");
             candidate.signal.throwIfAborted();
             return candidate.answer;
           } }));
           ctx.tools.register(defineTool({
             name: tools.submitReview,
-            description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables, requesting native completion. Missing protocol or Host prerequisites are corrected in this same review before closure; submission alone is not inspection or required test evidence.",
+            description: "Submit this candidate review's structured outcome after inspecting the rubric and deliverables. This requests native completion; resolve any returned protocol or evidence gap in the same review.",
             parameters: {
               status: { type: "string", required: true, enum: ["Pass", "Partial", "Block"] },
               issues: { type: "array", required: true, items: { type: "string" }, description: "Concrete remaining gaps; empty when no issues remain" },
@@ -392,7 +392,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
     mounted.set(agent, () => {});
     const off = agent.ctx.tools.register(defineTool({
       name: tools.review, description: host.record(agent.id) && host.config.completionVerification === "on-demand"
-        ? `Register independent acceptance for the current task with concrete criteria and an exact, natural completion statement. Continue the task and present your final candidate; the Host then runs hidden acceptance before closing. These helpers are not children to wait for with ${tools.observe}. Use this when a separate check adds value. The Builder derives its rubric from original human requirements, not these criteria.`
+        ? `Request independent acceptance for the current task when a separate check adds value. Bind concrete criteria and an exact, natural completion statement, then present your final candidate. The Host runs hidden acceptance before closing; ${tools.observe} is for managed Worker children. The Builder derives its rubric from original human requirements.`
         : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
       parameters: { criteria: { type: "string", required: true, description: "Task completion criteria" }, promise: { type: "string", required: true, description: "Exact complete promise" } }, output,
       async execute(args, exec) {
@@ -512,7 +512,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
               capabilitySuppressions.push(pair.verifier.agent.ctx.tools.suppress({ deny: [exec.name] }));
               if (!capabilityNotice) {
                 capabilityNotice = true;
-                pair.verifier.agent.inject(msg(`The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and ${tools.readDelivery}. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag.`));
+                pair.verifier.agent.inject(msg(`The native shell backend cannot enforce this review's file protection, so ${exec.name} has been removed for this review. Continue independent verification within the current protected scope using available file inspection tools and ${tools.readDelivery}. Submit Block with runtime_blocked: true and the missing capability when these tools cannot establish a requirement. Use Partial or Block with runtime_blocked false or omitted for ordinary deliverable gaps.`));
               }
             }
           }
@@ -543,12 +543,12 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
           let verdict: Verdict;
           try { verdict = readReviewVerdict(submitted, lastText(pair.verifier.agent, offset)); }
           catch {
-            return `Review protocol incomplete for this frozen candidate: call ${tools.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block, with status Pass, Partial or Block and an issues string array. Continue this same review; this is not a defect in the author's deliverable.`;
+            return `Review protocol incomplete for this frozen candidate: call ${tools.submitReview} or return a valid JSON verdict object as plain JSON or exactly one fenced JSON block, with status Pass, Partial or Block and an issues string array. Complete this submission in the same review.`;
           }
-          if (missingVerdictGap(verdict)) return "Review protocol incomplete for this frozen candidate: a Partial or Block verdict needs a concrete anchored defect, ambiguity or missing evidence in its issues array. Do not invent a defect to fill the array. If every rubric obligation is supported, submit Pass instead.";
+          if (missingVerdictGap(verdict)) return "Review protocol incomplete for this frozen candidate: for Partial or Block, list the concrete anchored defect, ambiguity or missing evidence in issues. Submit Pass when every rubric obligation is supported.";
           if (verdict.status !== "Pass") return;
           const missing = missingReviewEvidence(evidence());
-          if (missing.length) return `Review protocol incomplete for this frozen candidate. Missing Host prerequisites: ${missing.join(" ")} Reuse evidence already recorded in this attempt and submit a fresh verdict after resolving these gaps. If the available tools cannot verify a concrete requirement, submit Partial or Block with that gap. Do not request artifact rework merely because this review omitted its own evidence.`;
+          if (missing.length) return `Review protocol incomplete for this frozen candidate. Missing Host prerequisites: ${missing.join(" ")} Reuse this attempt's recorded evidence, resolve the missing review steps and submit a fresh verdict. Report a requirement that the available tools cannot verify as a concrete Partial or Block gap.`;
         },
       });
       pair.verifier.agent.followup(msg(buildDeliveryReviewInstructions(pair.rubricPath)));
@@ -586,7 +586,7 @@ export function bindDeliveryReview(host: HostAccess): (agent: Agent) => void {
         // that the user's deliverable needs more work. Let the native loop report
         // it instead of directing the Coordinator into repeated self-repair.
         if (error instanceof ReviewAgentFailure) throw error;
-        agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
+        agent.steer(msg(`Outcome verification blocked: ${String(error)}. Repeat verification against the original requirements with a current rubric.`));
       }
     } finally {
       candidateReview?.dispose();
