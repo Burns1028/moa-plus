@@ -205,7 +205,25 @@
       {
         "file": "lib/index.js",
         "before": "de5707b43480ba37c8e141e6f67674978f3a46d87d58390c18eb1659bb17ec2f",
-        "after": "9ea6ad2e6d99539b746e92196ea97a9725651266636fcce51eedd95c745f18f9"
+        "after": "898f47bc6c85f414febb61c01e3475d495348ba8f4179476e26759083d8ef29a"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-jobs",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-observation-upgrade",
+    "patch": "dsh-tool-jobs-observation-upgrade-runtime.patch",
+    "runtimePatch": "dsh-tool-jobs-observation-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "9ea6ad2e6d99539b746e92196ea97a9725651266636fcce51eedd95c745f18f9",
+        "after": "898f47bc6c85f414febb61c01e3475d495348ba8f4179476e26759083d8ef29a"
       }
     ],
     "runtimeFingerprint": {

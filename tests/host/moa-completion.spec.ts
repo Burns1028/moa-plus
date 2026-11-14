@@ -240,6 +240,8 @@ it.each([false, true])("still requires actual inspection and required tests afte
         if (++verifier === 1) return call("moa_read_checklist", {});
         if (testsRequired && verifier === 2) return call("moa_read_delivery", {});
         if (verifier === (testsRequired ? 3 : 2)) return call("moa_submit_review", { status: "Pass", issues: [] });
+        expect(JSON.stringify(options.messages)).toContain("Missing Host prerequisites");
+        agent.cancel({ kind: "user" });
         return response('{"status":"Pass","issues":[]}');
       }
       if (++main === 2) {
@@ -250,12 +252,12 @@ it.each([false, true])("still requires actual inspection and required tests afte
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver and verify report" }] }));
     await agent.whenIdle();
-    expect(main).toBe(2);
+    expect(main).toBe(1);
     expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
   } finally { await f.dispose(); }
 });
 
-it("does not reuse a prior structured Pass when a new attempt has no submission", async () => {
+it("discards an unsupported structured Pass and requires a fresh verdict within the same review", async () => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-structured-attempts"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
@@ -266,20 +268,20 @@ it("does not reuse a prior structured Pass when a new attempt has no submission"
       if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver report [human]", tests_required: false });
       if (id.startsWith("moa-verifier-")) {
         verifier++;
+        if (verifier === 3) expect(JSON.stringify(options.messages)).toContain("Missing Host prerequisites");
+        if (verifier === 6) expect(JSON.stringify(options.messages)).toContain("valid JSON verdict");
         if ([1, 3, 6].includes(verifier)) return call("moa_read_checklist", {});
         if ([4, 7].includes(verifier)) return call("moa_read_delivery", {});
         if ([2, 8].includes(verifier)) return call("moa_submit_review", { status: "Pass", issues: [] });
         return response("This review ended without a submitted or JSON verdict.");
       }
       main++;
-      if (main === 2) expect(JSON.stringify(options.messages)).toContain("inspect actual results using tools");
-      if (main === 3) expect(JSON.stringify(options.messages)).toContain("valid JSON verdict");
       if (main > 3) agent.cancel({ kind: "user" });
       return response(`candidate ${main}`);
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
     await agent.whenIdle();
-    expect(main).toBe(3);
+    expect(main).toBe(1);
     expect(verifier).toBe(8);
     expect(agent.session.snapshotEvents().filter(event => event.type === "turn/end")).toMatchObject([{ data: { reason: { kind: "completed" } } }]);
   } finally { await f.dispose(); }
@@ -328,11 +330,14 @@ it.each(["plain", "fenced"])("rejects a self-declared Pass without actual tool w
   try {
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-unsupported-pass"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
     await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
-    let main = 0;
+    let main = 0, verifier = 0;
     f.adapter.handler = (options) => {
       const id = String(options.sessionId);
       if (id.startsWith("moa-builder-")) return call("moa_publish_checklist", { rubric: "- Deliver report [human]", tests_required: false });
-      if (id.startsWith("moa-verifier-")) return response(format === "plain" ? '{"status":"Pass","issues":[],"tests_required":false}' : 'Review complete.\n\n```json\n{"status":"Pass","issues":[]}\n```');
+      if (id.startsWith("moa-verifier-")) {
+        if (++verifier === 2) { expect(JSON.stringify(options.messages)).toContain("Missing Host prerequisites"); agent.cancel({ kind: "user" }); }
+        return response(format === "plain" ? '{"status":"Pass","issues":[],"tests_required":false}' : 'Review complete.\n\n```json\n{"status":"Pass","issues":[]}\n```');
+      }
       if (++main === 2) {
         expect(JSON.stringify(options.messages)).toContain("Outcome verification did not pass");
         agent.cancel({ kind: "user" });
@@ -341,7 +346,7 @@ it.each(["plain", "fenced"])("rejects a self-declared Pass without actual tool w
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver report" }] }));
     await agent.whenIdle();
-    expect(main).toBe(2);
+    expect(main).toBe(1);
     expect(agent.session.snapshotEvents().filter((e) => e.type === "turn/end").some((e) => e.type === "turn/end" && e.data.reason.kind === "completed")).toBe(false);
   } finally { await f.dispose(); }
 });
@@ -350,7 +355,7 @@ it.each([
   ["malformed", 'Review complete.\n```json\n{"status":"Pass","issues":[]} trailing\n```', "valid JSON verdict"],
   ["ambiguous", '```json\n{"status":"Pass","issues":[]}\n```\nDifferent result:\n```json\n{"status":"Block","issues":["Not complete"]}\n```', "valid JSON verdict"],
   ["whole-fence JSON with code markers in an issue", '```json\n{"status":"Block","issues":["Fix ```bash npm test``` example"]}\n```', "Fix ```bash npm test``` example"],
-])("preserves the specific failure reason for a %s verdict after actual inspection", async (_format, body, reason) => {
+])("preserves the specific failure reason for a %s verdict after actual inspection", async (format, body, reason) => {
   const f = await fixture(undefined, { completionVerification: true });
   try {
     const { agent } = await f.ctx.agents.create({ sessionId: SessionId("completion-verdict-format"), meta: { cwd: f.root }, agentOptions: { provider: "test", model: "test" } });
@@ -362,6 +367,7 @@ it.each([
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("moa_read_delivery", {});
+        if (verifier === 4) { notice = JSON.stringify(options.messages); agent.cancel({ kind: "user" }); }
         return response(body);
       }
       if (++main === 2) {
@@ -372,8 +378,8 @@ it.each([
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Deliver the report" }] }));
     await agent.whenIdle();
-    expect(main).toBe(2);
-    expect(verifier).toBe(3);
+    expect(main).toBe(format.startsWith("whole-fence") ? 2 : 1);
+    expect(verifier).toBe(format.startsWith("whole-fence") ? 3 : 4);
     expect(notice).toContain(reason);
     expect(notice).not.toContain("Verifier must read the rubric, inspect actual results using tools");
     expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
@@ -414,6 +420,7 @@ it.each(["Bash", "pwsh"])("uses the independent rubric to reject a claimed Pass 
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call(name, {});
+        if (verifier === 4) { expect(JSON.stringify(options.messages)).toContain("confirmed successful exit"); agent.cancel({ kind: "user" }); }
         return response('{"status":"Pass","issues":[],"tests_required":false}');
       }
       if (++main === 2) {
@@ -424,7 +431,7 @@ it.each(["Bash", "pwsh"])("uses the independent rubric to reject a claimed Pass 
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the test" }] }));
     await agent.whenIdle();
-    expect(main).toBe(2);
+    expect(main).toBe(1);
   } finally { await f.dispose(); }
 });
 
@@ -460,6 +467,7 @@ it.each([
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("moa_read_checklist", {});
         if (verifier === 2) return call("pwsh", {});
+        if (!pass && verifier === 4) { expect(JSON.stringify(options.messages)).toContain("confirmed successful exit"); agent.cancel({ kind: "user" }); }
         return response('{"status":"Pass","issues":[]}');
       }
       if (++main > 1) {
@@ -470,7 +478,7 @@ it.each([
     };
     agent.followup(createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text: "Run the required tests" }] }));
     await agent.whenIdle();
-    expect(main).toBe(pass ? 1 : 2);
+    expect(main).toBe(1);
     expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(pass);
   } finally { await f.dispose(); }
 });

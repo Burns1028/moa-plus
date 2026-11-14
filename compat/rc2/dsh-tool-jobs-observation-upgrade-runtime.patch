@@ -1,0 +1,141 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -129,8 +129,19 @@
+ 		},
+ 		finishedAt: { type: "integer" }
+ 	}
+ };
++const JOB_OUTPUT_OBSERVATION_SCHEMA = {
++	type: "object",
++	additionalProperties: false,
++	properties: {
++		jobElapsedMs: { type: "integer", required: true },
++		waitedMs: { type: "integer", required: true },
++		waitOutcome: { type: "string", required: true, enum: ["not-requested", "settled", "timeout", "interrupted"] },
++		outputTotalBytes: { type: "integer", required: true },
++		noNewOutput: { type: "boolean", required: true }
++	}
++};
+ const encoder = new TextEncoder();
+ function retainTail(text, maxBytes) {
+ 	const retainer = new TextRetainer({
+ 		kind: "tail",
+@@ -248,8 +259,32 @@
+ 		text: read.result === void 0 ? delta : `${delta}${delta.length > 0 && !delta.endsWith("\n") ? "\n" : ""}${read.result}`,
+ 		job: publicJob(read.job)
+ 	};
+ }
++/** Read-only facts from the same consuming read; silence is not a liveness diagnosis. */
++function observeJobOutput(body, read, waitedMs, waitOutcome) {
++	body.observation = {
++		jobElapsedMs: Math.max(0, Math.round((read.job.finishedAt ?? Date.now()) - read.job.startedAt)),
++		waitedMs,
++		waitOutcome,
++		outputTotalBytes: read.job.output.total,
++		noNewOutput: body.text.length === 0
++	};
++	return body;
++}
++/** Preserve the original output first; observations never displace body/status under a cap. */
++function renderJobOutput(value, maxBytes) {
++	const body = value.text.length > 0 ? value.text : "(no new output)";
++	const content = body.endsWith("\n") ? body.slice(0, -1) : body;
++	const suffix = `\n${statusLine(value.job)}`;
++	const o = value.observation;
++	if (o !== void 0) {
++		const line = `[job observation: elapsed_ms=${o.jobElapsedMs} waited_ms=${o.waitedMs} wait=${o.waitOutcome} output_total_bytes=${o.outputTotalBytes} no_new_output=${o.noNewOutput}]`;
++		const complete = `${content}\n${line}${suffix}`;
++		if (maxBytes === void 0 || encoder.encode(complete).byteLength <= maxBytes) return complete;
++	}
++	return fitWithSuffix(content, suffix, maxBytes, "\n[output truncated]");
++}
+ function apply(ctx, config) {
+ 	const waitDefault = config.waitTimeoutMs ?? 3e4;
+ 	const waitCap = config.maxWaitTimeoutMs ?? 6e5;
+ 	const delivery = config.completionDelivery ?? "wakeup";
+@@ -280,14 +315,11 @@
+ 		outputLimits.delete(exec);
+ 		if (maxBytes === void 0) return void 0;
+ 		if (exec.name === "job_output" && !result.isError) {
+ 			const value = result.value;
+-			const body = value.text.length > 0 ? value.text : "(no new output)";
+-			const content = body.endsWith("\n") ? body.slice(0, -1) : body;
+-			const suffix = `\n${statusLine(value.job)}`;
+-			if (rawSingleText(result.content) === `${content}${suffix}`) return [{
++			if (rawSingleText(result.content) === renderJobOutput(value)) return [{
+ 				type: "text",
+-				text: fitWithSuffix(content, suffix, maxBytes, "\n[output truncated]")
++				text: renderJobOutput(value, maxBytes)
+ 			}];
+ 		}
+ 		return boundSingleText(result.content, maxBytes);
+ 	};
+@@ -401,25 +433,24 @@
+ 					},
+ 					job: {
+ 						...PUBLIC_JOB_SCHEMA,
+ 						required: true
+-					}
++					},
++					observation: JOB_OUTPUT_OBSERVATION_SCHEMA
+ 				}
+ 			},
+ 			render: (_args, value) => {
+-				const body = value.text.length > 0 ? value.text : "(no new output)";
+-				return [{
+-					type: "text",
+-					text: `${body}${body.endsWith("\n") ? "" : "\n"}${statusLine(value.job)}`
+-				}];
++				return [{ type: "text", text: renderJobOutput(value) }];
+ 			}
+ 		},
+ 		async execute(args, exec) {
+ 			const id = validateJobId(args.job_id);
+ 			const jobs = ctx.jobs;
+ 			const agent = exec.agent;
+ 			let endReleasedRead;
+ 			let releasedBy;
++			let waitedMs = 0;
++			let waitOutcome = "not-requested";
+ 			try {
+ 				if (args.wait === true) {
+ 					const input = new AbortController();
+ 					const checkInput = () => {
+@@ -432,28 +463,34 @@
+ 					};
+ 					const unsubscribe = agent === void 0 ? () => {} : ctx.on("agent/inbox/inserted", ({ agent: subject }) => {
+ 						if (subject === agent) checkInput();
+ 					});
++					let started;
+ 					try {
+ 						checkInput();
+-						await jobs.wait(id, Math.min(args.timeout_ms ?? waitDefault, waitCap), agent?.id, AbortSignal.any([exec.signal, input.signal]));
++						started = performance.now();
++						const waited = await jobs.wait(id, Math.min(args.timeout_ms ?? waitDefault, waitCap), agent?.id, AbortSignal.any([exec.signal, input.signal]));
++						waitOutcome = waited.status === "running" || waited.status === "stopping" ? "timeout" : "settled";
+ 					} catch (error) {
+ 						if (!input.signal.aborted) throw error;
+ 						if (exec.signal.aborted) throw new Error("wait aborted");
++						waitOutcome = "interrupted";
+ 					} finally {
++						if (started !== void 0) waitedMs = Math.max(0, Math.round(performance.now() - started));
+ 						unsubscribe();
+ 					}
+ 				}
+-				const body = readBody(jobs.read(id, exec.agent?.id));
++				const read = jobs.read(id, exec.agent?.id);
++				const body = readBody(read);
+ 				if (releasedBy !== void 0) suppressedSettlements.delete(id);
+ 				const notice = pending.get(id);
+ 				if (notice !== void 0) {
+ 					pending.delete(id);
+ 					ctx.get("agents")?.get(notice.owner)?.inbox.remove(notice.messageId);
+ 					body.text = `${notice.held ?? ""}${body.text}`;
+ 				}
+ 				if (releasedBy !== void 0 && (body.job.status === "running" || body.job.status === "stopping")) body.job.detail = body.job.detail === void 0 ? releasedBy : `${body.job.detail}; ${releasedBy}`;
+-				return body;
++				return observeJobOutput(body, read, waitedMs, waitOutcome);
+ 			} finally {
+ 				endReleasedRead?.();
+ 			}
+ 		},

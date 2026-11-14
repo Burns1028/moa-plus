@@ -766,13 +766,14 @@ export class MoAAgents {
                 ),
               )
             : undefined;
-          if (!input.wait) return { children, ...(history ? { history } : {}) };
+          const snapshot = { children, ...(history ? { history } : {}) };
+          if (!input.wait) return snapshot;
           if (agent.inbox.nextStep.length)
-            return { children, reason: "interrupted" as const };
+            return { ...snapshot, reason: "interrupted" as const };
           if (children.every((child) => child.status === "idle"))
-            return { children, reason: "done" as const };
+            return { ...snapshot, reason: "done" as const };
           const remaining = deadline - Date.now();
-          if (remaining <= 0) return { children, reason: "timeout" as const };
+          if (remaining <= 0) return { ...snapshot, reason: "timeout" as const };
           let timer: ReturnType<typeof setTimeout> | undefined;
           const abort = new AbortController();
           try {

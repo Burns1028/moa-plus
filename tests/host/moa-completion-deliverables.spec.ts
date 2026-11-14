@@ -176,6 +176,7 @@ it("requires actual build or test evidence even after inspecting the candidate a
       if (id.startsWith("moa-verifier-")) {
         if (++verifier === 1) return call("moa_read_checklist");
         if (verifier === 2) return call("moa_read_delivery");
+        if (verifier === 4) { expect(JSON.stringify(options.messages)).toContain("confirmed successful exit"); agent.cancel({ kind: "user" }); }
         return response('{"status":"Pass","issues":[]}');
       }
       if (++main === 2) agent.cancel({ kind: "user" });
@@ -183,7 +184,7 @@ it("requires actual build or test evidence even after inspecting the candidate a
     };
     agent.followup(user("Run the required tests and report the result"));
     await agent.whenIdle();
-    expect(main).toBe(2);
+    expect(main).toBe(1);
     expect(agent.session.snapshotEvents().some(event => event.type === "turn/end" && event.data.reason.kind === "completed")).toBe(false);
   } finally { await f.dispose(); }
 });

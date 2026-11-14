@@ -33,6 +33,7 @@ owners of the missing capabilities. Its reviewed boundaries are described in:
 - [Execution and cancellation](native-rc2-execution-contract.md)
 - [Client, Worker residency and attachments](native-rc2-client-contract.md)
 - [Record ownership](native-rc2-memory-contract.md)
+- [Job-output observations](native-job-output-observation-contract.md)
 
 PTC uses the existing native pipeline. `nativeOnly` tools appear as direct model
 schemas, have no SDK or runtime program binding, and are rejected as nested
