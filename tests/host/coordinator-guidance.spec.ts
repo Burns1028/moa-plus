@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import { join } from "node:path";
+import { realpath } from "node:fs/promises";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, type GenerateOptions, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import Loader from "@deepseek-ai/cordis-plugin-loader";
@@ -166,7 +167,7 @@ it("assembles role policy once with assignment constraints and actual Worker ide
     expect(identity?.type).toBe("text");
     if (identity?.type !== "text") throw new Error("missing worker identity");
     expect(identity.text).toContain(`Agent ID: ${receipt.workerId}`);
-    expect(identity.text).toContain(`Workdir: ${f.root} (Shared)`);
+    expect(identity.text).toContain(`Workdir: ${await realpath(f.root)} (Shared)`);
     expect(identity.text).toContain(`Report to: ${agent.id}`);
     expect(identity.text).toContain(join(f.root, "context", "index.md"));
     expect(identity.text).toContain(join(f.root, "notes.md"));
