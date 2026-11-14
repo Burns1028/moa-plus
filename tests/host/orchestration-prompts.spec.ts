@@ -67,11 +67,10 @@ it("协同探索各区域只有一名写入者，专家自主改变路线", () =
   expect(prompt).toMatch(/charter\.md：由你一次性写入/);
   expect(prompt).toMatch(/findings\/<peer>\/：仅由对应专家写入/);
   expect(prompt).toMatch(/board\.md：仅由记录员写入/);
-  expect(prompt).toMatch(/放弃停滞路线是一项义务/);
+  expect(prompt).toMatch(/原路线停滞时及时转向/);
   expect(prompt).toMatch(/不得向其他专家发送消息/);
   expect(prompt).toMatch(/不是原子锁/);
-  expect(prompt).toMatch(/不得分派工作、选择专家的方向/);
-  expect(prompt).toMatch(/不要假定未配置的定时器/);
+  expect(prompt).toMatch(/记录员.*整理事实板.*探索路线由专家自主选择/);
   expect(prompt).toMatch(/建立团队不等于完成任务/);
 });
 
@@ -94,14 +93,13 @@ it("统筹推进可选择简单阶段，并依据证据及时调整计划", () =
   const { prompt } = orchestrationPacks["auto-orchestration"];
   expect(prompt).toMatch(/简单阶段只安排一名执行者/);
   expect(prompt).toMatch(/目标、协作形式和完成标准/);
-  expect(prompt).toMatch(/不改变其他任务中的默认协调者策略/);
+  expect(prompt).toMatch(/担任本任务的统筹者/);
   expect(prompt).toMatch(/立即调整后续阶段/);
   expect(prompt).toMatch(/用户最初目标/);
 });
 
-it("保留轮次结束时的自动汇报，不重复发送完整结果通知", () => {
+it("各方案保留轮次结束时的自动汇报", () => {
   for (const { prompt } of Object.values(orchestrationPacks)) {
     expect(prompt).toMatch(/自动/);
-    expect(prompt).toMatch(/无须再请求|不要再/);
   }
 });

@@ -1,6 +1,12 @@
 # Verification
 
-## Unreleased 0.2.8: execution observations and review protocol repair — 2026-11-14
+## MoA+ 0.2.8: prompt cleanup and release checks — 2026-11-15
+
+Role and acceptance prompts now state responsibilities, evidence requirements and delivery directly. Fixed Worker guidance lives in its role prompt; identity messages carry actual IDs, reporting targets, paths and ownership facts. Chinese collaboration prompts retain their workflows while removing repeated reporting warnings and unrelated implementation explanations. Original-source chronology, independent evidence, native permissions and joined Stop retain their existing contracts.
+
+The final source passed the production build, both typechecks, and **519 Host/Client/integration/native-contract checks**, with **37 tests and one file explicitly skipped**. Launcher, offline-evaluation and native job-output checks passed **37**, with **five explicit platform/profile skips**. The [v0.2.8 release notes](https://github.com/Burns1028/moa-plus/releases/tag/v0.2.8) record the final package-consumer checks and fresh real-model acceptance results for ordinary chat, independent review, concurrent result delivery and Stop.
+
+## 0.2.8 development: execution observations and review protocol repair — 2026-11-14
 
 `moa_observe` now retains its requested native history window for completion, timeout and input-interruption returns. Native `job_output` adds actual job age, wait duration/outcome and output observations, preserving the existing consuming cursor, permissions, Stop and complete-output byte cap. Both audited compatibility profiles accept stock and previous patched bytes through exact upgrade paths; package/path counts are unchanged. The separate [native observation contract](native-job-output-observation-contract.md) was independently reviewed.
 
@@ -8,7 +14,7 @@ The Verifier sees attempt-local Host prerequisites through required read-only co
 
 Build and both typechecks passed. Host, Client, integration and native-contract checks passed **516 tests**, with **37 tests and one file skipped**. Launcher/offline-evaluator checks passed **30**, with three explicit skips. The matching Desktop Electron run passed **29 native checks**, with two rc.3-specific branches skipped; these include **13/13** Desktop completion checks and both profiles' job observation fixtures. Counterexamples cover native batch ordering, same-turn protocol correction, stale evidence, malformed/empty verdicts, superseded/unavailable rubrics, missing or console-only execution, Stop and role isolation. These scripted checks establish the tested boundaries; natural model acceptance is separate and does not imply a general capability or latency gain.
 
-## Unreleased 0.2.8: task text after native compaction — 2026-11-14
+## 0.2.8 development: task text after native compaction — 2026-11-14
 
 In default on-demand mode, an active native checkpoint restores the unfinished task's captured human text and explicit text-source snapshots to required runtime context. It does not request acceptance, create helpers, reread implementation-modified specifications, or restore a finished task. Rich attachments and binary content retain native compaction semantics. The plugin does not change production compaction thresholds.
 

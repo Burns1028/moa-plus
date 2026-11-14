@@ -15,10 +15,13 @@ function batch(...calls: [string, object?][]): StreamChunk[] {
 }
 const pass: [string, object] = ["moa_submit_review", { status: "Pass", issues: [] }];
 const reads: [string][] = [["moa_read_checklist"], ["moa_read_delivery"]];
-function facts(request: GenerateOptions) {
+function evidenceText(request: GenerateOptions) {
   const section = request.messages.filter(message => message.source.kind === "runtime-context").at(-1)?.source;
-  const body = section?.kind === "runtime-context" ? section.sections?.find(row => row.name === "project-mode:review-evidence")?.text : undefined;
-  expect(body).toContain("not a verdict or proof that the rubric is satisfied");
+  return section?.kind === "runtime-context" ? section.sections?.find(row => row.name === "project-mode:review-evidence")?.text : undefined;
+}
+function facts(request: GenerateOptions) {
+  const body = evidenceText(request);
+  expect(body).toBeTypeOf("string");
   return JSON.parse(body!.split("\n").at(-1)!);
 }
 const requestText = (request: GenerateOptions) => request.messages.flatMap(message => message.content).filter(block => block.type === "text").map(block => block.text).join("\n");
@@ -43,7 +46,7 @@ it("checks the completed native batch, accepting submit-before-read-and-shell wi
     f.adapter.handler = request => {
       const id = String(request.sessionId);
       if (id.startsWith("moa-builder-")) {
-        expect(requestText(request)).not.toContain("Host prerequisites recorded");
+        expect(evidenceText(request)).toBeUndefined();
         return batch(["moa_publish_checklist", { rubric: "- Answer and required tests [human 1]", tests_required: true }]);
       }
       if (id.startsWith("moa-verifier-")) {
@@ -52,7 +55,7 @@ it("checks the completed native batch, accepting submit-before-read-and-shell wi
         expect(facts(request)).toEqual({ rubricRead: false, inspectionRecorded: false, testsRequired: true, successfulNativeExecution: false, capabilityUnavailable: false });
         return batch(pass, ...reads, ["pwsh"]);
       }
-      expect(requestText(request)).not.toContain("Host prerequisites recorded");
+      expect(evidenceText(request)).toBeUndefined();
       roots++;
       return response("The frozen answer.");
     };
@@ -176,8 +179,11 @@ it.each([
       if (id.startsWith("moa-verifier-")) {
         if (++reviews === 1) return legacy ? batch(...reads, ["pwsh"]) : batch(...reads, ["pwsh"], ["moa_submit_review", { status, issues }]);
         if (legacy && reviews === 2) return response(JSON.stringify({ status, issues }));
-        expect(requestText(request)).toContain("needs a concrete anchored");
-        expect(requestText(request)).toContain("Do not invent a defect");
+        const notice = request.messages.findLast(message => message.source.kind === "moa-completion");
+        const body = notice?.content.filter(block => block.type === "text").map(block => block.text).join("\n");
+        expect(body).toMatch(/Partial.*Block/);
+        expect(body).toContain("issues");
+        expect(body).toContain("Pass");
         return batch(pass);
       }
       return response(`candidate ${++roots}`);

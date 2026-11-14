@@ -6,6 +6,7 @@ import Loader from "@deepseek-ai/cordis-plugin-loader";
 import Presets from "@deepseek-ai/dsh-agent-preset-registry";
 import { fixture, response } from "./fixture.ts";
 import { coordinatorPrompt } from "../../packages/project-mode/src/host/prompts/coordinator.ts";
+import { workerPrompt } from "../../packages/project-mode/src/host/prompts/worker.ts";
 import type { MoAAgents } from "../../packages/project-mode/src/host/moa/agents.ts";
 
 function systemText(request: GenerateOptions) {
@@ -88,10 +89,9 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
       expect(facts).not.toContain("Automatic outcome verification is not enabled");
       expect(verifierStep).toBe(3);
       const review = f.adapter.requests.find(entry => String(entry.sessionId).startsWith("moa-verifier-"))!;
-      const reviewInput = JSON.stringify(review.messages);
-      expect(reviewInput).toContain("Prefer native glob, grep and read for file and directory inspection");
-      expect(reviewInput).toContain("only when the verification responsibility requires command execution, builds or tests");
-      expect(reviewInput).toContain("Candidate factual claims still require evidence");
+      expect(review.tools?.map(tool => tool.name)).toEqual(expect.arrayContaining([
+        "moa_read_checklist", "moa_read_delivery", "moa_submit_review",
+      ]));
     } else if (completionVerification === false) {
       expect(facts).toContain("Automatic outcome verification is not enabled in this runtime");
       expect(facts).not.toContain("automatically runs an independent tool-backed Outcome Verifier");
@@ -125,7 +125,7 @@ it.each([true, false, "on-demand"] as const)("describes configured outcome verif
   }
 });
 
-it("assembles one-owner, source-grounded review and optional memory instructions in both roles", async () => {
+it("assembles role policy once with assignment constraints and actual Worker identity paths", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
@@ -137,18 +137,8 @@ it("assembles one-owner, source-grounded review and optional memory instructions
     agent.followup(prompt("Continue from the existing evidence and assign the remaining work."));
     await agent.whenIdle();
     const coordinator = f.adapter.requests.find((request) => request.sessionId === agent.id)!;
-    const policy = `${systemText(coordinator)}\n${runtimeText(coordinator)}`;
-    expect(policy).toContain("primary executor with a team available when useful");
-    expect(policy).toContain("one owner responsible for its implementation, checks and integration");
-    expect(policy).toContain("a brief acknowledgement or a short clarification in the normal chat reply is a complete response");
-    expect(policy).toContain("Respond only to that input; do not add unverified claims about workspace, system or runtime state");
-    expect(policy).toContain("ordinary chat clarification should not block a turn on a question card");
-    expect(policy).toContain("Reuse completed results and existing checks");
-    expect(policy).toContain("unresolved question");
-    expect(policy).toContain("verify against original requirements, source data and contracts before changing artifacts or checks");
-    expect(policy).toContain("A later suggestion does not redefine those sources");
-    expect(policy).toContain("Record only state useful for later continuation");
-    expect(policy).not.toContain("update them when the state changes");
+    expect(policyCopies(coordinator)).toBe(1);
+    expect(systemText(coordinator)).toContain(coordinatorPrompt);
 
     const seen = Promise.withResolvers<GenerateOptions>();
     f.adapter.handler = (request) => {
@@ -168,22 +158,19 @@ it("assembles one-owner, source-grounded review and optional memory instructions
     expect(worker.sessionId).toBe(receipt.workerId);
     const instructions = JSON.stringify(worker.messages);
     expect(instructions).toContain("without modifying any file");
-    expect(instructions).toContain("Only contribute knowledge when");
-    expect(instructions).toContain("no new reusable finding");
-    expect(instructions).toContain("assignment's write constraints");
     const workerPolicy = `${systemText(worker)}\n${runtimeText(worker)}`;
-    expect(workerPolicy).toContain("Distinguish demonstrated defects from uncertain suggestions");
-    expect(workerPolicy).toContain("workstream owner verifies findings and integrates changes");
+    expect(workerPolicy.split(workerPrompt)).toHaveLength(2);
     const identity = worker.messages
       .flatMap((message) => message.content)
       .find((block) => block.type === "text" && block.text.startsWith("Agent ID:"));
     expect(identity?.type).toBe("text");
     if (identity?.type !== "text") throw new Error("missing worker identity");
+    expect(identity.text).toContain(`Agent ID: ${receipt.workerId}`);
+    expect(identity.text).toContain(`Workdir: ${f.root} (Shared)`);
     expect(identity.text).toContain(`Report to: ${agent.id}`);
-    expect(identity.text).toContain("complete final AI message returns automatically to reportTo; no duplicate send is needed");
-    expect(identity.text).toContain("read it when relevant");
-    expect(identity.text).not.toContain("to report results");
-    expect(identity.text).not.toContain("Maintain valuable reusable knowledge");
+    expect(identity.text).toContain(join(f.root, "context", "index.md"));
+    expect(identity.text).toContain(join(f.root, "notes.md"));
+    expect(identity.text).toContain(join(f.root, "archived.md"));
   } finally {
     await f.dispose();
   }
@@ -217,7 +204,7 @@ it("explains role execution capabilities and explicit reply syntax in native too
   }
 });
 
-it("keeps adaptive collaboration policy and native contracts while schemas own control syntax", async () => {
+it("keeps collaboration controls in native schemas with one Coordinator policy", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
@@ -231,13 +218,9 @@ it("keeps adaptive collaboration policy and native contracts while schemas own c
     const request = f.adapter.requests.find((entry) => entry.sessionId === agent.id)!;
     const policy = `${systemText(request)}\n${runtimeText(request)}`;
     expect(policyCopies(request)).toBe(1);
-    expect(policy).toMatch(/prefer moa_message.*familiar worker/i);
-    expect(policy).toMatch(/moa_branch.*useful committed history/);
-    expect(policy).toMatch(/moa_dispatch.*clean independent context/);
-    expect(policy).toContain("When collaboration helps");
-    expect(policy).toContain("ready work in parallel");
-    expect(policy).toContain("unlock downstream");
-    expect(policy).toContain("Small self-contained actions");
+    expect(request.tools?.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "moa_dispatch", "moa_branch", "moa_message", "moa_observe", "moa_stop", "moa_context",
+    ]));
 
     const query = request.tools!.find((tool) => tool.name === "moa_observe");
     expect(query?.parameters).toMatchObject({
@@ -252,19 +235,8 @@ it("keeps adaptive collaboration policy and native contracts while schemas own c
         },
       },
     });
-    expect(policy).toContain("native wait");
     expect(policy).not.toContain("history_offset");
     expect(policy).not.toContain("timeout_ms");
-    expect(policy).toContain("timeout alone is not failure");
-    expect(policy).toContain("use observed progress");
-    expect(policy).toContain("carry a complete task through investigation, implementation, testing and delivery yourself");
-    expect(policy).toContain("take responsibility off your critical path");
-    expect(policy).not.toContain("dispatch or reuse workers before doing their assigned investigation yourself");
-    expect(policy).toContain("already adequate independent check may be enough");
-    expect(policy).toMatch(/moa_stop.*cancel a branch whose result is no longer needed/);
-    expect(policy).toContain("Await native cleanup before revising its assignment or final delivery");
-    expect(policy).toContain("automatically returns its complete final AI message");
-    expect(policy).toContain("message-driven background handoff is not task completion");
   } finally {
     await f.dispose();
   }

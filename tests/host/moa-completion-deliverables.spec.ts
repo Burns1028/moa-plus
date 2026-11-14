@@ -118,7 +118,9 @@ it.each([false, true])("versions an explicitly revised specification while prese
     expect(builders).toHaveLength(2);
     expect(builders[1]).toContain("INITIAL REQUIREMENT: RED");
     expect(builders[1]).toContain("UPDATED REQUIREMENT: BLUE");
-    const inputText = f.adapter.requests.filter(options => String(options.sessionId).startsWith("moa-builder-")).at(-1)!.messages.flatMap(message => message.content.filter(block => block.type === "text").map(block => block.text)).find(body => body.startsWith("Independently derive"))!;
+    const builderRequest = f.adapter.requests.filter(options => String(options.sessionId).startsWith("moa-builder-")).at(-1)!;
+    const inputText = builderRequest.messages.filter(message => message.source.kind === "user").at(-1)!.content
+      .filter(block => block.type === "text").map(block => block.text).join("\n");
     const input = JSON.parse(inputText.slice(inputText.lastIndexOf("\n") + 1));
     expect(input.sourceVersions).toEqual([
       { path: "spec.md", requirement: legacy ? null : 1, content: "INITIAL REQUIREMENT: RED" },

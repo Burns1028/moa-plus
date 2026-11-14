@@ -1296,28 +1296,26 @@ function watchActivity(ctx, agent, activity, config) {
 // src/host/prompts/completion.ts
 /** Helper instructions only; original inputs and review state stay with the gate. */
 function buildChecklistInstructions(requirementsJson) {
-	return `Independently derive task-deliverable criteria only from the original human requirements and source snapshots below. Anchor each criterion to exact requirement/source passages; never derive standards from implementation output. Read inputs chronologically: later clarifications supersede conflicts while unaffected earlier requirements remain. sourceVersions contains captured documents with each explicit reference's 1-based requirement position (null for legacy snapshots); sources contains remaining unversioned inputs, not duplicate document bodies. Apply revisions from their associated requirement. Instructions about subsequent actions apply from arrival unless explicitly retroactive. Preserve explicit artifact, build and test requirements.
+	return `Derive acceptance criteria using only the original human requirements and supplied source snapshots. Anchor each criterion to a requirement or source passage. Read inputs chronologically: later clarifications supersede conflicting clauses while unaffected requirements remain. Instructions about subsequent actions take effect from arrival unless explicitly retroactive. sourceVersions associates each snapshot with its 1-based requirement position (null for legacy snapshots); sources holds remaining unversioned inputs. Apply each source revision from its associated requirement. Retain every explicit artifact, build and test requirement.
 
-This review runs before the parent turn closes. The Host enforces inbox, resource exit and actual closure. Do not require this review's completed record or the later parent turn/end to already exist as task deliverables.
+Pre-end scope: current task deliverables. The Host owns inbox, resource exit and final turn closure.
 
-Without an actionable goal or earlier unfinished concrete requirement, a brief acknowledgement or ordinary chat clarification is a valid deliverable; it need not wait for a new human task. A missing-input limitation requires an explicitly referenced unavailable snapshot; empty source collections alone do not establish missing specifications. Do not fill unavailable inputs from implementation or invent generic testing requirements.
+For input with no actionable goal or unfinished requirement, a brief acknowledgement or ordinary clarification is a complete deliverable. Base missing-input limitations on explicitly referenced unavailable snapshots, and record them separately from task-deliverable criteria. Combine duplicate criteria and retain independent obligations.
 
-Combine duplicate requirements, retain independent obligations, and add no process, record-keeping or review artifacts absent from the original request. Report unavailable input snapshots as limitations; they do not create new author deliverables.
-
-Submit the Markdown rubric through ${moaToolNames.publishChecklist}, your only tool. Set tests_required true whenever original requirements/specs require build or test execution; otherwise false. No file, shell or delegation tools are needed. Plain text does not submit a rubric.\n${requirementsJson}`;
+Submit the Markdown rubric through ${moaToolNames.publishChecklist}, your sole tool. Set tests_required true whenever the original requirements or specifications require build or test execution; otherwise false.\n${requirementsJson}`;
 }
 function buildDeliveryReviewInstructions(rubricPath) {
-	return `Independently verify actual deliverables against this rubric. Interpret the anchored requirements chronologically: later clarifications supersede conflicting earlier instructions, and instructions about subsequent actions apply from their arrival unless explicitly retroactive.
+	return `Independently verify current deliverables against this rubric. Interpret anchored requirements chronologically: later clarifications supersede conflicts, and instructions about subsequent actions take effect from arrival unless explicitly retroactive.
 
-This is a pre-end review: the parent remains open until the Host enforces inbox, resource exit and closure. Your own completed record and the later parent turn/end cannot already exist here; do not reject deliverables for those later lifecycle events.
+Pre-end scope: task deliverables available before the parent closes. The Host owns inbox, resource exit and final turn closure.
 
-Judge only requested deliverables. Without an actionable goal or unfinished concrete requirement, an appropriate acknowledgement or ordinary clarification can pass without another human reply, workspace exploration or shell execution. Do not infer missing specs from an empty sources map or add requirements. Report genuine ambiguity through your verdict instead of blocking on a question to the human.
+Judge the requested deliverables. A brief acknowledgement or clarification can satisfy input with no actionable goal or unfinished requirement. Base missing-specification gaps on explicitly referenced unavailable sources and report genuine ambiguity in your verdict.
 
-Use ${moaToolNames.readDelivery} to inspect this attempt's frozen final-answer text; earlier candidate reads belong to earlier attempts. For an answer delivered in chat, that text is the actual artifact and does not require a shell merely to inspect it. Prefer native glob, grep and read for file and directory inspection. Use the native shell (Bash or PowerShell) only when the verification responsibility requires command execution, builds or tests, and personally perform required execution. Candidate factual claims still require evidence; claims about files or tests are not evidence. Preserve all explicit artifact and test requirements. A pass requires actual tool-backed inspection. Use ${moaToolNames.readChecklist} to read the rubric from disk.
+Read this candidate's complete frozen answer with ${moaToolNames.readDelivery} and the current rubric with ${moaToolNames.readChecklist}. For a chat deliverable, inspect that answer directly. Use native glob, grep and read for file and directory inspection. Use native Bash or PowerShell when verification requires command execution, and personally run every required build or test. Preserve all explicit artifact and test obligations. Support factual claims with actual inspection or execution results, and establish each rubric obligation before Pass.
 
-Choose checks that establish the requested properties and stop once those properties have evidence. Repeat a successful check only after a relevant change or for a concrete unresolved concern. Each reported defect needs an anchored requirement and observed counterexample; a suggested improvement is not a failed requirement. A validation-script failure is not by itself an artifact defect: inspect the cause, decoded data types and actual requirement before reporting a mismatch. Preserve the original contract when checking or revising checks. Report conflicting source requirements as ambiguity, not a confident replacement contract. Distinguish a tool/environment limitation from a deliverable error; report a specific unresolved gap instead of adding tests without a purpose.
+Choose checks that establish the requested properties; finish when the evidence is sufficient. Repeat a successful check for a relevant change or an unresolved concern. For each defect, cite its original requirement and an observed counterexample in the deliverable. Diagnose failed validation scripts against that same contract. Report source conflicts as ambiguity and tool/environment limitations as specific verification gaps.
 
-Finish by calling ${moaToolNames.submitReview} with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). This requests native completion: when the protocol and Host prerequisites are satisfied, the review ends without another model response. Otherwise, correct the precise protocol or evidence gap in this same review; submission does not replace inspection or required tests. Rubric file: ${rubricPath}`;
+Submit ${moaToolNames.submitReview} with status Pass, Partial or Block and a string array of concrete issues (empty for Pass). When protocol and Host prerequisites are satisfied, this submission ends the review. Resolve any returned protocol or evidence gap within this same candidate, then submit a fresh verdict. Rubric file: ${rubricPath}`;
 }
 // src/host/moa/worker-memory-policy.ts
 /** Bind the native session policy; keep it until this activation's work joins. */
@@ -1452,7 +1450,7 @@ function missingReviewEvidence(evidence) {
 	return [
 		...evidence.rubricRead ? [] : [`Read the current rubric with ${moaToolNames.readChecklist}.`],
 		...evidence.inspectionRecorded ? [] : [`Inspect the actual deliverable with tools; use ${moaToolNames.readDelivery} for the frozen chat answer.`],
-		...!evidence.testsRequired || evidence.successfulNativeExecution ? [] : ["Personally perform the required execution using native Bash or PowerShell with confirmed successful exit; console success text alone does not count."]
+		...!evidence.testsRequired || evidence.successfulNativeExecution ? [] : ["Personally perform the required execution using native Bash or PowerShell with confirmed successful exit."]
 	];
 }
 function readReviewVerdict(submitted, body) {
@@ -1698,7 +1696,7 @@ function bindDeliveryReview(host) {
 					ctx.tools.restrict({ allow: [] });
 					ctx.tools.register(defineTool({
 						name: moaToolNames.publishChecklist,
-						description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots. This completes rubric building without reading implementation outputs.",
+						description: "Submit the acceptance rubric derived from the supplied original requirements and source snapshots, completing rubric building.",
 						parameters: {
 							rubric: {
 								type: "string",
@@ -1725,7 +1723,7 @@ function bindDeliveryReview(host) {
 						order: 665,
 						required: true,
 						interpolate: false,
-						text: () => !candidate || candidate.signal.aborted ? "" : `Host prerequisites recorded for this frozen candidate only; these are not a verdict or proof that the rubric is satisfied. inspectionRecorded means another tool succeeded, not that its result establishes a requirement. successfulNativeExecution means confirmed native exit zero, not that the right tests were chosen or passed semantically. Judge the actual evidence against every rubric obligation.\n${JSON.stringify(candidate.attempt.evidence())}`
+						text: () => !candidate || candidate.signal.aborted ? "" : `Host progress facts for this frozen candidate. inspectionRecorded records another successful tool call; successfulNativeExecution records a confirmed native exit zero. Determine whether each rubric obligation is satisfied from the actual tool results.\n${JSON.stringify(candidate.attempt.evidence())}`
 					});
 					ctx.on("agent/turn-stopping", async ({ agent: stopping, signal }) => {
 						const current = candidate;
@@ -1744,7 +1742,7 @@ function bindDeliveryReview(host) {
 					}));
 					ctx.tools.register(defineTool({
 						name: moaToolNames.readDelivery,
-						description: "Read the complete frozen final-answer text for this review attempt, including an empty answer. This is the actual deliverable when the user requested an answer in chat; claims about files or tests still need native artifact inspection or execution.",
+						description: "Read this review attempt's complete frozen final answer, including an empty answer. Inspect file or test claims through native artifact or execution tools.",
 						parameters: {},
 						output: output$1,
 						execute: async () => {
@@ -1755,7 +1753,7 @@ function bindDeliveryReview(host) {
 					}));
 					ctx.tools.register(defineTool({
 						name: moaToolNames.submitReview,
-						description: "Submit this review attempt's structured outcome after inspecting the rubric and actual deliverables, requesting native completion. Missing protocol or Host prerequisites are corrected in this same review before closure; submission alone is not inspection or required test evidence.",
+						description: "Submit this candidate review's structured outcome after inspecting the rubric and deliverables. This requests native completion; resolve any returned protocol or evidence gap in the same review.",
 						parameters: {
 							status: {
 								type: "string",
@@ -1838,7 +1836,7 @@ function bindDeliveryReview(host) {
 		mounted.set(agent, () => {});
 		const off = agent.ctx.tools.register(defineTool({
 			name: moaToolNames.review,
-			description: host.record(agent.id) && host.config.completionVerification === "on-demand" ? `Register independent acceptance for the current task with concrete criteria and an exact, natural completion statement. Continue the task and present your final candidate; the Host then runs hidden acceptance before closing. These helpers are not children to wait for with ${moaToolNames.observe}. Use this when a separate check adds value. The Builder derives its rubric from original human requirements, not these criteria.` : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
+			description: host.record(agent.id) && host.config.completionVerification === "on-demand" ? `Request independent acceptance for the current task when a separate check adds value. Bind concrete criteria and an exact, natural completion statement, then present your final candidate. The Host runs hidden acceptance before closing; ${moaToolNames.observe} is for managed Worker children. The Builder derives its rubric from original human requirements.` : "Bind this task's completion criteria and exact completion promise to include in the final answer.",
 			parameters: {
 				criteria: {
 					type: "string",
@@ -2008,7 +2006,7 @@ function bindDeliveryReview(host) {
 							capabilitySuppressions.push(pair.verifier.agent.ctx.tools.suppress({ deny: [exec.name] }));
 							if (!capabilityNotice) {
 								capabilityNotice = true;
-								pair.verifier.agent.inject(msg(`The native shell backend cannot enforce this review's file protection, so the unavailable tool has been removed from your scope. Continue independent verification using available file inspection tools and ${moaToolNames.readDelivery}. Do not retry unavailable shell tools or request wider access. Submit a verdict based on actual evidence; if available tools cannot establish the requirements, submit Block with runtime_blocked: true and the missing capability. Ordinary deliverable gaps remain Partial or Block without that flag.`));
+								pair.verifier.agent.inject(msg(`The native shell backend cannot enforce this review's file protection, so ${exec.name} has been removed for this review. Continue independent verification within the current protected scope using available file inspection tools and ${moaToolNames.readDelivery}. Submit Block with runtime_blocked: true and the missing capability when these tools cannot establish a requirement. Use Partial or Block with runtime_blocked false or omitted for ordinary deliverable gaps.`));
 							}
 						}
 					}
@@ -2038,12 +2036,12 @@ function bindDeliveryReview(host) {
 					try {
 						verdict = readReviewVerdict(submitted, lastText(pair.verifier.agent, offset));
 					} catch {
-						return `Review protocol incomplete for this frozen candidate: call ${moaToolNames.submitReview} or return a valid JSON verdict object, directly or in exactly one fenced JSON block, with status Pass, Partial or Block and an issues string array. Continue this same review; this is not a defect in the author's deliverable.`;
+						return `Review protocol incomplete for this frozen candidate: call ${moaToolNames.submitReview} or return a valid JSON verdict object as plain JSON or exactly one fenced JSON block, with status Pass, Partial or Block and an issues string array. Complete this submission in the same review.`;
 					}
-					if (missingVerdictGap(verdict)) return "Review protocol incomplete for this frozen candidate: a Partial or Block verdict needs a concrete anchored defect, ambiguity or missing evidence in its issues array. Do not invent a defect to fill the array. If every rubric obligation is supported, submit Pass instead.";
+					if (missingVerdictGap(verdict)) return "Review protocol incomplete for this frozen candidate: for Partial or Block, list the concrete anchored defect, ambiguity or missing evidence in issues. Submit Pass when every rubric obligation is supported.";
 					if (verdict.status !== "Pass") return;
 					const missing = missingReviewEvidence(evidence());
-					if (missing.length) return `Review protocol incomplete for this frozen candidate. Missing Host prerequisites: ${missing.join(" ")} Reuse evidence already recorded in this attempt and submit a fresh verdict after resolving these gaps. If the available tools cannot verify a concrete requirement, submit Partial or Block with that gap. Do not request artifact rework merely because this review omitted its own evidence.`;
+					if (missing.length) return `Review protocol incomplete for this frozen candidate. Missing Host prerequisites: ${missing.join(" ")} Reuse this attempt's recorded evidence, resolve the missing review steps and submit a fresh verdict. Report a requirement that the available tools cannot verify as a concrete Partial or Block gap.`;
 				}
 			});
 			pair.verifier.agent.followup(msg(buildDeliveryReviewInstructions(pair.rubricPath)));
@@ -2080,7 +2078,7 @@ function bindDeliveryReview(host) {
 					retire(active);
 				}
 				if (error instanceof ReviewAgentFailure) throw error;
-				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Continue the task and repeat verification against its original requirements; a superseded rubric requires re-verification, not changes to otherwise correct deliverables.`));
+				agent.steer(msg(`Outcome verification blocked: ${String(error)}. Repeat verification against the original requirements with a current rubric.`));
 			}
 		} finally {
 			candidateReview?.dispose();
@@ -2184,7 +2182,7 @@ function identityMessage(identity) {
 	return `Agent ID: ${identity.id}\nWorkdir: ${identity.workdir} (${identity.isolated ? "Isolated" : "Shared"})\nReport to: ${identity.reportTo}\nReporting instructions: ${identity.reportingInstructions}`;
 }
 function workerReportingInstructions(contextIndex, notes, archived) {
-	return `Your complete final AI message returns automatically to reportTo; no duplicate send is needed. Use ${moaToolNames.message} for useful mid-task findings or blockers. Shared context index: ${contextIndex}; read it when relevant, before opening needed context files. Notes ${notes} and archive ${archived} are Coordinator-owned and read-only for you.`;
+	return `Shared context index: ${contextIndex}. Notes: ${notes}; archive: ${archived} (Coordinator-owned, read-only).`;
 }
 // src/host/moa/workspaces.ts
 const exec = promisify(execFile);
@@ -5182,37 +5180,37 @@ const Config = z$1.object({
 const coordinatorPrompt = `You are the MoA+ coordinator: the primary executor with a team available when useful. Own the user's goal and final delivery. Speak to the user in their language.
 
 Your responsibility
-Your ordinary execution tools remain available. You can carry a complete task through investigation, implementation, testing and delivery yourself. Choose collaboration when it adds useful parallel work, an independent perspective on a concrete uncertainty, or relief from substantial detail. Give each workstream one owner responsible for its implementation, checks and integration, with requirements, existing findings, relevant file references and an expected deliverable. A worker should take responsibility off your critical path; do not first perform its full investigation and then ask it to repeat the same work. While workers run, advance another useful part of the goal.
-Use concrete evidence and the next useful check to resolve uncertainty, rather than exhaustively speculating about possible failures. Reuse completed results and existing checks; repeat a check only after a relevant change or unresolved concern. If you change a checked artifact, rerun affected checks before reporting its result. An independent review should answer an unresolved question or check a concrete risk. Review findings are claims to verify against original requirements, source data and contracts before changing artifacts or checks. A later suggestion does not redefine those sources; preserve or clarify genuine ambiguity. Once the requested deliverable and its required evidence are ready, finish.
-Match effort to the actual human goal. When there is no actionable request and no ongoing task or team needing attention, a brief acknowledgement or a short clarification in the normal chat reply is a complete response. Respond only to that input; do not add unverified claims about workspace, system or runtime state. Do not inspect the workspace, run commands, update project files or delegate merely to acknowledge or clarify that input. Reserve ask_user_question for necessary structured decisions in concrete work; ordinary chat clarification should not block a turn on a question card.
+Your ordinary execution tools remain available. You can carry a complete task through investigation, implementation, testing and delivery yourself. Choose collaboration when it adds useful parallel work, an independent perspective on a concrete uncertainty, or relief from substantial detail. Give each workstream one owner responsible for its implementation, checks and integration, with requirements, existing findings, relevant file references and an expected deliverable. A worker should take responsibility off your critical path. While workers run, advance another useful part of the goal.
+Use concrete evidence and the next useful check to resolve uncertainty. Reuse completed results and existing checks; repeat a check only after a relevant change or unresolved concern. If you change a checked artifact, rerun affected checks before reporting its result. An independent review should answer an unresolved question or check a concrete risk. Verify review findings against original requirements, source data and contracts before changing artifacts or checks. Keep those sources authoritative and clarify genuine ambiguity. Once the requested deliverable and its required evidence are ready, finish.
+Match effort to the actual human goal. With no actionable request or unfinished work, give a brief acknowledgement or clarification in chat. Use tools, delegation and structured questions for concrete work.
 
 Memory
-You alone maintain notes.md and archived.md. Current notes are supplied automatically. Record only state useful for later continuation; a task does not require a separate log. Archive concluded state when needed to keep notes useful. Use the shared index at context/index.md (or the supplied existing index) when relevant, then load only needed files. Contribute confirmed knowledge useful to future work through ${moaToolNames.context}; no new reusable finding means no context update.
+You alone maintain notes.md and archived.md. Current notes are supplied automatically. Record only state useful for later continuation. Archive concluded state when needed to keep notes useful. Use the shared index at context/index.md (or the supplied existing index) when relevant, then load only needed files. Contribute confirmed knowledge useful to future work through ${moaToolNames.context}.
 
 Working flow
 Small self-contained actions and larger coherent tasks can stay with you. When collaboration helps, prefer ${moaToolNames.message} to continue with a familiar worker, ${moaToolNames.branch} when useful committed history helps a new identity, or ${moaToolNames.dispatch} for a clean independent context. Dispatch independent ready work in parallel within native capacity; unlock downstream work as evidence arrives. For input concerning existing workers, check their latest state: users may have guided them directly.
-Use ${moaToolNames.observe}'s native wait when waiting helps, rather than polling. A timeout alone is not failure; use observed progress to decide whether to ask about a blocker, continue waiting or change direction. Use ${moaToolNames.stop} to cancel a branch whose result is no longer needed. Await native cleanup before revising its assignment or final delivery.
-A worker's ended turn automatically returns its complete final AI message, including an empty result when none was committed; inspect its history or ask it to continue when the result is insufficient. You do not need to poll for completion.
-For independent checks, pass original requirements and artifact references without the author's reasoning or expected verdict. Ask for specific findings with source evidence and a reproducible check, separating demonstrated defects from uncertain suggestions. The workstream owner resolves verified gaps and integrates changes.
+Use ${moaToolNames.observe}'s native wait when waiting helps. Use observed progress after a timeout to decide whether to ask about a blocker, continue waiting or change direction. Use ${moaToolNames.stop} to cancel a branch whose result is no longer needed. Await native cleanup before revising its assignment or final delivery.
+A worker's ended turn automatically returns its complete final AI message, including an empty result when none was committed; inspect its history or ask it to continue when the result is insufficient.
+For independent checks, pass original requirements and artifact references. Let the reviewer derive its own reasoning and verdict. Ask for specific findings with source evidence and a reproducible check, separating demonstrated defects from uncertain suggestions. The workstream owner resolves verified gaps and integrates changes.
 
 Execution and completion
 Messages steer at safe steps or queue for later turns; notify does not cancel an active tool. Answer a request using its explicit reply_to; after interruption or timeout, read actual returned state and later inbox replies. Slow tools can move to native background jobs; actual results return automatically. A message-driven background handoff is not task completion. Preserve native permissions, approvals, Stop, queue semantics and tool-result pairing. Tool schemas describe control arguments, role capabilities and workspace choices.
-Decide whether independent acceptance adds value from the goal, existing evidence and remaining uncertainty. Request ${moaToolNames.review} when useful and available; the user does not need to toggle configuration. An already adequate independent check may be enough; do not routinely stack full self-checks, worker reviews and another acceptance pass. If you bind a completion promise, include it only when its criteria are met. Do not report completion merely because dispatch or cancellation was accepted. Exact workspace paths are supplied in the session's project facts.`;
+Decide whether independent acceptance adds value from the goal, existing evidence and remaining uncertainty. Request ${moaToolNames.review} when useful and available, reusing adequate prior checks. If you bind a completion promise, include it when its criteria are met. Confirm task results and resource exit before reporting completion. Exact workspace paths are supplied in the session's project facts.`;
 // src/host/prompts/worker.ts
 /** Shared worker policy; concrete identity is injected in conversation history. */
-const workerPrompt = `You are a MoA+ worker or specialist. Complete your assigned responsibility and return a result that helps your reporting agent decide the next step. Your identity declaration in the conversation states your actual ID, work directory, workspace isolation, reportTo and shared project paths. A ${moaToolNames.branch} inherits another agent's history, not its identity or authority.
+const workerPrompt = `You are a MoA+ worker or specialist. Complete your assigned responsibility and return a result that helps your reporting agent decide the next step. Your identity declaration in the conversation states your actual ID, work directory, workspace isolation, reportTo and shared project paths. A ${moaToolNames.branch} starts its own identity and authority with the selected source history.
 
 Use the current goal, constraints, latest instructions and existing findings. Reuse confirmed evidence and completed checks; resolve remaining uncertainty with concrete evidence and the next useful check. When reviewing, tie specific findings to original requirements, source data or contracts and a reproducible check. Distinguish demonstrated defects from uncertain suggestions; the workstream owner verifies findings and integrates changes. Users can guide your conversation directly. Your native tools and delegated permissions determine your authority.
 
-Use ${moaToolNames.message} for useful mid-task findings, blockers or missing decisions. Answer requests with the explicit reply_to. After interruption or timeout, read actual returned state and later inbox replies. Notifications need no ceremonial acknowledgement; final results return automatically.
+Use ${moaToolNames.message} for useful mid-task findings, blockers or missing decisions. Answer requests with the explicit reply_to. After interruption or timeout, read actual returned state and later inbox replies.
 
 steer reaches the next safe step; queue belongs to a later turn. Slow tools can move to native background jobs; actual results return automatically. Respect native cancellation, approvals and tool boundaries. Nested delegation is off unless explicitly enabled. Tool schemas describe control arguments.
 
-Read the shared index when relevant, then only needed files. Only contribute knowledge when it is confirmed, useful to future work and allowed by the assignment's write constraints. Keep task-local derivations in requested deliverables. When there is no new reusable finding, finish without writing Context. notes.md and archived.md are coordinator-owned; read them when useful and leave their maintenance to it.
+Read the shared index when relevant, then only needed files. Contribute confirmed, reusable findings through ${moaToolNames.context} when allowed by the assignment's write constraints. Keep task-local derivations in requested deliverables. notes.md and archived.md are Coordinator-owned and read-only for you.
 
 Perform the checks required for your responsibility and inspect their results. If you change a checked artifact, rerun affected checks before reporting its result. Once the deliverable meets the requirements and those checks pass, return it. Repeat checks only for a relevant change or unresolved concern. Adapt failed commands to the actual environment and reuse known environment facts.
 
-End with a self-contained AI message: result, evidence, files/artifacts and unresolved issues. Your complete final message returns automatically to reportTo; no duplicate send is needed. Report blockers while working. Mention knowledge only if contributed. If you bound a completion promise with ${moaToolNames.review}, include it only after its criteria are fulfilled.`;
+End with a self-contained AI message: result, evidence, files/artifacts and unresolved issues. The Host automatically returns your complete final message once to reportTo. If you bound a completion promise with ${moaToolNames.review}, include it after its criteria are fulfilled.`;
 // src/host/worker-activity.ts
 /** Read native committed messages and the native Inbox; no shadow task queue. */
 async function readWorkerActivity(host, workerId, signal, previewChars = host.config.progressTextMaxChars) {
