@@ -6,13 +6,14 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cases } from './suite.mjs';
 import { makeReport } from './report.mjs';
+import { earlyCompactionPolicy, evaluationArms } from './compaction-control.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(here, '../..');
 const args = process.argv.slice(2);
 const option = (name, fallback) => { const at = args.indexOf(name); return at < 0 ? fallback : args[at + 1]; };
 const hash = value => createHash('sha256').update(value).digest('hex');
-const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'cases-hard.mjs', 'run.mjs', 'run-case.mjs', 'outcome-observation.mjs', 'report.mjs'];
+const sourceFiles = ['suite.mjs', 'cases-code.mjs', 'cases-analysis.mjs', 'cases-hard.mjs', 'run.mjs', 'run-case.mjs', 'outcome-observation.mjs', 'compaction-control.mjs', 'report.mjs'];
 const fingerprints = async () => Object.fromEntries(await Promise.all(sourceFiles.map(async name => [name, hash(await readFile(join(here, name)))])));
 const planPath = resolve(option('--plan', join(option('--output', '.'), 'manifest.json')));
 async function describeBuild(directory) {
@@ -27,6 +28,7 @@ async function verifyBuilds(manifest) {
 }
 
 async function prepare() {
+  assert.ok(!(args.includes('--compare-compaction') && args.includes('--baseline-repository')), '--compare-compaction and --baseline-repository are mutually exclusive');
   const output = resolve(option('--output', ''));
   assert.ok(args.includes('--output') && args.includes('--runtime') && args.includes('--credentials'), 'Provide --output, --runtime, --credentials');
   const runtime = resolve(option('--runtime'));
@@ -46,7 +48,9 @@ async function prepare() {
   const selectedCases = requestedCases ? requestedCases.map(id => cases.find(task => task.id === id)) :
     cases.filter(task => suite === 'all' || (task.difficulty === 'hard') === (suite === 'hard'));
   const baselineRepository = args.includes('--baseline-repository') ? resolve(option('--baseline-repository')) : undefined;
-  const arms = baselineRepository ? ['single', 'moa-baseline', 'moa'] : ['single', 'moa'];
+  const compareCompaction = args.includes('--compare-compaction');
+  const arms = evaluationArms({ compareCompaction, baselineRepository });
+  const model = { provider: option('--provider', 'deepseek-official'), model: option('--model', 'deepseek-flash'), reasoningEffort: option('--reasoning', 'high') };
   const maxRequests = Number(option('--max-requests', 64));
   const maxTotalTokens = Number(option('--max-total-tokens', 500000));
   assert.ok(Number.isSafeInteger(maxRequests) && maxRequests > 0 && Number.isSafeInteger(maxTotalTokens) && maxTotalTokens > 0, 'Budgets must be positive safe integers');
@@ -63,7 +67,8 @@ async function prepare() {
     }
   }
   const manifest = { version: 1, preparedAt: new Date().toISOString(), suite: requestedCases ? 'selected' : suite, arms, repetitions, concurrency: arms.length,
-    model: { provider: option('--provider', 'deepseek-official'), model: option('--model', 'deepseek-flash'), reasoningEffort: option('--reasoning', 'high') },
+    model,
+    ...(compareCompaction ? { compactionStudy: { policy: earlyCompactionPolicy(model), changedArms: ['single-compact', 'moa-compact'] } } : {}),
     limits: { maxRequests, maxTotalTokens },
     candidate: await describeBuild(repository),
     ...(baselineRepository ? { baseline: await describeBuild(baselineRepository) } : {}),
@@ -144,7 +149,7 @@ async function execute() {
       const stdout = execFileSync(manifest.local.engine, command, { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true, encoding: 'utf8', timeout: 60000 });
       const result = JSON.parse(await readFile(join(dirname(planPath), 'runs', entry.id, 'result.json'), 'utf8'));
       assert.ok(result.bootOnly && !result.stopReason && result.validControl && result.modelRequestCount === 0, `${arm} preflight failed: ${stdout.slice(-1000)}`);
-      console.log(JSON.stringify({ preflight: arm, tools: result.visibleToolNames, modelStarted: false }));
+      console.log(JSON.stringify({ preflight: arm, tools: result.visibleToolNames, compaction: result.compaction?.resolvedConfig, modelStarted: false }));
     }
     return;
   }

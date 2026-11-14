@@ -7,13 +7,16 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cases } from './suite.mjs';
 import { observeNativeOutcome } from './outcome-observation.mjs';
+import { armMode, createCompactionObserver, earlyCompactionPolicy, flushLiveSessions, requestRoutingMetadata, verifyCompactionConfig } from './compaction-control.mjs';
 
 const [manifestPath, runId, bootOnly] = process.argv.slice(2);
 assert.ok(manifestPath && runId, 'Use run.mjs to prepare and dispatch evaluation runs');
 const manifest = JSON.parse(await readFile(resolve(manifestPath), 'utf8'));
 const entry = manifest.runs.find(row => row.id === runId);
 assert.ok(entry, 'Run must exist in the frozen plan');
-assert.ok(['single', 'moa-baseline', 'moa'].includes(entry.arm), 'Unknown evaluation arm');
+const { moa, compact } = armMode(entry.arm);
+assert.ok(!compact || manifest.compactionStudy, 'Early compaction arms require a frozen compaction study');
+assert.ok(!manifest.compactionStudy || !manifest.baseline, 'Compaction and baseline-repository comparisons are mutually exclusive');
 const hash = value => createHash('sha256').update(value).digest('hex');
 async function verifyBuild(directory, expected, label) {
   assert.ok(directory && expected, `${label} repository and fingerprint are required`);
@@ -55,7 +58,8 @@ const load = name => import(pathToFileURL(join(runtime, 'node_modules/@deepseek-
 const boot = await load('dsh-app-boot');
 const { runProfile } = await import(pathToFileURL(join(runtime, 'node_modules/@deepseek-ai/dsh/lib/profile-boot.js')).href);
 const { createUserMessage } = await load('dsh-llm');
-const moa = entry.arm !== 'single';
+const compactPolicy = compact ? earlyCompactionPolicy(manifest.model) : null;
+if (manifest.compactionStudy) assert.deepEqual(manifest.compactionStudy.policy, earlyCompactionPolicy(manifest.model), 'Compaction study policy changed');
 const pluginRepository = entry.arm === 'moa-baseline' ? manifest.local.baselineRepository : manifest.local.repository;
 const pluginBuild = entry.arm === 'moa-baseline' ? manifest.baseline : manifest.candidate;
 boot.initProfile(profileDirectory, ['@deepseek-ai/dsh-base', ...(moa ? ['dsh-plugin-project-mode'] : [])]);
@@ -73,6 +77,7 @@ const patches = [
   { id: 'credentials', config: { path: manifest.local.credentials, watch: false } },
   { id: 'deepseek-account', disabled: true }, { id: 'llm-deepseek-account', disabled: true },
   { id: 'agent-default-model', config: manifest.model },
+  ...(compact ? [{ id: 'compaction-basic', config: { modelPolicies: [compactPolicy] } }] : []),
   { id: 'fs-sandbox', config: { cwd: project } },
   { id: 'sandbox-policy', config: { mode: 'workspace-write', workspaceRoot: project } },
   { id: 'session-persistence-jsonl', config: { root: join(home, 'sessions'), compression: 'none' } },
@@ -86,9 +91,11 @@ await writeFile(join(profileDirectory, 'cordis.patch.yml'), JSON.stringify(patch
 
 const started = Date.now();
 const requests = [], agents = [], tools = [], errors = [], textMessages = [];
+const compactionObserver = createCompactionObserver();
 const result = { id: runId, caseId: entry.caseId, arm: entry.arm, repetition: entry.repetition,
   startedAt: new Date().toISOString(), runtime: process.versions, model: manifest.model, ...(moa ? { pluginBuild } : {}),
-  completed: false, stopReason: null, project, requests, tools, agents, errors };
+  completed: false, stopReason: null, project, requests, tools, agents, errors,
+  compaction: { requestedPolicy: compactPolicy, events: compactionObserver.events } };
 let ctx, shutdown, root, submittedAt, firstTextAt, timer;
 let stopPromise;
 const textOf = message => (message?.content ?? []).filter(block => block.type === 'text').map(block => block.text).join('');
@@ -112,6 +119,7 @@ function stop(reason) {
   if (stopPromise) return stopPromise;
   result.stopReason = reason;
   stopPromise = (async () => {
+    compactionObserver.cancelActive();
     root?.cancel({ kind: 'user' });
     if (root && ctx.subagents) await ctx.subagents.drainDescendants([root]);
     if (root) await root.whenIdle();
@@ -126,9 +134,11 @@ try {
     environment: boot.loadLayeredEnv('dsh', project),
     resolvedProfile: { profile, installAnchor: join(runtime, 'package.json') } }));
   if (moa) assert.equal(ctx.projectMode.config.completionVerification, 'on-demand');
+  result.compaction.resolvedConfig = verifyCompactionConfig(ctx.compaction?.config, compactPolicy, manifest.model);
   ctx.on('agent/created', ({ agent }) => agents.push(agent));
   ctx.on('agent/error', ({ agent, error }) => errors.push({ agentId: agent?.id, message: errorText(error) }));
   ctx.on('session/event', (session, event) => {
+    compactionObserver.observe(session.id, event);
     if (event.type === 'tool/call') tools.push({ agentId: session.id, name: event.data.name, time: event.time });
     if (event.type === 'assistant/message' && session.id === root?.id) {
       const text = textOf(event.data.message);
@@ -142,6 +152,7 @@ try {
     }
     const notes = (options.messages ?? []).filter(message => message.role === 'user' && message.source?.kind === 'moa-notes');
     const request = { sessionId: options.sessionId, provider: options.provider, model: options.model,
+      ...requestRoutingMetadata(options),
       reasoningEffort: options.reasoningEffort, startedAt: Date.now(), toolNames: (options.tools ?? []).map(tool => tool.name),
       notesSnapshotCount: notes.length, notesSnapshotCharacters: notes.reduce((sum, message) => sum + textOf(message).length, 0) };
     requests.push(request);
@@ -153,11 +164,15 @@ try {
             request.usage = chunk.usage;
             if (aggregateUsage().totalTokens > manifest.limits.maxTotalTokens) void stop('aggregate-budget-exceeded');
           }
-          if (chunk.type === 'text-delta' && options.sessionId === root?.id && chunk.text.trim()) firstTextAt ??= Date.now();
+          if (chunk.type === 'text-delta' && options.purpose !== 'compaction' && options.sessionId === root?.id && chunk.text.trim()) firstTextAt ??= Date.now();
           yield chunk;
         }
       } catch (error) { request.error = errorText(error); throw error; }
-      finally { request.elapsedMs = Date.now() - request.startedAt; }
+      finally {
+        request.elapsedMs = Date.now() - request.startedAt;
+        request.cancelled = options.signal?.aborted === true;
+        if (request.purpose === 'compaction' && request.cancelled) compactionObserver.cancelActive(options.sessionId);
+      }
     })();
   });
   ({ agent: root } = await ctx.agents.create({ sessionId: `eval-${randomUUID()}`,
@@ -207,12 +222,11 @@ try {
   result.validControl = moa || agents.length === 1;
   if (!result.validControl) errors.push({ phase: 'control', message: 'Single-agent baseline unexpectedly created a child' });
   if (ctx) {
-    for (const agent of agents) {
-      try { await ctx.sessions.flush(agent.session); } catch (error) { errors.push({ phase: 'flush', message: errorText(error) }); }
-    }
+    await flushLiveSessions(ctx.sessions, agents, error => errors.push({ phase: 'flush', message: errorText(error) }));
     try { await ctx.fiber.dispose(); } catch (error) { errors.push({ phase: 'teardown', message: errorText(error) }); }
   }
   result.usage = aggregateUsage();
+  result.compaction.metrics = compactionObserver.metrics(requests);
   result.budgetOvershootTokens = Math.max(0, result.usage.totalTokens - manifest.limits.maxTotalTokens);
   result.modelRequestCount = requests.length;
   result.finishedAt = new Date().toISOString();

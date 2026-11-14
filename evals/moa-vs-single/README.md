@@ -71,6 +71,21 @@ node evals/moa-vs-single/run.mjs --report --plan C:/eval-output-001/manifest.jso
 
 固定三组复测可分两份计划：基础题 `--cases code-usage-invoice,code-incremental-build,analysis-reconciliation --baseline-repository C:/moa-baseline`，2次重复共18次，保留500,000总token/64请求上限；难题 `--cases hard-journal-ledger --baseline-repository C:/moa-baseline --max-total-tokens 1000000 --max-requests 80`，2次重复共6次。两份计划都需全新输出目录并在开始前冻结，不能根据结果调限额或重试到通过。
 
+原生压缩四组研究使用 `--compare-compaction`，与 `--baseline-repository` 互斥。组别固定为 `single`、`single-compact`、`moa`、`moa-compact`；两个 Single 组都禁用协作工具，不会因为组名带后缀而加载 MoA。例：
+
+```powershell
+node evals/moa-vs-single/run.mjs --prepare `
+  --output C:/eval-compaction-001 --runtime C:/eval-runtime `
+  --credentials C:/credentials.yaml --engine 'C:/Program Files/DSH NEXT/DSH NEXT.exe' `
+  --compare-compaction --cases hard-journal-ledger --repetitions 2 `
+  --max-total-tokens 1000000 --max-requests 80
+node evals/moa-vs-single/run.mjs --boot-check --plan C:/eval-compaction-001/manifest.json
+```
+
+该例预登记8次（1题×2次×4组），同题四组并发，第二次反转顺序。只有早压缩组向原生 `compaction-basic.modelPolicies` 挂载精确 provider/model 的 `thresholdRatio:0.0625`、`retainTokens:16384`、摘要 `maxTokens:8192`。控制组保留原生默认配置；主模型、high推理、输入、评分及预算均不改，也不改写摘要请求或增加评测重试。启动检查直接断言挂载后的 `ctx.compaction.config`，保存完整解析配置，必须0模型请求。
+
+报告分别给出同设置的 Single→MoA、Single早压缩→MoA早压缩，以及两种身份各自的默认→早压缩。前两对考察MoA，后两对考察压缩，不能跨设置声称MoA增益。固定hard-journal×2×4只支持对这道题的描述性结果，不能泛化为多Agent普遍提升。这个实验不是生产默认压缩策略的变更。
+
 ## 证据与解释
 
 输出包含：
@@ -82,6 +97,11 @@ node evals/moa-vs-single/run.mjs --report --plan C:/eval-output-001/manifest.jso
 - `report.md`、`report.html`、`report.json`：各组独立汇总、逐题结果和两两配对；三组时同时给出旧 MoA+/单 Agent、新 MoA+/单 Agent、新 MoA+/旧 MoA+。
 
 用量覆盖主 Agent、普通 Worker、验收助手和后台判断请求。每个请求只取最后一份 usage，避免重复累计。
+所有 `llm/stream` 请求原样记录实际 `purpose` 与 `maxTokens`，缺失为null，不按Agent身份推断用途。`purpose=compaction` 的摘要请求及失败/取消摘要用量仍进入相同请求数和总token预算，不另给预算、不从总量扣除。摘要若因8192上限/MAX_TOKENS或没有正文失败，保留原生失败，不筛掉或重试到成功。
+
+`result.compaction.events` 只采集原生 start/end/summary/prune 的会话、序号、时间、事务、影子范围及token计数等元数据，不复制summary或rawOutput正文。成功与失败由原生end是否含error确定；失败总数包含取消请求之后的失败，后者仅另列子集，不把错误原因擅自归给取消。摘要request的signal已abort数在该请求结束时采样，未闭合事务单列。分项统计摘要input/cache/output及缺usage；这些分项已包含在整体用量内，不再次相加。历史2/3组结果未采集这些指标时保留未知。
+
+零模型回归：`node --test --test-isolation=none tests/evals/compaction-control.test.mjs`。评测结束仅flush原生store中仍为同一对象的live Session；已退出对象跳过，真实live持久化失败仍记录。
 输入、缓存读取、缓存写入、输出分开记录；reasoning 是输出子集，未上报时记未知。
 usage 不完整时，已记录 token 标为下限；完整样本均值附样本数，精确用量比值只用于两边 usage 完整的配对，不能把未知消费当作零。
 总 token 是用量指标；这里不按可能变化的价格折算金额。
