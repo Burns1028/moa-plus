@@ -2,7 +2,7 @@
 
 The [current walkthrough](media/moa-plus-workflow.mp4) records the updated `main` interface opening a retained Note Bundle task. That task was executed during **MoA+ v0.2.0 release preparation**, using the matching DSH 0.2.1-rc.3 runtime and a real DeepSeek-V4.1-Flash model with High reasoning. The recording revisits its original conversation, Worker messages, and results; it does not start a new model task.
 
-The GIF and MP4 use sampled native UI clips edited into a walkthrough. They are not an uninterrupted screen recording, and the edit length is not a task-duration or comparative-performance claim. The published v0.2.0 package in the [quick start](../README.md#quick-start) predates the wordmark control shown in the current interface.
+The GIF and MP4 use sampled native UI clips edited into a walkthrough. They are not an uninterrupted screen recording, and the edit length is not a task-duration or comparative-performance claim. The published [v0.2.0 package](https://github.com/Burns1028/moa-plus/tree/v0.2.0) predates the wordmark control shown in the current interface.
 
 ## What the walkthrough shows
 
@@ -14,19 +14,23 @@ The 60-second edit uses 66 new native browser captures across six chapters. Chap
 
 ## What happened in the task
 
+The tool names below describe the historical v0.2.0 execution, not the current API.
+
 1. The Coordinator read the Note Bundle task and started **Exporter** and **Docs** with `Task`, in a shared workspace with separate file ownership.
 2. The Workers exchanged the CLI contract directly with `SendMessage`, including Request and explicit replies.
 3. A human opened Docs from its capsule and asked for copyable commands and exact output headings.
 4. Back in the main conversation, the Coordinator checked Docs' current state and relevant human/AI history with `QueryAgent`, then brought both Workers into line.
 5. Workers returned complete final replies; the Coordinator checked actual output, saved reusable knowledge, and finished through the independent completion-review flow.
 
-## Reproduce it
+## Reproduce on v0.2.8
 
 Copy [examples/note-bundle](../examples/note-bundle) into a new Git workspace. Prepare the [matching runtime](quickstart.md), create a new conversation, and select **MoA+** before its first message. Use separate source files for each Worker so the shared workspace has clear ownership.
 
+The fixture intentionally starts with one failing feature test. The prompt below uses the current tool names; it is not a claim that this guide has been rerun with v0.2.8.
+
 Send the Coordinator:
 
-> Finish TASK.md with two general-purpose Workers in this shared workspace. Exporter owns note-bundle.mjs and tests; Docs owns docs/usage.md. Use Task to delegate both. Ask them to agree the --sort title interface through a direct Agent message. Save the confirmed CLI contract and test command in shared context and its index for later reuse. Run the tests and generate dist/notes.md before reporting the result. Keep it local: no dependencies or commits. Use concise English.
+> Finish TASK.md using two Workers in this shared workspace. Exporter owns note-bundle.mjs and tests; Docs owns docs/usage.md. Use moa_dispatch to delegate the two parts with workspace: "shared". Have the Workers agree the --sort title interface through moa_message. Save the confirmed CLI contract and test command in shared context. Run npm test and npm run demo before reporting the result. Keep it local: no new dependencies or commits. Use concise English.
 
 Open Docs and send:
 
@@ -38,7 +42,9 @@ Use **Back** and send the Coordinator:
 
 Use native **Steer** when a message should interrupt a current wait; native Queue leaves it for the next turn.
 
-## Actual result
+Check that the tests pass, `dist/notes.md` contains `# apples`, `# Bananas`, and `# Pears` in that order, and `docs/usage.md` documents both ordering modes. Record the actual outcome and any blocker in the [trial feedback form](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml).
+
+## Historical result
 
 The original v0.2.0 run passed **10 tests**, including default filename ordering, title ordering, heading fallback, tie-breaking, option errors, and output-file generation. The final `dist/notes.md` contains `# apples`, `# Bananas`, `# Pears` in that order. `docs/usage.md` includes commands and exact heading lines for both default and title sorting. The accepted contract and test command are indexed under `context/`.
 

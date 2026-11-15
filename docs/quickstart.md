@@ -1,25 +1,28 @@
 # Run MoA+ in an isolated DSH Web runtime
 
-Set up the **MoA+ v0.2.8 development candidate (unreleased)** in a separate local Web environment. The commands below follow `main`; the latest published stable tag remains **[v0.2.7](https://github.com/Burns1028/moa-plus/tree/v0.2.7)**. For that stable version, clone `v0.2.7` and follow its own documentation.
+Set up the **MoA+ v0.2.8 stable release** in a separate local Web environment. Use the plugin and compatibility profile from this same release; the commands below clone the published **[v0.2.8](https://github.com/Burns1028/moa-plus/tree/v0.2.8)** tag.
 
 Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. Its explicit manifest extends **22 native packages across 50 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
-The candidate also includes an audited **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** profile. The launcher here remains pinned to rc.3; use the separate [native compatibility instructions](native-compatibility.md) to prepare Desktop Next with a full application backup.
+This release also includes an audited **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** profile. The launcher here remains pinned to rc.3; use the separate [native compatibility instructions](native-compatibility.md) to prepare Desktop Next with a full application backup.
 
 ## Install and start
 
 Choose a new empty directory outside this checkout and your ordinary DSH home. Replace `/absolute/empty-moa-runtime` below and reuse the same `--dir` for setup, doctor, and start.
 
 ```sh
-git clone --branch main --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.8 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 npm run build
 node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
 node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
 ```
+
+Check the read-only `doctor` result before starting. Resolve reported mismatches before configuring a model or sending a task.
 
 The compatibility command backs up the changed files before extending this checkout's dependencies. Setup installs the locked runtime and this plugin build in the chosen directory, with its own `home/`, `agents/`, configuration, documents, native backups, and plugin archive. It does not modify an installed Desktop app or reuse your personal `~/.dsh` profile.
 
@@ -57,6 +60,8 @@ Click a Worker capsule to enter its native conversation, give it instructions di
 New workspaces contain `notes.md`, `archived.md`, and `context/index.md`; independent acceptance can publish `rubrics.md`. Coordinator and Workers share Context even across isolated worktrees. Conversations in the same directory share these files, so use a separate workspace for an independent project. See [roles and common flows](moa-architecture.md) for the collaboration model.
 
 For an optional collaboration prompt, type `@` and choose **并行攻坚**, **多方会审**, **协同探索**, **迭代精修**, or **统筹推进**. Selection inserts editable text; add the actual task and send normally. A simple chat acknowledgement or clarification does not require a team or workspace investigation. See the [orchestration guide](orchestration.md).
+
+Share the outcome, including installation blockers, through the existing [trial feedback form](https://github.com/Burns1028/moa-plus/issues/new?template=project-mode-trial.yml). Do not include API keys, private conversations, or credentials.
 
 ## Restart and recovery
 
