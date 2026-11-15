@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.9 — 2026-11-15
 
-- Consolidate Coordinator responsibilities, evidence review and completion guidance; keep tool arguments in their schemas and retain direct chat, on-demand acceptance and native cleanup semantics.
+- Consolidate Coordinator responsibilities, evidence review and completion guidance from 4,344 to 3,412 characters (21.5% shorter); keep tool arguments in their schemas and retain direct chat, on-demand acceptance and native cleanup semantics.
+- Align first-run instructions with the stable tag and document the existing read-only doctor check before startup. Include the Desktop Next installation route in trial feedback.
+- Distinguish the historical recorded task from current-version reproduction, update the example to current tool names, and state expected tests and output.
 
 ## 0.2.8 — 2026-11-15
 
