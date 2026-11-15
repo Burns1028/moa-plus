@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Consolidate Coordinator responsibilities, evidence review and completion guidance; keep tool arguments in their schemas and retain direct chat, on-demand acceptance and native cleanup semantics.
+
 ## 0.2.8 — 2026-11-15
 
 - Streamline role, acceptance and Chinese collaboration prompts around responsibilities, evidence and delivery. Keep shared Worker policy in its role instructions and actual identity/path facts in its identity message.
