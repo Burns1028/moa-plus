@@ -20,7 +20,7 @@ English | [简体中文](README.zh.md)
 
 ## Quick start
 
-This page documents **[MoA+ v0.2.8](https://github.com/Burns1028/moa-plus/releases/tag/v0.2.8)**.
+This page documents **[MoA+ v0.2.9](https://github.com/Burns1028/moa-plus/releases/tag/v0.2.9)**.
 
 The release uses the audited **DSH 0.2.1-rc.3** and
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** compatibility profiles. The rc.3
@@ -33,12 +33,12 @@ Requires **Node 24.9+**, npm, and Git. The isolated Web launcher below prepares 
 
 The updated rc.2 Desktop Next profile supports protected Workers through native nonpersistent PowerShell, and Bash where installed, on Windows. It preserves existing records across Coordinator atomic updates and requires native Windows Job containment. Persistent terminals and unadapted process providers still refuse protected use. The rc.3 profile retains its macOS Seatbelt/Linux bubblewrap requirement; it does not include this Windows extension. See [backend requirements][compatibility] for the supported policy and filesystem scope.
 
-The commands below install the `v0.2.8` release with its matching compatibility profile.
+The commands below install the `v0.2.9` release with its matching compatibility profile.
 
 Clone the project and prepare a separate Web runtime:
 
 ```sh
-git clone --branch v0.2.8 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.9 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
