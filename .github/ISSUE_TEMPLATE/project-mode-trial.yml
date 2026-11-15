@@ -34,6 +34,13 @@ body:
       placeholder: "macOS arm64, Node 24.x"
     validations:
       required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model and provider (optional)
+      description: If you reached model setup, share the model and provider names only. Leave blank or write "not reached" if setup stopped earlier. Do not include API keys or private endpoint URLs.
+    validations:
+      required: false
   - type: textarea
     id: task
     attributes:
@@ -69,3 +76,10 @@ body:
       description: Expected behavior, actual behavior, and minimal reproduction steps. A short redacted error is enough.
     validations:
       required: true
+  - type: textarea
+    id: task_checks
+    attributes:
+      label: Task checks and manual intervention (optional)
+      description: If you ran a task, which checks or tests passed, failed, or were not run? Where did you need to correct, retry, or stop the team? Leave blank or write "not reached" for an installation-only attempt.
+    validations:
+      required: false
