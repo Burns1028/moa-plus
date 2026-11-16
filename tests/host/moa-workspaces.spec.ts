@@ -19,90 +19,109 @@ import {
   MoAWorkspacePrepareError,
 } from "../../packages/project-mode/src/host/moa/workspaces";
 
+type WorkspaceMode = "danger-full-access" | "workspace-write";
+
+async function withWorkspace(
+  mode: WorkspaceMode,
+  run: (fixture: {
+    root: string;
+    fs: LocalFileSystem;
+    manager: MoAWorkspaceManager;
+    signal: AbortSignal;
+    failures: { preparation: boolean; cleanup: boolean; indexRemoval: boolean };
+  }) => Promise<void>,
+) {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "moa-workspaces-")));
+  const git = (...args: string[]) =>
+    execFileSync("git", args, { cwd: root, stdio: "pipe" });
+  try {
+    git("init");
+    git("config", "user.name", "Test");
+    git("config", "user.email", "test@example.org");
+    await writeFile(join(root, "tracked"), "initial");
+    await writeFile(join(root, ".gitignore"), "ignored\nignored-cwd/\n");
+    git("add", ".");
+    git("commit", "-m", "initial");
+    await writeFile(join(root, "tracked"), "dirty");
+    await writeFile(join(root, "staged"), "staged");
+    git("add", "staged");
+    await writeFile(join(root, "untracked"), "untracked");
+    await writeFile(join(root, "binary"), Buffer.from([0, 255, 1, 2]));
+    await writeFile(join(root, "ignored"), "ignored");
+    const fs = new LocalFileSystem(new Context(), {
+      cwd: root,
+      diffBasisMaxBytes: 1048576,
+    });
+    const policy = {
+      mode,
+      workspaceRoot:
+        mode === "danger-full-access"
+          ? tmpdir() + "/not-the-policy-root"
+          : root,
+    };
+    const failures = {
+      preparation: false,
+      cleanup: false,
+      indexRemoval: false,
+    };
+    const sandbox = {
+      confine: async (argv: readonly string[]) => {
+        if (
+          failures.indexRemoval &&
+          argv[0] === process.execPath &&
+          argv[2]?.includes(".rm(") &&
+          argv.some((arg) => arg.includes("moa-index-"))
+        ) {
+          failures.indexRemoval = false;
+          throw new Error("injected index failure");
+        }
+        if (
+          failures.preparation &&
+          argv.includes("add") &&
+          argv.includes("worktree")
+        ) {
+          failures.preparation = false;
+          throw new Error("injected prepare failure");
+        }
+        if (
+          failures.cleanup &&
+          argv.includes("list") &&
+          argv.includes("worktree")
+        ) {
+          failures.cleanup = false;
+          throw new Error("injected cleanup failure");
+        }
+        return {
+          argv: [
+            "/usr/bin/sandbox-exec",
+            "-p",
+            `(version 1)(allow default)(deny file-write*)(allow file-write* (literal "/dev/null"))(allow file-write* (subpath "${root}"))`,
+            ...argv,
+          ],
+          enforcement: "full" as const,
+          denialSignatures: [],
+          runnerFailureRules: [],
+        };
+      },
+    };
+    const manager = new MoAWorkspaceManager({
+      fs,
+      policy: () => policy,
+      sandbox,
+    });
+    const signal = new AbortController().signal;
+    await run({ root, fs, manager, signal, failures });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
 describe.each([
   "danger-full-access",
   ...(process.platform === "darwin" ? ["workspace-write"] : []),
 ] as const)("MoA workspaces (%s)", (mode) => {
-  it("snapshots current content, isolates writes, retains zombies, and removes only owned worktrees", async () => {
-    const root = await realpath(
-      await mkdtemp(join(tmpdir(), "moa-workspaces-")),
-    );
-    const git = (...args: string[]) =>
-      execFileSync("git", args, { cwd: root, stdio: "pipe" });
-    try {
-      git("init");
-      git("config", "user.name", "Test");
-      git("config", "user.email", "test@example.org");
-      await writeFile(join(root, "tracked"), "initial");
-      await writeFile(join(root, ".gitignore"), "ignored\nignored-cwd/\n");
-      git("add", ".");
-      git("commit", "-m", "initial");
-      await writeFile(join(root, "tracked"), "dirty");
-      await writeFile(join(root, "staged"), "staged");
-      git("add", "staged");
-      await writeFile(join(root, "untracked"), "untracked");
-      await writeFile(join(root, "binary"), Buffer.from([0, 255, 1, 2]));
-      await writeFile(join(root, "ignored"), "ignored");
-      const fs = new LocalFileSystem(new Context(), {
-        cwd: root,
-        diffBasisMaxBytes: 1048576,
-      });
-      const policy = {
-        mode,
-        workspaceRoot:
-          mode === "danger-full-access"
-            ? tmpdir() + "/not-the-policy-root"
-            : root,
-      };
-      let failPreparation = false;
-      let failCleanup = false;
-      let failIndexRemoval = false;
-      const sandbox = {
-        confine: async (argv: readonly string[]) => {
-          if (
-            failIndexRemoval &&
-            argv[0] === process.execPath &&
-            argv[2]?.includes(".rm(") &&
-            argv.some((arg) => arg.includes("moa-index-"))
-          ) {
-            failIndexRemoval = false;
-            throw new Error("injected index failure");
-          }
-          if (
-            failPreparation &&
-            argv.includes("add") &&
-            argv.includes("worktree")
-          ) {
-            failPreparation = false;
-            throw new Error("injected prepare failure");
-          }
-          if (
-            failCleanup &&
-            argv.includes("list") &&
-            argv.includes("worktree")
-          ) {
-            failCleanup = false;
-            throw new Error("injected cleanup failure");
-          }
-          return {
-            argv: [
-              "/usr/bin/sandbox-exec",
-              "-p",
-              `(version 1)(allow default)(deny file-write*)(allow file-write* (literal "/dev/null"))(allow file-write* (subpath "${root}"))`,
-              ...argv,
-            ],
-            enforcement: "full" as const,
-            denialSignatures: [],
-            runnerFailureRules: [],
-          };
-        },
-      };
-      const manager = new MoAWorkspaceManager({
-        fs,
-        policy: () => policy,
-        sandbox,
-      });
-      const signal = new AbortController().signal;
+  it("snapshots current content, isolates writes, and removes only owned worktrees", () =>
+    withWorkspace(mode, async ({ root, manager, signal }) => {
       const originalIndex = await readFile(join(root, ".git", "index"));
       const a = await manager.prepare({
         ownerId: "a",
@@ -176,6 +195,17 @@ describe.each([
       );
       await expect(readFile(join(a.directory, "tracked"))).rejects.toThrow();
       expect(await readFile(join(b.directory, "tracked"), "utf8")).toBe("b");
+      await manager.destroy(b, signal);
+    }));
+
+  it("isolates subdirectories derived from an existing worktree", () =>
+    withWorkspace(mode, async ({ root, manager, signal }) => {
+      const b = await manager.prepare({
+        ownerId: "b",
+        sourceDirectory: root,
+        mode: "isolated",
+        signal,
+      });
       await mkdir(join(b.directory, "nested"));
       await writeFile(join(b.directory, "nested", "child"), "from-parent");
       const child = await manager.prepare({
@@ -192,7 +222,13 @@ describe.each([
         "from-parent",
       );
       await manager.destroy(child, signal);
-      for (const name of ["empty-cwd", "ignored-cwd"]) {
+      await manager.destroy(b, signal);
+    }));
+
+  it.each(["empty-cwd", "ignored-cwd"])(
+    "creates an isolated %s working directory",
+    (name) =>
+      withWorkspace(mode, async ({ root, manager, signal }) => {
         await mkdir(join(root, name));
         if (name === "ignored-cwd") {
           await writeFile(join(root, name, "ignored"), "ignored");
@@ -205,7 +241,17 @@ describe.each([
         });
         expect((await stat(emptyCwd.directory)).isDirectory()).toBe(true);
         await manager.destroy(emptyCwd, signal);
-      }
+      }),
+  );
+
+  it("retains owned recovery records when branch removal fails and supports retry", () =>
+    withWorkspace(mode, async ({ root, manager, signal }) => {
+      const b = await manager.prepare({
+        ownerId: "b",
+        sourceDirectory: root,
+        mode: "isolated",
+        signal,
+      });
       const internals = manager as unknown as {
         git: (
           cwd: string,
@@ -225,8 +271,12 @@ describe.each([
       expect(await manager.discoverOwned(root, "b", signal)).toEqual([b]);
       internals.git = gitMethod;
       await manager.destroy(b, signal);
-      if (mode === "workspace-write") {
-        failIndexRemoval = true;
+    }));
+
+  if (mode === "workspace-write") {
+    it("retains records when sandboxed preparation or index cleanup fails", () =>
+      withWorkspace(mode, async ({ root, manager, signal, failures }) => {
+        failures.indexRemoval = true;
         let indexFailure: unknown;
         try {
           await manager.prepare({
@@ -243,9 +293,9 @@ describe.each([
           (indexFailure as MoAWorkspacePrepareError).record,
           signal,
         );
-        failPreparation = true;
-        failCleanup = true;
-        failIndexRemoval = true;
+        failures.preparation = true;
+        failures.cleanup = true;
+        failures.indexRemoval = true;
         let failure: unknown;
         try {
           await manager.prepare({
@@ -261,12 +311,16 @@ describe.each([
         expect(
           (failure as MoAWorkspacePrepareError).preparationError,
         ).toHaveProperty("message", "injected prepare failure");
-        failCleanup = false;
+        failures.cleanup = false;
         await manager.destroy(
           (failure as MoAWorkspacePrepareError).record,
           signal,
         );
-      }
+      }));
+  }
+
+  it("cleans failed marker publication and recovers durable marker-only records", () =>
+    withWorkspace(mode, async ({ root, fs, manager, signal }) => {
       // A post-publication write error still cleans its owned marker in-process.
       const writeText = fs.writeText.bind(fs);
       let crash = true;
@@ -296,6 +350,10 @@ describe.each([
       expect(recovered).toHaveLength(1);
       await manager.destroy(recovered[0], signal);
       expect(await manager.discoverOwned(root, "crash", signal)).toEqual([]);
+    }));
+
+  it("rejects isolated workspaces in repositories without a commit", () =>
+    withWorkspace(mode, async ({ root, manager, signal }) => {
       const empty = await mkdtemp(join(root, "empty-"));
       execFileSync("git", ["init"], { cwd: empty, stdio: "pipe" });
       await expect(
@@ -306,10 +364,7 @@ describe.each([
           signal,
         }),
       ).rejects.toThrow("isolated-requires-git-repository-with-commit");
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  });
+    }));
 });
 
 it("runs single-file cleanup with literal argv and retains native sandbox denials", async () => {

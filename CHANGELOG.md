@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.10 — 2026-11-17
+
+- Pin the isolated rc.3 Web runtime’s direct `@deepseek-ai/dsh-client-ui-input-trigger` dependency to `0.2.1-rc.3`, so a fresh Linux install keeps the audited package instead of drifting through peer resolution.
+- Add a regression covering the direct runtime pin and its lockfile entry. Plugin behavior, prompts and native compatibility profiles are unchanged.
+- Split the compound workspace regression into independent behavior cases while preserving its assertions and 15-second per-case limit, and run it in Linux/macOS CI; production workspace logic is unchanged.
+
 ## 0.2.9 — 2026-11-15
 
 - Consolidate Coordinator responsibilities, evidence review and completion guidance from 4,344 to 3,412 characters (21.5% shorter); keep tool arguments in their schemas and retain direct chat, on-demand acceptance and native cleanup semantics.
