@@ -6839,7 +6839,6 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
   font:inherit;font-size:13px;line-height:20px;animation:pm-guide-in .24s ease-out both
 }
 body[data-ds-dark-theme] .pm-first-guide{--pm-guide-accent:#cbff45;--pm-guide-bg:#23291b;--pm-guide-edge:#47562f}
-.pm-guide-sender{color:var(--pm-guide-accent)}
 .pm-guide-line{position:relative;min-width:0;overflow-wrap:anywhere}
 .pm-guide-readable{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .pm-guide-measure{visibility:hidden}
@@ -7554,35 +7553,27 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					className: "pm-first-guide",
 					"data-guide-stage": stage,
-					children: [
-						stage === "result" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-							className: "pm-guide-sender pm-wordmark",
-							role: "img",
-							"aria-label": t("project")
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: message }, message),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: "pm-guide-actions",
-							children: [stage === "example" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								type: "button",
-								size: "sm",
-								variant: "outline",
-								onClick: () => {
-									const binding = ctx.sessions.binding(sessionId);
-									if (binding) ctx.conversation.input.requestDraftInitialization(binding, {
-										prompt: t("guideExamplePrompt"),
-										whenDraftExists: "keep"
-									});
-								},
-								children: t("guideFill")
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								type: "button",
-								size: "sm",
-								onClick: dismiss,
-								children: t(stage === "result" ? "guideDone" : "guideSkip")
-							})]
-						})
-					]
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: message }, message), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "pm-guide-actions",
+						children: [stage === "example" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							type: "button",
+							size: "sm",
+							variant: "outline",
+							onClick: () => {
+								const binding = ctx.sessions.binding(sessionId);
+								if (binding) ctx.conversation.input.requestDraftInitialization(binding, {
+									prompt: t("guideExamplePrompt"),
+									whenDraftExists: "keep"
+								});
+							},
+							children: t("guideFill")
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							type: "button",
+							size: "sm",
+							onClick: dismiss,
+							children: t(stage === "result" ? "guideDone" : "guideSkip")
+						})]
+					})]
 				}, stage);
 			}));
 			ctx.inject(["sidebarRight"], (scope) => {

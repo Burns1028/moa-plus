@@ -142,9 +142,6 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
       };
       return (
         <div className="pm-first-guide" data-guide-stage={stage} key={stage}>
-          {stage === "result" && (
-            <span className="pm-guide-sender pm-wordmark" role="img" aria-label={t("project")} />
-          )}
           <TypedLine key={message} text={message} />
           <div className="pm-guide-actions">
             {stage === "example" && (
