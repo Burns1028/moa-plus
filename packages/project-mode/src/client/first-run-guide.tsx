@@ -1,19 +1,26 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import type { Context } from "@deepseek-ai/cordis";
+import type { SessionSnapshot } from "@deepseek-ai/dsh-api-session-controller/client";
 import type { ChatNode, ChatSnapshot } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 import type { PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
-import { Button, MenuItemButton } from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, IconCloseOutlineRegular, MenuItemButton, useAnchoredPosition } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
 import { isVisibleWorker } from "../shared/worker-membership.ts";
+import { ProjectToggle, type SharedProps } from "./components.tsx";
 import { useSelected } from "./hooks.ts";
 import type { ProjectKey } from "./locales.ts";
 import type { ProjectClient } from "./runtime.ts";
 
 const progressKey = "project-mode.first-run-guide";
 const finished = "finished";
+
+function canStartGuide(session: SessionSnapshot): boolean {
+  return session.openState === "open" && session.blank && !session.running && !session.subagent;
+}
 
 function firstCompletedTaskTurn(chat: ChatSnapshot): number | undefined {
   let firstInput = Infinity;
@@ -59,14 +66,13 @@ function TypedLine({ text }: { text: string }) {
 }
 
 const copy = {
-  enable: "guideEnable",
   example: "guideExample",
   send: "guideSend",
   workers: "guideWorkers",
   result: "guideResult",
 } as const satisfies Record<string, ProjectKey>;
 
-export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void {
+export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
   let progress: string | null = null;
   try {
     progress = localStorage.getItem(progressKey);
@@ -95,6 +101,10 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
     }
     notify();
   };
+  const dismiss = () => {
+    result = undefined;
+    save(finished);
+  };
 
   ctx.slots.inject("conversation.input.dock", () => ctx.slots.register(
     { name: "conversation.input.dock", id: "project-mode.first-run-guide", locale: "project-mode" },
@@ -109,8 +119,7 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
       const workers = useSelected(client.store.subscribe, () =>
         current === sessionId && client.store.project(sessionId)?.workers.some(worker => worker.lifecycle === "active"),
       );
-      const candidate = session.openState === "open" && session.blank &&
-        !session.running && !session.subagent && mode?.canToggle;
+      const candidate = canStartGuide(session) && mode?.canToggle;
       const completedTurn = useChat(chat =>
         current === sessionId && mode?.enabled ? firstCompletedTaskTurn(chat) : undefined,
       );
@@ -142,8 +151,8 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
       const empty = input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain";
       if (workerCount !== undefined && !session.running) stage = "result";
       else if (current === sessionId && session.running && workers) stage = "workers";
-      else if (candidate && (current === null || current === sessionId))
-        stage = mode?.enabled ? empty ? "example" : "send" : "enable";
+      else if (candidate && mode?.enabled && (current === null || current === sessionId))
+        stage = empty ? "example" : "send";
       if (!stage) return null;
 
       let message = t(copy[stage]);
@@ -151,10 +160,6 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
         if (workerCount === 1) message = t("guideResultOneWorker");
         if (workerCount > 1) message = t("guideResultWorkers", { count: workerCount });
       }
-      const dismiss = () => {
-        result = undefined;
-        save(finished);
-      };
       return (
         <div className="pm-first-guide" data-guide-stage={stage} key={stage}>
           <TypedLine key={message} text={message} />
@@ -200,4 +205,32 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
       },
     ));
   });
+
+  return function GuidedProjectToggle(p:
+    PropsRuntime<"conversation.input.left"> & PropsLocale<"project-mode"> & Omit<SharedProps, "t">) {
+    const { sessionId, useSession, useInput, t } = p;
+    const blank = useSession(canStartGuide);
+    const running = useSession(session => session.running);
+    const empty = useInput(input => input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain");
+    const mode = useSelected(client.subscribeModes, () => client.mode(sessionId));
+    const current = useSelected(subscribe, () => progress);
+    const open = current === null && blank && empty && !mode.busy &&
+      mode.value?.canToggle === true && !mode.value.enabled;
+    const anchorRef = React.useRef<HTMLButtonElement>(null);
+    const panelRef = React.useRef<HTMLDivElement>(null);
+    const descriptionId = React.useId();
+    const position = useAnchoredPosition({ open, anchorRef, panelRef, side: "top", gap: 8, margin: 12 });
+    return <>
+      <ProjectToggle {...p} running={running} buttonRef={anchorRef} guideDescriptionId={open ? descriptionId : undefined} />
+      {open && createPortal(
+        <div ref={panelRef} className="pm-first-guide pm-guide-by-toggle" data-guide-stage="enable"
+          style={position ?? { visibility: "hidden" }}>
+          <div id={descriptionId} className="pm-guide-description"><TypedLine text={t("guideEnable")} /></div>
+          <Button type="button" size="sm" aria-label={t("guideClose")} onClick={dismiss}
+            icon={<IconCloseOutlineRegular aria-hidden="true" />} />
+        </div>,
+        document.body,
+      )}
+    </>;
+  };
 }

@@ -1,5 +1,6 @@
 export const en = {
-  guideEnable: "Turn on MoA+ to start your first collaboration.",
+  guideEnable: "Select MoA+ to try a task with multiple assistants.",
+  guideClose: "Close the MoA+ guide",
   guideExample: "Try a sample task, or write something of your own.",
   guideSend: "Make the request your own, then send it when ready.",
   guideWorkers: "Open a worker card above to see how that part is going.",
@@ -114,7 +115,8 @@ export const en = {
 } as const;
 export type ProjectKey = keyof typeof en;
 export const zh: Record<ProjectKey, string> = {
-  guideEnable: "点亮 MoA+，试一次协作。",
+  guideEnable: "点 MoA+，试试让多个助手分工。",
+  guideClose: "关闭 MoA+ 引导",
   guideExample: "试一条示例，也可以写自己的任务。",
   guideSend: "这条需求可以改，准备好后点发送。",
   guideWorkers: "点开上方的子助手卡片，就能看各自的进展。",

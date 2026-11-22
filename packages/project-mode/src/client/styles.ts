@@ -45,10 +45,14 @@ body[data-ds-dark-theme] .pm-first-guide{--pm-guide-accent:#cbff45;--pm-guide-bg
 .pm-guide-typed{position:absolute;inset:0}
 .pm-guide-caret{display:inline-block;width:1px;height:1em;vertical-align:-2px;margin-inline-start:1px;background:var(--pm-guide-accent)}
 .pm-guide-actions{display:flex;align-items:center;gap:3px}
-[data-composer-seat]:has(.pm-first-guide[data-guide-stage="enable"]) .pm-mode-button:enabled{
+.pm-guide-by-toggle{position:fixed;z-index:100;margin:0;max-width:min(300px,calc(100vw - 24px));flex-wrap:nowrap;padding:6px 6px 6px 12px;gap:6px}
+.pm-guide-description{min-width:0;position:relative}
+.pm-guide-description>.pm-guide-line{display:block}
+.pm-guide-by-toggle>button{flex:none}
+.pm-mode-button[aria-describedby]:enabled{
   outline:1px solid #526b00;outline-offset:3px
 }
-body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-stage="enable"]) .pm-mode-button:enabled{outline-color:#cbff45}
+body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color:#cbff45}
 @keyframes pm-guide-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.pm-first-guide{animation:none}}
 `;

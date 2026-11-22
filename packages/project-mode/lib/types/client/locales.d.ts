@@ -1,5 +1,6 @@
 export declare const en: {
-    readonly guideEnable: "Turn on MoA+ to start your first collaboration.";
+    readonly guideEnable: "Select MoA+ to try a task with multiple assistants.";
+    readonly guideClose: "Close the MoA+ guide";
     readonly guideExample: "Try a sample task, or write something of your own.";
     readonly guideSend: "Make the request your own, then send it when ready.";
     readonly guideWorkers: "Open a worker card above to see how that part is going.";

@@ -269,6 +269,50 @@ function timelineEntry(turn: number): HTMLElement {
     .closest<HTMLElement>("article")!;
 }
 
+function guideToggle(
+  b: Awaited<ReturnType<typeof bench>>,
+  sessionId: ReturnType<typeof sid>,
+  session: { openState: string; blank: boolean; running: boolean; subagent: null },
+  input: { draft: string; attachmentIds: unknown[]; phase: string },
+) {
+  const entry = b.slots.entries("conversation.input.left")
+    .find((item) => item.options.id === "project-mode.toggle")!;
+  const Toggle = entry.component as any;
+  return <Toggle {...entry.inject?.()} sessionId={sessionId} t={t}
+    useSession={(select: (snapshot: typeof session) => unknown) => select(session)}
+    useInput={(select: (snapshot: typeof input) => unknown) => select(input)} />;
+}
+
+it("closes the guide beside the off button and remembers the dismissal", async () => {
+  const sessionId = sid("parent");
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, {
+      mode: async () => ({ ok: true, value: { sessionId, enabled: false, role: "ordinary", canToggle: true, revision: 1 } }),
+    });
+    await b.client.refreshMode(sessionId);
+    return { b, view: render(guideToggle(b, sessionId, session, input)) };
+  }
+  const first = await mount();
+  const toggle = screen.getByRole("button", { name: en.project });
+  const guide = document.querySelector('[data-guide-stage="enable"]');
+  expect(guide?.querySelector(".pm-guide-readable")?.textContent).toBe(en.guideEnable);
+  expect(document.getElementById(toggle.getAttribute("aria-describedby")!)).toBe(guide?.querySelector(".pm-guide-description"));
+  input.draft = "My own task";
+  first.view.rerender(guideToggle(first.b, sessionId, session, input));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  input.draft = "";
+  first.view.rerender(guideToggle(first.b, sessionId, session, input));
+  fireEvent.click(screen.getByRole("button", { name: en.guideClose }));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  first.view.unmount();
+  await mount();
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+});
+
 it.each([
   [0, en.guideResult],
   [1, en.guideResultOneWorker],
@@ -317,7 +361,11 @@ it.each([
         ]),
       ],
     });
-    Object.assign(b.remote, { mode: async () => ({ ok: true, value: mode }) });
+    const setEnabled = vi.fn(async (_id: typeof sessionId, enabled: boolean) => {
+      mode = { ...mode, enabled, role: enabled ? "coordinator" : "ordinary", revision: mode.revision + 1 };
+      return { ok: true, value: mode };
+    });
+    Object.assign(b.remote, { mode: async () => ({ ok: true, value: mode }), setEnabled });
     const prompt = vi.fn();
     const binding = { sessionId, session: { prompt } };
     Object.assign(b.root.sessions, {
@@ -329,19 +377,22 @@ it.each([
     const entry = b.slots.entries("conversation.input.dock")
       .find((item) => item.options.id === "project-mode.first-run-guide")!;
     const Bubble = entry.component as any;
-    const element = () => (
+    const element = () => <>
+      {guideToggle(b, sessionId, session, input)}
       <Bubble sessionId={sessionId} session={{ ...session }} input={{ ...input }}
         useChat={(select: (snapshot: typeof chat) => unknown) => select(chat)} t={t} />
-    );
+    </>;
     const view = render(element());
     const stage = () => view.container.querySelector("[data-guide-stage]")?.getAttribute("data-guide-stage");
-    return { b, view, redraw: () => view.rerender(element()), stage, binding, prompt, requestDraftInitialization };
+    return { view, redraw: () => view.rerender(element()), stage, binding, prompt, requestDraftInitialization, setEnabled };
   }
 
   const first = await mount();
-  expect(first.stage()).toBe("enable");
-  mode = { ...mode, enabled: true, role: "coordinator", revision: 2 };
-  await act(async () => first.b.client.refreshMode(sessionId));
+  expect(first.stage()).toBeUndefined();
+  expect(screen.getByRole("button", { name: en.guideClose })).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: en.project })));
+  expect(first.setEnabled).toHaveBeenCalledExactlyOnceWith(sessionId, true, 1, expect.any(String));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
   expect(first.stage()).toBe("example");
   fireEvent.click(screen.getByRole("button", { name: en.guideFill }));
   expect(first.requestDraftInitialization).toHaveBeenCalledExactlyOnceWith(first.binding, {
@@ -370,7 +421,7 @@ it.each([
   const resumed = await mount();
   expect(resumed.stage()).toBe("result");
   expect(screen.getByRole("status").querySelector(".pm-guide-readable")?.textContent).toBe(resultCopy);
-  expect(screen.queryByRole("img", { name: en.project })).toBeNull();
+  expect(within(resumed.view.container.querySelector<HTMLElement>('[data-guide-stage="result"]')!).queryByRole("img", { name: en.project })).toBeNull();
   expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
   resumed.view.unmount();
 

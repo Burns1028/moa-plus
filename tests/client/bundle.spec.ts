@@ -21,6 +21,7 @@ it("ships a lazy public factory with own generated Remote descriptor inline and 
   expect(requires).toEqual([
     "@deepseek-ai/dsh-client-ui-primitives",
     "react",
+    "react-dom",
     "react/jsx-runtime",
     "zod",
   ]);

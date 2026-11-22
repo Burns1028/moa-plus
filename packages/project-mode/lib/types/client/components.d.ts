@@ -15,7 +15,9 @@ export declare function WorkerCapsuleList({ client, sessionId, turn, closed, seg
     closed: boolean;
     segmentStartSeq?: number;
 }): React.JSX.Element | null;
-export declare function ProjectToggle({ client, sessionId, running, open, t, }: SharedProps & {
+export declare function ProjectToggle({ client, sessionId, running, buttonRef, guideDescriptionId, open, t, }: SharedProps & {
     sessionId: SessionId;
     running: boolean;
+    buttonRef?: React.Ref<HTMLButtonElement>;
+    guideDescriptionId?: string;
 }): React.JSX.Element;
