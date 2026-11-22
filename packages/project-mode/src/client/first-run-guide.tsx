@@ -75,7 +75,7 @@ const copy = {
 export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
   let progress: string | null = null;
   try {
-    progress = localStorage.getItem(progressKey);
+    if (localStorage.getItem(progressKey) !== null) progress = finished;
   } catch {
     // Keep progress in memory when the client profile cannot write storage.
   }
@@ -91,19 +91,21 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
     result = undefined;
     notify();
   };
-  const save = (next: string | null) => {
-    progress = next;
+  const rememberSeen = () => {
     try {
-      if (next === null) localStorage.removeItem(progressKey);
-      else localStorage.setItem(progressKey, next);
+      localStorage.setItem(progressKey, finished);
     } catch {
       // The current client still keeps its progress.
     }
+  };
+  const setProgress = (next: string | null) => {
+    progress = next;
+    if (next !== null) rememberSeen();
     notify();
   };
   const dismiss = () => {
     result = undefined;
-    save(finished);
+    setProgress(finished);
   };
 
   ctx.slots.inject("conversation.input.dock", () => ctx.slots.register(
@@ -125,8 +127,8 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
       );
 
       React.useEffect(() => {
-        if (candidate && mode?.enabled && progress === null) save(sessionId);
-        if (candidate && !mode?.enabled && progress === sessionId) save(null);
+        if (candidate && mode?.enabled && progress === null) setProgress(sessionId);
+        if (candidate && !mode?.enabled && progress === sessionId) setProgress(null);
       }, [candidate, current, mode?.enabled, sessionId]);
       React.useEffect(() => {
         if (progress !== sessionId || completedTurn === undefined) return;
@@ -140,7 +142,7 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
             participants.has(worker.workerId) && isVisibleWorker(worker),
           ).length ?? 0,
         };
-        save(finished);
+        setProgress(finished);
       }, [sessionId, completedTurn]);
       React.useEffect(() => () => clearResult(sessionId), [sessionId]);
       React.useEffect(() => {
@@ -199,7 +201,7 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
         if (!canReplay) return null;
         return <MenuItemButton onSelect={() => {
           result = undefined;
-          save(null);
+          setProgress(null);
           onDismiss();
         }}>{t("guideMenu")}</MenuItemButton>;
       },
@@ -220,6 +222,10 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient) {
     const panelRef = React.useRef<HTMLDivElement>(null);
     const descriptionId = React.useId();
     const position = useAnchoredPosition({ open, anchorRef, panelRef, side: "top", gap: 8, margin: 12 });
+    const visible = open && position !== null;
+    React.useEffect(() => {
+      if (visible) rememberSeen();
+    }, [visible]);
     return <>
       <ProjectToggle {...p} running={running} buttonRef={anchorRef} guideDescriptionId={open ? descriptionId : undefined} />
       {open && createPortal(

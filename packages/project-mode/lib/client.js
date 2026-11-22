@@ -7501,7 +7501,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color
 		function registerFirstRunGuide(ctx, client) {
 			let progress = null;
 			try {
-				progress = localStorage.getItem(progressKey);
+				if (localStorage.getItem(progressKey) !== null) progress = finished;
 			} catch {}
 			let result;
 			const listeners = /* @__PURE__ */ new Set();
@@ -7519,17 +7519,19 @@ body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color
 				result = void 0;
 				notify();
 			};
-			const save = (next) => {
-				progress = next;
+			const rememberSeen = () => {
 				try {
-					if (next === null) localStorage.removeItem(progressKey);
-					else localStorage.setItem(progressKey, next);
+					localStorage.setItem(progressKey, finished);
 				} catch {}
+			};
+			const setProgress = (next) => {
+				progress = next;
+				if (next !== null) rememberSeen();
 				notify();
 			};
 			const dismiss = () => {
 				result = void 0;
-				save(finished);
+				setProgress(finished);
 			};
 			ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({
 				name: "conversation.input.dock",
@@ -7543,8 +7545,8 @@ body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color
 				const candidate = canStartGuide(session) && mode?.canToggle;
 				const completedTurn = useChat((chat) => current === sessionId && mode?.enabled ? firstCompletedTaskTurn(chat) : void 0);
 				react.useEffect(() => {
-					if (candidate && mode?.enabled && progress === null) save(sessionId);
-					if (candidate && !mode?.enabled && progress === sessionId) save(null);
+					if (candidate && mode?.enabled && progress === null) setProgress(sessionId);
+					if (candidate && !mode?.enabled && progress === sessionId) setProgress(null);
 				}, [
 					candidate,
 					current,
@@ -7559,7 +7561,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color
 						sessionId,
 						workerCount: project?.workers.filter((worker) => participants.has(worker.workerId) && isVisibleWorker(worker)).length ?? 0
 					};
-					save(finished);
+					setProgress(finished);
 				}, [sessionId, completedTurn]);
 				react.useEffect(() => () => clearResult(sessionId), [sessionId]);
 				react.useEffect(() => {
@@ -7617,7 +7619,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color
 					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MenuItemButton, {
 						onSelect: () => {
 							result = void 0;
-							save(null);
+							setProgress(null);
 							onDismiss();
 						},
 						children: t("guideMenu")
@@ -7642,6 +7644,10 @@ body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color
 					gap: 8,
 					margin: 12
 				});
+				const visible = open && position !== null;
+				react.useEffect(() => {
+					if (visible) rememberSeen();
+				}, [visible]);
 				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ProjectToggle, {
 					...p,
 					running,

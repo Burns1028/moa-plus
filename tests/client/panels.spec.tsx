@@ -313,6 +313,27 @@ it("closes the guide beside the off button and remembers the dismissal", async (
   expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
 });
 
+it("remembers the first guide appearance without a click or dismissal", async () => {
+  const sessionId = sid("parent");
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, {
+      mode: async () => ({ ok: true, value: { sessionId, enabled: false, role: "ordinary", canToggle: true, revision: 1 } }),
+    });
+    await b.client.refreshMode(sessionId);
+    return render(guideToggle(b, sessionId, session, input));
+  }
+  const first = await mount();
+  expect(screen.getByRole("button", { name: en.guideClose })).toBeTruthy();
+  first.unmount();
+
+  await mount();
+  expect(screen.getByRole("button", { name: en.project }).getAttribute("aria-pressed")).toBe("false");
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+});
+
 it.each([
   [0, en.guideResult],
   [1, en.guideResultOneWorker],
@@ -415,15 +436,14 @@ it.each([
   finish(2, 35, "aborted");
   first.redraw();
   expect(first.stage()).toBeUndefined();
-  first.view.unmount();
 
   finish(3, 51, "completed");
-  const resumed = await mount();
-  expect(resumed.stage()).toBe("result");
+  first.redraw();
+  expect(first.stage()).toBe("result");
   expect(screen.getByRole("status").querySelector(".pm-guide-readable")?.textContent).toBe(resultCopy);
-  expect(within(resumed.view.container.querySelector<HTMLElement>('[data-guide-stage="result"]')!).queryByRole("img", { name: en.project })).toBeNull();
+  expect(within(first.view.container.querySelector<HTMLElement>('[data-guide-stage="result"]')!).queryByRole("img", { name: en.project })).toBeNull();
   expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
-  resumed.view.unmount();
+  first.view.unmount();
 
   const reopened = await mount();
   expect(reopened.stage()).toBeUndefined();
