@@ -6830,6 +6830,32 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 .pm-agent-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:4px 21px 0 23px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6}
 .pm-agent-body{min-width:0;padding:12px;border-top:1px solid var(--dsw-alias-border-l4);font-size:13px;line-height:1.65}.pm-agent-body>*:first-child{margin-top:0}.pm-agent-body>*:last-child{margin-bottom:0}.pm-agent-reasoning{margin:0 0 10px;color:var(--dsw-alias-label-secondary)}.pm-agent-reasoning>summary{cursor:pointer;font-size:12px}.pm-agent-reasoning[open]>summary{margin-bottom:8px}
 .pm-agent-empty{color:var(--dsw-alias-label-tertiary)}
+.pm-first-guide{
+  --pm-guide-accent:#526b00;--pm-guide-bg:#f7f9ef;--pm-guide-edge:#dce4c8;
+  position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;
+  width:max-content;max-width:calc(100% - 32px);box-sizing:border-box;
+  margin:4px 16px 12px;padding:8px 10px 8px 13px;border:1px solid var(--pm-guide-edge);
+  border-radius:13px;background:var(--pm-guide-bg);color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:13px;line-height:20px;animation:pm-guide-in .24s ease-out both
+}
+body[data-ds-dark-theme] .pm-first-guide{--pm-guide-accent:#cbff45;--pm-guide-bg:#23291b;--pm-guide-edge:#47562f}
+.pm-first-guide::after{
+  content:"";position:absolute;inset-inline-start:22px;bottom:-5px;width:8px;height:8px;
+  transform:rotate(45deg);background:var(--pm-guide-bg);border:solid var(--pm-guide-edge);border-width:0 1px 1px 0
+}
+.pm-first-guide[data-guide-stage="result"]::after,.pm-first-guide[data-guide-stage="workers"]::after{bottom:auto;top:-5px;transform:rotate(225deg)}
+.pm-guide-line{position:relative;min-width:0;overflow-wrap:anywhere}
+.pm-guide-readable{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.pm-guide-measure{visibility:hidden}
+.pm-guide-typed{position:absolute;inset:0}
+.pm-guide-caret{display:inline-block;width:1px;height:1em;vertical-align:-2px;margin-inline-start:1px;background:var(--pm-guide-accent)}
+.pm-guide-actions{display:flex;align-items:center;gap:3px}
+[data-composer-seat]:has(.pm-first-guide[data-guide-stage="enable"]) .pm-mode-button:enabled{
+  outline:1px solid #526b00;outline-offset:3px
+}
+body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-stage="enable"]) .pm-mode-button:enabled{outline-color:#cbff45}
+@keyframes pm-guide-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.pm-first-guide{animation:none}}
 `;
 		// src/client/components.tsx
 		function WorkerCapsuleList({ client, sessionId, turn, closed, segmentStartSeq, open, t }) {
@@ -7056,6 +7082,16 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 		}
 		// src/client/locales.ts
 		const en = {
+			guideEnable: "Turn on MoA+ to start your first collaboration.",
+			guideExample: "Try a sample task, or write something of your own.",
+			guideSend: "Make the request your own, then send it when ready.",
+			guideWorkers: "Open a worker card above to see how that part is going.",
+			guideResult: "Your first task is complete. The result is right above.",
+			guideFill: "Fill in sample",
+			guideSkip: "Skip",
+			guideDone: "Got it",
+			guideMenu: "MoA+ first-run guide",
+			guideExamplePrompt: "Our notes exporter supports both default order and title sorting. Work on two things in parallel: write a three-line user update and list three acceptance checks. Combine them into a short release card.",
 			timeline: "Work timeline",
 			noWorkers: "No workers yet",
 			selectWorker: "Select a worker to view its work.",
@@ -7156,6 +7192,16 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			running: "Running: {count}"
 		};
 		const zh = {
+			guideEnable: "点亮 MoA+，试一次协作。",
+			guideExample: "试一条示例，也可以写自己的任务。",
+			guideSend: "这条需求可以改，准备好后点发送。",
+			guideWorkers: "点开上方的子助手卡片，就能看各自的进展。",
+			guideResult: "第一次任务完成了。上面就是这次的结果。",
+			guideFill: "填入示例",
+			guideSkip: "跳过",
+			guideDone: "知道了",
+			guideMenu: "MoA+ 使用引导",
+			guideExamplePrompt: "笔记导出工具支持默认顺序和标题排序。请并行准备两项内容：写三行用户更新说明，列三条验收检查。最后合成一份简短的发布卡片。",
 			timeline: "工作轴",
 			noWorkers: "还没有 Worker",
 			selectWorker: "选择一个 Worker 查看工作记录。",
@@ -7383,6 +7429,181 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				})]
 			})] });
 		}
+		// src/client/first-run-guide.tsx
+		const progressKey = "project-mode.first-run-guide";
+		const finished = "finished";
+		function hasCompletedTask(chat) {
+			let firstInput = Infinity;
+			for (const node of chat.nodes.values()) {
+				if (node.kind !== "user") continue;
+				const { source, seq } = node.data;
+				if (source && typeof source === "object" && "kind" in source && source.kind === "user") firstInput = Math.min(firstInput, seq);
+			}
+			for (const turn of chat.timeline.turns.values()) if (turn.end?.data.reason.kind === "completed" && turn.end.seq > firstInput) return true;
+			return false;
+		}
+		function TypedLine({ text }) {
+			const characters = react.useMemo(() => Array.from(text), [text]);
+			const [count, setCount] = react.useState(0);
+			react.useEffect(() => {
+				if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+					setCount(characters.length);
+					return;
+				}
+				let cursor = 0;
+				const timer = window.setInterval(() => {
+					cursor += 1;
+					setCount(cursor);
+					if (cursor >= characters.length) window.clearInterval(timer);
+				}, 22);
+				return () => window.clearInterval(timer);
+			}, [characters]);
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: "pm-guide-line",
+				role: "status",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "pm-guide-readable",
+						children: text
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "pm-guide-measure",
+						"aria-hidden": "true",
+						children: text
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "pm-guide-typed",
+						"aria-hidden": "true",
+						children: [characters.slice(0, count).join(""), count < characters.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: "pm-guide-caret" })]
+					})
+				]
+			});
+		}
+		const copy = {
+			enable: "guideEnable",
+			example: "guideExample",
+			send: "guideSend",
+			workers: "guideWorkers",
+			result: "guideResult"
+		};
+		function registerFirstRunGuide(ctx, client) {
+			let progress = null;
+			try {
+				progress = localStorage.getItem(progressKey);
+			} catch {}
+			let resultSession;
+			const listeners = /* @__PURE__ */ new Set();
+			const subscribe = (listener) => {
+				listeners.add(listener);
+				return () => {
+					listeners.delete(listener);
+				};
+			};
+			const notify = () => {
+				for (const listener of listeners) listener();
+			};
+			const clearResult = (sessionId) => {
+				if (resultSession !== sessionId) return;
+				resultSession = void 0;
+				notify();
+			};
+			const save = (next) => {
+				progress = next;
+				try {
+					if (next === null) localStorage.removeItem(progressKey);
+					else localStorage.setItem(progressKey, next);
+				} catch {}
+				notify();
+			};
+			ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({
+				name: "conversation.input.dock",
+				id: "project-mode.first-run-guide",
+				locale: "project-mode"
+			}, function FirstRunBubble({ sessionId, session, input, useChat, t }) {
+				const current = useSelected(subscribe, () => progress);
+				const showResult = useSelected(subscribe, () => resultSession === sessionId);
+				const mode = useSelected(client.subscribeModes, () => client.mode(sessionId).value);
+				const workers = useSelected(client.store.subscribe, () => current === sessionId && client.store.project(sessionId)?.workers.some((worker) => worker.lifecycle === "active"));
+				const candidate = session.openState === "open" && session.blank && !session.running && !session.subagent && mode?.canToggle;
+				const completed = useChat((chat) => current === sessionId && !!mode?.enabled && hasCompletedTask(chat));
+				react.useEffect(() => {
+					if (candidate && mode?.enabled && progress === null) save(sessionId);
+					if (candidate && !mode?.enabled && progress === sessionId) save(null);
+				}, [
+					candidate,
+					current,
+					mode?.enabled,
+					sessionId
+				]);
+				react.useEffect(() => {
+					if (progress !== sessionId || !completed) return;
+					resultSession = sessionId;
+					save(finished);
+				}, [sessionId, completed]);
+				react.useEffect(() => () => clearResult(sessionId), [sessionId]);
+				react.useEffect(() => {
+					if (session.running) clearResult(sessionId);
+				}, [sessionId, session.running]);
+				let stage;
+				const empty = input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain";
+				if (showResult && !session.running) stage = "result";
+				else if (current === sessionId && session.running && workers) stage = "workers";
+				else if (candidate && (current === null || current === sessionId)) stage = mode?.enabled ? empty ? "example" : "send" : "enable";
+				if (!stage) return null;
+				const message = t(copy[stage]);
+				const dismiss = () => {
+					resultSession = void 0;
+					save(finished);
+				};
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "pm-first-guide",
+					"data-guide-stage": stage,
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: message }, message), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "pm-guide-actions",
+						children: [stage === "example" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							type: "button",
+							size: "sm",
+							variant: "outline",
+							onClick: () => {
+								const binding = ctx.sessions.binding(sessionId);
+								if (binding) ctx.conversation.input.requestDraftInitialization(binding, {
+									prompt: t("guideExamplePrompt"),
+									whenDraftExists: "keep"
+								});
+							},
+							children: t("guideFill")
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							type: "button",
+							size: "sm",
+							onClick: dismiss,
+							children: t(stage === "result" ? "guideDone" : "guideSkip")
+						})]
+					})]
+				}, stage);
+			}));
+			ctx.inject(["sidebarRight"], (scope) => {
+				scope.slots.inject("sidebar.panellist.actions", () => scope.slots.register({
+					name: "sidebar.panellist.actions",
+					id: "project-mode.reopen-first-run-guide",
+					locale: "project-mode"
+				}, function ReopenGuide({ onDismiss, t }) {
+					const id = useSelected(scope.sidebarRight.mounted.subscribe, scope.sidebarRight.mounted.getSnapshot);
+					const session = id ? scope.sessions.binding(id)?.session : void 0;
+					if (!useSelected((listener) => session?.subscribe(listener) ?? (() => {}), () => {
+						const state = session?.getSnapshot();
+						return !!state?.blank && !state.running && !state.subagent;
+					})) return null;
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MenuItemButton, {
+						onSelect: () => {
+							resultSession = void 0;
+							save(null);
+							onDismiss();
+						},
+						children: t("guideMenu")
+					});
+				}));
+			});
+		}
 		// src/client/index.tsx
 		const inject = [
 			"remote",
@@ -7434,6 +7655,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				en,
 				zh
 			}));
+			registerFirstRunGuide(ctx, client);
 			ctx.effect(() => ctx.uiConversation.events.register(humanBoundaryDefinition));
 			ctx.effect(() => ctx.uiConversation.events.register(workerTailDefinition));
 			const refreshRoots = () => {

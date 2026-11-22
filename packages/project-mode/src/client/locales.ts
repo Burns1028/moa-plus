@@ -1,4 +1,14 @@
 export const en = {
+  guideEnable: "Turn on MoA+ to start your first collaboration.",
+  guideExample: "Try a sample task, or write something of your own.",
+  guideSend: "Make the request your own, then send it when ready.",
+  guideWorkers: "Open a worker card above to see how that part is going.",
+  guideResult: "Your first task is complete. The result is right above.",
+  guideFill: "Fill in sample",
+  guideSkip: "Skip",
+  guideDone: "Got it",
+  guideMenu: "MoA+ first-run guide",
+  guideExamplePrompt: "Our notes exporter supports both default order and title sorting. Work on two things in parallel: write a three-line user update and list three acceptance checks. Combine them into a short release card.",
   timeline: "Work timeline",
   noWorkers: "No workers yet",
   selectWorker: "Select a worker to view its work.",
@@ -102,6 +112,16 @@ export const en = {
 } as const;
 export type ProjectKey = keyof typeof en;
 export const zh: Record<ProjectKey, string> = {
+  guideEnable: "点亮 MoA+，试一次协作。",
+  guideExample: "试一条示例，也可以写自己的任务。",
+  guideSend: "这条需求可以改，准备好后点发送。",
+  guideWorkers: "点开上方的子助手卡片，就能看各自的进展。",
+  guideResult: "第一次任务完成了。上面就是这次的结果。",
+  guideFill: "填入示例",
+  guideSkip: "跳过",
+  guideDone: "知道了",
+  guideMenu: "MoA+ 使用引导",
+  guideExamplePrompt: "笔记导出工具支持默认顺序和标题排序。请并行准备两项内容：写三行用户更新说明，列三条验收检查。最后合成一份简短的发布卡片。",
   timeline: "工作轴",
   noWorkers: "还没有 Worker",
   selectWorker: "选择一个 Worker 查看工作记录。",

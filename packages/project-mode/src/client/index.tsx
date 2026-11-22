@@ -34,6 +34,7 @@ import { en, zh } from "./locales.ts";
 import { styles } from "./styles.ts";
 import { useSelected } from "./hooks.ts";
 import { AgentMessage } from "./agent-message.tsx";
+import { registerFirstRunGuide } from "./first-run-guide.tsx";
 export const inject = [
   "remote",
   "sessions",
@@ -98,6 +99,7 @@ function applyProjectClient(ctx: Context) {
     ),
   );
   ctx.effect(() => ctx.locale.register("project-mode", { en, zh }));
+  registerFirstRunGuide(ctx, client);
   ctx.effect(() => ctx.uiConversation.events.register(humanBoundaryDefinition));
   ctx.effect(() => ctx.uiConversation.events.register(workerTailDefinition));
   const refreshRoots = () => {

@@ -22,6 +22,7 @@ import { submissionFixture } from "./submission-fixture.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { en } from "../../packages/project-mode/src/client/locales.ts";
 import type {
+  SessionModeView,
   WorkerMessageAttachment,
   WorkerTimelineTurn,
 } from "../../packages/project-mode/src/shared/index.ts";
@@ -54,6 +55,7 @@ async function bench(
       name: "root",
       children: {
         "conversation.input.left": { kind: "list", scope: "session" },
+        "conversation.input.dock": { kind: "list", scope: "session" },
         "conversation.chat.node": { kind: "keyed", scope: "session" },
         "conversation.composer": { kind: "chain", scope: "session" },
         "conversation.session.header.actions": {
@@ -266,6 +268,87 @@ function timelineEntry(turn: number): HTMLElement {
     .getByText(t("timelineTurn", { turn }))
     .closest<HTMLElement>("article")!;
 }
+
+it("guides the first real task through drafting, completion, and one-time display across reload", async () => {
+  const sessionId = sid("parent");
+  let mode: SessionModeView = {
+    sessionId,
+    role: "ordinary",
+    enabled: false,
+    canToggle: true,
+    revision: 1,
+  };
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  const turns = new Map<number, { end: { seq: number; data: { reason: { kind: string } } } }>();
+  let inputSource = "project-mode-assignment";
+  const chat = {
+    nodes: { values: () => [{ kind: "user", data: { seq: 10, source: { kind: inputSource } } }] },
+    timeline: { turns },
+  };
+  const finish = (turn: number, seq: number, kind: string) => {
+    turns.set(turn, { end: { seq, data: { reason: { kind } } } });
+  };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, { mode: async () => ({ ok: true, value: mode }) });
+    const prompt = vi.fn();
+    const binding = { sessionId, session: { prompt } };
+    Object.assign(b.root.sessions, {
+      binding: (id: string) => id === sessionId ? binding : undefined,
+    });
+    const requestDraftInitialization = vi.fn(() => "applied");
+    Object.assign(b.root.conversation, { input: { requestDraftInitialization } });
+    await b.client.refreshMode(sessionId);
+    const entry = b.slots.entries("conversation.input.dock")
+      .find((item) => item.options.id === "project-mode.first-run-guide")!;
+    const Bubble = entry.component as any;
+    const element = () => (
+      <Bubble sessionId={sessionId} session={{ ...session }} input={{ ...input }}
+        useChat={(select: (snapshot: typeof chat) => unknown) => select(chat)} t={t} />
+    );
+    const view = render(element());
+    const stage = () => view.container.querySelector("[data-guide-stage]")?.getAttribute("data-guide-stage");
+    return { b, view, redraw: () => view.rerender(element()), stage, binding, prompt, requestDraftInitialization };
+  }
+
+  const first = await mount();
+  expect(first.stage()).toBe("enable");
+  mode = { ...mode, enabled: true, role: "coordinator", revision: 2 };
+  await act(async () => first.b.client.refreshMode(sessionId));
+  expect(first.stage()).toBe("example");
+  fireEvent.click(screen.getByRole("button", { name: en.guideFill }));
+  expect(first.requestDraftInitialization).toHaveBeenCalledExactlyOnceWith(first.binding, {
+    prompt: en.guideExamplePrompt,
+    whenDraftExists: "keep",
+  });
+  expect(first.prompt).not.toHaveBeenCalled();
+  input.draft = en.guideExamplePrompt;
+  first.redraw();
+  expect(first.stage()).toBe("send");
+
+  session.blank = false;
+  mode = { ...mode, canToggle: false, modeLocked: true };
+  finish(1, 20, "completed");
+  first.redraw();
+  expect(first.stage()).toBeUndefined();
+  turns.clear();
+  inputSource = "user";
+  finish(1, 21, "handoff");
+  finish(2, 35, "aborted");
+  first.redraw();
+  expect(first.stage()).toBeUndefined();
+  first.view.unmount();
+
+  finish(3, 51, "completed");
+  const resumed = await mount();
+  expect(resumed.stage()).toBe("result");
+  expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
+  resumed.view.unmount();
+
+  const reopened = await mount();
+  expect(reopened.stage()).toBeUndefined();
+});
 
 it("shows attachment-only timeline input and opens its existing native file resource", async () => {
   const b = await bench("", [
