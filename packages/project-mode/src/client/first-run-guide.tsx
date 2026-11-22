@@ -7,6 +7,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 import type { PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
 import { Button, MenuItemButton } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
+import { isVisibleWorker } from "../shared/worker-membership.ts";
 import { useSelected } from "./hooks.ts";
 import type { ProjectKey } from "./locales.ts";
 import type { ProjectClient } from "./runtime.ts";
@@ -14,7 +15,7 @@ import type { ProjectClient } from "./runtime.ts";
 const progressKey = "project-mode.first-run-guide";
 const finished = "finished";
 
-function hasCompletedTask(chat: ChatSnapshot): boolean {
+function firstCompletedTaskTurn(chat: ChatSnapshot): number | undefined {
   let firstInput = Infinity;
   for (const node of chat.nodes.values()) {
     if (node.kind !== "user") continue;
@@ -22,11 +23,10 @@ function hasCompletedTask(chat: ChatSnapshot): boolean {
     if (source && typeof source === "object" && "kind" in source && source.kind === "user")
       firstInput = Math.min(firstInput, seq);
   }
-  for (const turn of chat.timeline.turns.values()) {
-    if (turn.end?.data.reason.kind === "completed" && turn.end.seq > firstInput)
-      return true;
+  for (const turn of chat.timeline.turnOrder) {
+    const end = chat.timeline.turns.get(turn)?.end;
+    if (end?.data.reason.kind === "completed" && end.seq > firstInput) return turn;
   }
-  return false;
 }
 
 function TypedLine({ text }: { text: string }) {
@@ -73,7 +73,7 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
   } catch {
     // Keep progress in memory when the client profile cannot write storage.
   }
-  let resultSession: SessionId | undefined;
+  let result: { sessionId: SessionId; workerCount: number } | undefined;
   const listeners = new Set<() => void>();
   const subscribe = (listener: () => void) => {
     listeners.add(listener);
@@ -81,8 +81,8 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
   };
   const notify = () => { for (const listener of listeners) listener(); };
   const clearResult = (sessionId: SessionId) => {
-    if (resultSession !== sessionId) return;
-    resultSession = undefined;
+    if (result?.sessionId !== sessionId) return;
+    result = undefined;
     notify();
   };
   const save = (next: string | null) => {
@@ -102,15 +102,17 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
       sessionId, session, input, useChat, t,
     }: PropsRuntime<"conversation.input.dock"> & PropsLocale<"project-mode">) {
       const current = useSelected(subscribe, () => progress);
-      const showResult = useSelected(subscribe, () => resultSession === sessionId);
+      const workerCount = useSelected(subscribe, () =>
+        result?.sessionId === sessionId ? result.workerCount : undefined,
+      );
       const mode = useSelected(client.subscribeModes, () => client.mode(sessionId).value);
       const workers = useSelected(client.store.subscribe, () =>
         current === sessionId && client.store.project(sessionId)?.workers.some(worker => worker.lifecycle === "active"),
       );
       const candidate = session.openState === "open" && session.blank &&
         !session.running && !session.subagent && mode?.canToggle;
-      const completed = useChat(chat =>
-        current === sessionId && !!mode?.enabled && hasCompletedTask(chat),
+      const completedTurn = useChat(chat =>
+        current === sessionId && mode?.enabled ? firstCompletedTaskTurn(chat) : undefined,
       );
 
       React.useEffect(() => {
@@ -118,10 +120,19 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
         if (candidate && !mode?.enabled && progress === sessionId) save(null);
       }, [candidate, current, mode?.enabled, sessionId]);
       React.useEffect(() => {
-        if (progress !== sessionId || !completed) return;
-        resultSession = sessionId;
+        if (progress !== sessionId || completedTurn === undefined) return;
+        const project = client.store.project(sessionId);
+        const participants = new Set(project?.turnMemberships
+          .filter(member => member.coordinatorTurn === completedTurn)
+          .map(member => member.workerId));
+        result = {
+          sessionId,
+          workerCount: project?.workers.filter(worker =>
+            participants.has(worker.workerId) && isVisibleWorker(worker),
+          ).length ?? 0,
+        };
         save(finished);
-      }, [sessionId, completed]);
+      }, [sessionId, completedTurn]);
       React.useEffect(() => () => clearResult(sessionId), [sessionId]);
       React.useEffect(() => {
         if (session.running) clearResult(sessionId);
@@ -129,15 +140,19 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
 
       let stage: keyof typeof copy | undefined;
       const empty = input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain";
-      if (showResult && !session.running) stage = "result";
+      if (workerCount !== undefined && !session.running) stage = "result";
       else if (current === sessionId && session.running && workers) stage = "workers";
       else if (candidate && (current === null || current === sessionId))
         stage = mode?.enabled ? empty ? "example" : "send" : "enable";
       if (!stage) return null;
 
-      const message = t(copy[stage]);
+      let message = t(copy[stage]);
+      if (stage === "result" && workerCount !== undefined) {
+        if (workerCount === 1) message = t("guideResultOneWorker");
+        if (workerCount > 1) message = t("guideResultWorkers", { count: workerCount });
+      }
       const dismiss = () => {
-        resultSession = undefined;
+        result = undefined;
         save(finished);
       };
       return (
@@ -178,7 +193,7 @@ export function registerFirstRunGuide(ctx: Context, client: ProjectClient): void
         );
         if (!canReplay) return null;
         return <MenuItemButton onSelect={() => {
-          resultSession = undefined;
+          result = undefined;
           save(null);
           onDismiss();
         }}>{t("guideMenu")}</MenuItemButton>;

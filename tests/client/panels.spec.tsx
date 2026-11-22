@@ -269,7 +269,11 @@ function timelineEntry(turn: number): HTMLElement {
     .closest<HTMLElement>("article")!;
 }
 
-it("guides the first real task through drafting, completion, and one-time display across reload", async () => {
+it.each([
+  [0, en.guideResult],
+  [1, en.guideResultOneWorker],
+  [2, en.guideResultWorkers.replace("{count}", "2")],
+] as const)("shows the first real task's result once with %i participating workers", async (workerCount, resultCopy) => {
   const sessionId = sid("parent");
   let mode: SessionModeView = {
     sessionId,
@@ -284,13 +288,35 @@ it("guides the first real task through drafting, completion, and one-time displa
   let inputSource = "project-mode-assignment";
   const chat = {
     nodes: { values: () => [{ kind: "user", data: { seq: 10, source: { kind: inputSource } } }] },
-    timeline: { turns },
+    timeline: { turns, get turnOrder() { return [...turns.keys()]; } },
   };
   const finish = (turn: number, seq: number, kind: string) => {
     turns.set(turn, { end: { seq, data: { reason: { kind } } } });
   };
   async function mount() {
     const b = await bench();
+    const initial = snapshot();
+    const [worker] = initial.workers;
+    const [membership] = initial.turnMemberships;
+    const deleted = sid("removed");
+    const participants = [sid("exporter"), sid("reviewer")].slice(0, workerCount);
+    b.client.store.accept({
+      ...initial,
+      revision: initial.revision + 1,
+      workers: [
+        worker,
+        { ...worker, workerId: deleted, lifecycle: "deleted" },
+        ...participants.map(workerId => ({ ...worker, workerId })),
+      ],
+      turnMemberships: [
+        { ...membership, coordinatorTurn: 2 },
+        { ...membership, workerId: deleted },
+        ...participants.flatMap(workerId => [
+          { ...membership, workerId, segmentStartSeq: 10 },
+          { ...membership, workerId, segmentStartSeq: 40 },
+        ]),
+      ],
+    });
     Object.assign(b.remote, { mode: async () => ({ ok: true, value: mode }) });
     const prompt = vi.fn();
     const binding = { sessionId, session: { prompt } };
@@ -343,7 +369,7 @@ it("guides the first real task through drafting, completion, and one-time displa
   finish(3, 51, "completed");
   const resumed = await mount();
   expect(resumed.stage()).toBe("result");
-  expect(screen.getByRole("status").textContent).toContain(en.guideResult);
+  expect(screen.getByRole("status").querySelector(".pm-guide-readable")?.textContent).toBe(resultCopy);
   expect(screen.queryByRole("img", { name: en.project })).toBeNull();
   expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
   resumed.view.unmount();

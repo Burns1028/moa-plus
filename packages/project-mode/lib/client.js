@@ -7081,7 +7081,9 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 			guideExample: "Try a sample task, or write something of your own.",
 			guideSend: "Make the request your own, then send it when ready.",
 			guideWorkers: "Open a worker card above to see how that part is going.",
-			guideResult: "Your first task is complete.",
+			guideResult: "Your result is ready.",
+			guideResultOneWorker: "Your result is ready. One worker contributed.",
+			guideResultWorkers: "Your result is ready. {count} workers contributed.",
 			guideFill: "Fill in sample",
 			guideSkip: "Skip",
 			guideDone: "Got it",
@@ -7191,7 +7193,9 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 			guideExample: "试一条示例，也可以写自己的任务。",
 			guideSend: "这条需求可以改，准备好后点发送。",
 			guideWorkers: "点开上方的子助手卡片，就能看各自的进展。",
-			guideResult: "第一次任务完成了。",
+			guideResult: "结果已就绪。",
+			guideResultOneWorker: "结果已就绪，1 位子助手参与。",
+			guideResultWorkers: "结果已就绪，{count} 位子助手参与。",
 			guideFill: "填入示例",
 			guideSkip: "跳过",
 			guideDone: "知道了",
@@ -7427,15 +7431,17 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 		// src/client/first-run-guide.tsx
 		const progressKey = "project-mode.first-run-guide";
 		const finished = "finished";
-		function hasCompletedTask(chat) {
+		function firstCompletedTaskTurn(chat) {
 			let firstInput = Infinity;
 			for (const node of chat.nodes.values()) {
 				if (node.kind !== "user") continue;
 				const { source, seq } = node.data;
 				if (source && typeof source === "object" && "kind" in source && source.kind === "user") firstInput = Math.min(firstInput, seq);
 			}
-			for (const turn of chat.timeline.turns.values()) if (turn.end?.data.reason.kind === "completed" && turn.end.seq > firstInput) return true;
-			return false;
+			for (const turn of chat.timeline.turnOrder) {
+				const end = chat.timeline.turns.get(turn)?.end;
+				if (end?.data.reason.kind === "completed" && end.seq > firstInput) return turn;
+			}
 		}
 		function TypedLine({ text }) {
 			const characters = react.useMemo(() => Array.from(text), [text]);
@@ -7486,7 +7492,7 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 			try {
 				progress = localStorage.getItem(progressKey);
 			} catch {}
-			let resultSession;
+			let result;
 			const listeners = /* @__PURE__ */ new Set();
 			const subscribe = (listener) => {
 				listeners.add(listener);
@@ -7498,8 +7504,8 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 				for (const listener of listeners) listener();
 			};
 			const clearResult = (sessionId) => {
-				if (resultSession !== sessionId) return;
-				resultSession = void 0;
+				if (result?.sessionId !== sessionId) return;
+				result = void 0;
 				notify();
 			};
 			const save = (next) => {
@@ -7516,11 +7522,11 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 				locale: "project-mode"
 			}, function FirstRunBubble({ sessionId, session, input, useChat, t }) {
 				const current = useSelected(subscribe, () => progress);
-				const showResult = useSelected(subscribe, () => resultSession === sessionId);
+				const workerCount = useSelected(subscribe, () => result?.sessionId === sessionId ? result.workerCount : void 0);
 				const mode = useSelected(client.subscribeModes, () => client.mode(sessionId).value);
 				const workers = useSelected(client.store.subscribe, () => current === sessionId && client.store.project(sessionId)?.workers.some((worker) => worker.lifecycle === "active"));
 				const candidate = session.openState === "open" && session.blank && !session.running && !session.subagent && mode?.canToggle;
-				const completed = useChat((chat) => current === sessionId && !!mode?.enabled && hasCompletedTask(chat));
+				const completedTurn = useChat((chat) => current === sessionId && mode?.enabled ? firstCompletedTaskTurn(chat) : void 0);
 				react.useEffect(() => {
 					if (candidate && mode?.enabled && progress === null) save(sessionId);
 					if (candidate && !mode?.enabled && progress === sessionId) save(null);
@@ -7531,23 +7537,32 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 					sessionId
 				]);
 				react.useEffect(() => {
-					if (progress !== sessionId || !completed) return;
-					resultSession = sessionId;
+					if (progress !== sessionId || completedTurn === void 0) return;
+					const project = client.store.project(sessionId);
+					const participants = new Set(project?.turnMemberships.filter((member) => member.coordinatorTurn === completedTurn).map((member) => member.workerId));
+					result = {
+						sessionId,
+						workerCount: project?.workers.filter((worker) => participants.has(worker.workerId) && isVisibleWorker(worker)).length ?? 0
+					};
 					save(finished);
-				}, [sessionId, completed]);
+				}, [sessionId, completedTurn]);
 				react.useEffect(() => () => clearResult(sessionId), [sessionId]);
 				react.useEffect(() => {
 					if (session.running) clearResult(sessionId);
 				}, [sessionId, session.running]);
 				let stage;
 				const empty = input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain";
-				if (showResult && !session.running) stage = "result";
+				if (workerCount !== void 0 && !session.running) stage = "result";
 				else if (current === sessionId && session.running && workers) stage = "workers";
 				else if (candidate && (current === null || current === sessionId)) stage = mode?.enabled ? empty ? "example" : "send" : "enable";
 				if (!stage) return null;
-				const message = t(copy[stage]);
+				let message = t(copy[stage]);
+				if (stage === "result" && workerCount !== void 0) {
+					if (workerCount === 1) message = t("guideResultOneWorker");
+					if (workerCount > 1) message = t("guideResultWorkers", { count: workerCount });
+				}
 				const dismiss = () => {
-					resultSession = void 0;
+					result = void 0;
 					save(finished);
 				};
 				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -7590,7 +7605,7 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 					})) return null;
 					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MenuItemButton, {
 						onSelect: () => {
-							resultSession = void 0;
+							result = void 0;
 							save(null);
 							onDismiss();
 						},
