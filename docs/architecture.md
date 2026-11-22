@@ -4,7 +4,7 @@ MoA+ organizes persistent Agents into a collaborating team inside DeepSeek Harne
 
 The implementation is a Cordis Host/Client plugin over DSH's native Agent Loop, Sessions, inboxes, subagent manager, filesystem, jobs, and workspace registry. Coordinator and Worker use the same runtime. The plugin supplies role composition, collaboration tools, shared knowledge, durable delivery facts, and completion hooks.
 
-This guide describes MoA+ v0.2.10, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
+This guide describes MoA+ v0.2.11, including Worker attachments, 自适应协调, Chinese orchestration prompts, and the audited Desktop Next profile. The v0.2.0 tag has the earlier runtime; v0.1.23 and its media document the Project Mode preview. Read [compatibility](compatibility.md) for the matching native runtime and [verification](verification.md) for evidence status.
 
 ## Three layers
 
