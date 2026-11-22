@@ -23,17 +23,14 @@ import {
   segmentTail,
   segmentHistoryTarget,
 } from "./tail.ts";
-import {
-  ProjectToggle,
-  WorkerCapsuleList,
-  type SharedProps,
-} from "./components.tsx";
+import { WorkerCapsuleList, type SharedProps } from "./components.tsx";
 import { bindProjectBranches } from "./branch.tsx";
 import { workerReadOnly, composerMatch } from "./tree.ts";
 import { en, zh } from "./locales.ts";
 import { styles } from "./styles.ts";
 import { useSelected } from "./hooks.ts";
 import { AgentMessage } from "./agent-message.tsx";
+import { registerFirstRunGuide } from "./first-run-guide.tsx";
 export const inject = [
   "remote",
   "sessions",
@@ -98,6 +95,7 @@ function applyProjectClient(ctx: Context) {
     ),
   );
   ctx.effect(() => ctx.locale.register("project-mode", { en, zh }));
+  const GuidedProjectToggle = registerFirstRunGuide(ctx, client);
   ctx.effect(() => ctx.uiConversation.events.register(humanBoundaryDefinition));
   ctx.effect(() => ctx.uiConversation.events.register(workerTailDefinition));
   const refreshRoots = () => {
@@ -135,7 +133,7 @@ function applyProjectClient(ctx: Context) {
       ) => (
         <>
           <style>{styles}</style>
-          <ProjectToggle {...p} running={p.useSession((s) => s.running)} />
+          <GuidedProjectToggle {...p} />
         </>
       ),
     ),

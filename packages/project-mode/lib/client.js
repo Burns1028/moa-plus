@@ -30,6 +30,7 @@ window.__ModuleLoader__.load({
 		let zod = require("zod");
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
+		let react_dom = require("react-dom");
 		// ../../node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
 		/** Lazy assembly of generated Remote definitions using caller-supplied Zod; no runtime imports. */
 		/**
@@ -6830,6 +6831,31 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 .pm-agent-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:4px 21px 0 23px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6}
 .pm-agent-body{min-width:0;padding:12px;border-top:1px solid var(--dsw-alias-border-l4);font-size:13px;line-height:1.65}.pm-agent-body>*:first-child{margin-top:0}.pm-agent-body>*:last-child{margin-bottom:0}.pm-agent-reasoning{margin:0 0 10px;color:var(--dsw-alias-label-secondary)}.pm-agent-reasoning>summary{cursor:pointer;font-size:12px}.pm-agent-reasoning[open]>summary{margin-bottom:8px}
 .pm-agent-empty{color:var(--dsw-alias-label-tertiary)}
+.pm-first-guide{
+  --pm-guide-accent:#526b00;--pm-guide-bg:#f7f9ef;--pm-guide-edge:#dce4c8;
+  position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;
+  width:max-content;max-width:calc(100% - 32px);box-sizing:border-box;
+  margin:4px 16px 12px;padding:8px 10px 8px 13px;border:1px solid var(--pm-guide-edge);
+  border-radius:13px;background:var(--pm-guide-bg);color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:13px;line-height:20px;animation:pm-guide-in .24s ease-out both
+}
+body[data-ds-dark-theme] .pm-first-guide{--pm-guide-accent:#cbff45;--pm-guide-bg:#23291b;--pm-guide-edge:#47562f}
+.pm-guide-line{position:relative;min-width:0;overflow-wrap:anywhere}
+.pm-guide-readable{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.pm-guide-measure{visibility:hidden}
+.pm-guide-typed{position:absolute;inset:0}
+.pm-guide-caret{display:inline-block;width:1px;height:1em;vertical-align:-2px;margin-inline-start:1px;background:var(--pm-guide-accent)}
+.pm-guide-actions{display:flex;align-items:center;gap:3px}
+.pm-guide-by-toggle{position:fixed;z-index:100;margin:0;max-width:min(300px,calc(100vw - 24px));flex-wrap:nowrap;padding:6px 6px 6px 12px;gap:6px}
+.pm-guide-description{min-width:0;position:relative}
+.pm-guide-description>.pm-guide-line{display:block}
+.pm-guide-by-toggle>button{flex:none}
+.pm-mode-button[aria-describedby]:enabled{
+  outline:1px solid #526b00;outline-offset:3px
+}
+body[data-ds-dark-theme] .pm-mode-button[aria-describedby]:enabled{outline-color:#cbff45}
+@keyframes pm-guide-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.pm-first-guide{animation:none}}
 `;
 		// src/client/components.tsx
 		function WorkerCapsuleList({ client, sessionId, turn, closed, segmentStartSeq, open, t }) {
@@ -6865,7 +6891,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				})
 			})] });
 		}
-		function ProjectToggle({ client, sessionId, running, open, t }) {
+		function ProjectToggle({ client, sessionId, running, buttonRef, guideDescriptionId, open, t }) {
 			const state = useSelected(client.subscribeModes, () => client.mode(sessionId));
 			const projectMode = useSelected(client.store.subscribe, () => {
 				const project = client.store.projects().find((p) => p.project.coordinatorSessionId === sessionId || p.workers.some((w) => w.workerId === sessionId))?.project;
@@ -6901,8 +6927,10 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				"aria-busy": state.busy,
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
+					ref: buttonRef,
 					className: "pm-mode-button",
 					"aria-label": t("project"),
+					"aria-describedby": guideDescriptionId,
 					"aria-pressed": state.value?.enabled ?? false,
 					title: reason ? t(`blocked.${reason}`) : state.value?.paths?.root,
 					disabled: state.busy || !state.value?.canToggle,
@@ -7056,6 +7084,19 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 		}
 		// src/client/locales.ts
 		const en = {
+			guideEnable: "Select MoA+ to try a task with multiple assistants.",
+			guideClose: "Close the MoA+ guide",
+			guideExample: "Try a sample task, or write something of your own.",
+			guideSend: "Make the request your own, then send it when ready.",
+			guideWorkers: "Open a worker card above to see how that part is going.",
+			guideResult: "Your result is ready.",
+			guideResultOneWorker: "Your result is ready. One worker contributed.",
+			guideResultWorkers: "Your result is ready. {count} workers contributed.",
+			guideFill: "Fill in sample",
+			guideSkip: "Skip",
+			guideDone: "Got it",
+			guideMenu: "MoA+ first-run guide",
+			guideExamplePrompt: "Our notes exporter supports both default order and title sorting. Work on two things in parallel: write a three-line user update and list three acceptance checks. Combine them into a short release card.",
 			timeline: "Work timeline",
 			noWorkers: "No workers yet",
 			selectWorker: "Select a worker to view its work.",
@@ -7156,6 +7197,19 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 			running: "Running: {count}"
 		};
 		const zh = {
+			guideEnable: "点 MoA+，试试让多个助手分工。",
+			guideClose: "关闭 MoA+ 引导",
+			guideExample: "试一条示例，也可以写自己的任务。",
+			guideSend: "这条需求可以改，准备好后点发送。",
+			guideWorkers: "点开上方的子助手卡片，就能看各自的进展。",
+			guideResult: "结果已就绪。",
+			guideResultOneWorker: "结果已就绪，1 位子助手参与。",
+			guideResultWorkers: "结果已就绪，{count} 位子助手参与。",
+			guideFill: "填入示例",
+			guideSkip: "跳过",
+			guideDone: "知道了",
+			guideMenu: "MoA+ 使用引导",
+			guideExamplePrompt: "笔记导出工具支持默认顺序和标题排序。请并行准备两项内容：写三行用户更新说明，列三条验收检查。最后合成一份简短的发布卡片。",
 			timeline: "工作轴",
 			noWorkers: "还没有 Worker",
 			selectWorker: "选择一个 Worker 查看工作记录。",
@@ -7383,6 +7437,241 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				})]
 			})] });
 		}
+		// src/client/first-run-guide.tsx
+		const progressKey = "project-mode.first-run-guide";
+		const finished = "finished";
+		function canStartGuide(session) {
+			return session.openState === "open" && session.blank && !session.running && !session.subagent;
+		}
+		function firstCompletedTaskTurn(chat) {
+			let firstInput = Infinity;
+			for (const node of chat.nodes.values()) {
+				if (node.kind !== "user") continue;
+				const { source, seq } = node.data;
+				if (source && typeof source === "object" && "kind" in source && source.kind === "user") firstInput = Math.min(firstInput, seq);
+			}
+			for (const turn of chat.timeline.turnOrder) {
+				const end = chat.timeline.turns.get(turn)?.end;
+				if (end?.data.reason.kind === "completed" && end.seq > firstInput) return turn;
+			}
+		}
+		function TypedLine({ text }) {
+			const characters = react.useMemo(() => Array.from(text), [text]);
+			const [count, setCount] = react.useState(0);
+			react.useEffect(() => {
+				if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+					setCount(characters.length);
+					return;
+				}
+				let cursor = 0;
+				const timer = window.setInterval(() => {
+					cursor += 1;
+					setCount(cursor);
+					if (cursor >= characters.length) window.clearInterval(timer);
+				}, 22);
+				return () => window.clearInterval(timer);
+			}, [characters]);
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: "pm-guide-line",
+				role: "status",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "pm-guide-readable",
+						children: text
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "pm-guide-measure",
+						"aria-hidden": "true",
+						children: text
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "pm-guide-typed",
+						"aria-hidden": "true",
+						children: [characters.slice(0, count).join(""), count < characters.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: "pm-guide-caret" })]
+					})
+				]
+			});
+		}
+		const copy = {
+			example: "guideExample",
+			send: "guideSend",
+			workers: "guideWorkers",
+			result: "guideResult"
+		};
+		function registerFirstRunGuide(ctx, client) {
+			let progress = null;
+			try {
+				if (localStorage.getItem(progressKey) !== null) progress = finished;
+			} catch {}
+			let result;
+			const listeners = /* @__PURE__ */ new Set();
+			const subscribe = (listener) => {
+				listeners.add(listener);
+				return () => {
+					listeners.delete(listener);
+				};
+			};
+			const notify = () => {
+				for (const listener of listeners) listener();
+			};
+			const clearResult = (sessionId) => {
+				if (result?.sessionId !== sessionId) return;
+				result = void 0;
+				notify();
+			};
+			const rememberSeen = () => {
+				try {
+					localStorage.setItem(progressKey, finished);
+				} catch {}
+			};
+			const setProgress = (next) => {
+				progress = next;
+				if (next !== null) rememberSeen();
+				notify();
+			};
+			const dismiss = () => {
+				result = void 0;
+				setProgress(finished);
+			};
+			ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({
+				name: "conversation.input.dock",
+				id: "project-mode.first-run-guide",
+				locale: "project-mode"
+			}, function FirstRunBubble({ sessionId, session, input, useChat, t }) {
+				const current = useSelected(subscribe, () => progress);
+				const workerCount = useSelected(subscribe, () => result?.sessionId === sessionId ? result.workerCount : void 0);
+				const mode = useSelected(client.subscribeModes, () => client.mode(sessionId).value);
+				const workers = useSelected(client.store.subscribe, () => current === sessionId && client.store.project(sessionId)?.workers.some((worker) => worker.lifecycle === "active"));
+				const candidate = canStartGuide(session) && mode?.canToggle;
+				const completedTurn = useChat((chat) => current === sessionId && mode?.enabled ? firstCompletedTaskTurn(chat) : void 0);
+				react.useEffect(() => {
+					if (candidate && mode?.enabled && progress === null) setProgress(sessionId);
+					if (candidate && !mode?.enabled && progress === sessionId) setProgress(null);
+				}, [
+					candidate,
+					current,
+					mode?.enabled,
+					sessionId
+				]);
+				react.useEffect(() => {
+					if (progress !== sessionId || completedTurn === void 0) return;
+					const project = client.store.project(sessionId);
+					const participants = new Set(project?.turnMemberships.filter((member) => member.coordinatorTurn === completedTurn).map((member) => member.workerId));
+					result = {
+						sessionId,
+						workerCount: project?.workers.filter((worker) => participants.has(worker.workerId) && isVisibleWorker(worker)).length ?? 0
+					};
+					setProgress(finished);
+				}, [sessionId, completedTurn]);
+				react.useEffect(() => () => clearResult(sessionId), [sessionId]);
+				react.useEffect(() => {
+					if (session.running) clearResult(sessionId);
+				}, [sessionId, session.running]);
+				let stage;
+				const empty = input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain";
+				if (workerCount !== void 0 && !session.running) stage = "result";
+				else if (current === sessionId && session.running && workers) stage = "workers";
+				else if (candidate && mode?.enabled && (current === null || current === sessionId)) stage = empty ? "example" : "send";
+				if (!stage) return null;
+				let message = t(copy[stage]);
+				if (stage === "result" && workerCount !== void 0) {
+					if (workerCount === 1) message = t("guideResultOneWorker");
+					if (workerCount > 1) message = t("guideResultWorkers", { count: workerCount });
+				}
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "pm-first-guide",
+					"data-guide-stage": stage,
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: message }, message), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "pm-guide-actions",
+						children: [stage === "example" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							type: "button",
+							size: "sm",
+							variant: "outline",
+							onClick: () => {
+								const binding = ctx.sessions.binding(sessionId);
+								if (binding) ctx.conversation.input.requestDraftInitialization(binding, {
+									prompt: t("guideExamplePrompt"),
+									whenDraftExists: "keep"
+								});
+							},
+							children: t("guideFill")
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							type: "button",
+							size: "sm",
+							onClick: dismiss,
+							children: t(stage === "result" ? "guideDone" : "guideSkip")
+						})]
+					})]
+				}, stage);
+			}));
+			ctx.inject(["sidebarRight"], (scope) => {
+				scope.slots.inject("sidebar.panellist.actions", () => scope.slots.register({
+					name: "sidebar.panellist.actions",
+					id: "project-mode.reopen-first-run-guide",
+					locale: "project-mode"
+				}, function ReopenGuide({ onDismiss, t }) {
+					const id = useSelected(scope.sidebarRight.mounted.subscribe, scope.sidebarRight.mounted.getSnapshot);
+					const session = id ? scope.sessions.binding(id)?.session : void 0;
+					if (!useSelected((listener) => session?.subscribe(listener) ?? (() => {}), () => {
+						const state = session?.getSnapshot();
+						return !!state?.blank && !state.running && !state.subagent;
+					})) return null;
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.MenuItemButton, {
+						onSelect: () => {
+							result = void 0;
+							setProgress(null);
+							onDismiss();
+						},
+						children: t("guideMenu")
+					});
+				}));
+			});
+			return function GuidedProjectToggle(p) {
+				const { sessionId, useSession, useInput, t } = p;
+				const blank = useSession(canStartGuide);
+				const running = useSession((session) => session.running);
+				const empty = useInput((input) => input.draft === "" && input.attachmentIds.length === 0 && input.phase === "plain");
+				const mode = useSelected(client.subscribeModes, () => client.mode(sessionId));
+				const open = useSelected(subscribe, () => progress) === null && blank && empty && !mode.busy && mode.value?.canToggle === true && !mode.value.enabled;
+				const anchorRef = react.useRef(null);
+				const panelRef = react.useRef(null);
+				const descriptionId = react.useId();
+				const position = (0, _deepseek_ai_dsh_client_ui_primitives.useAnchoredPosition)({
+					open,
+					anchorRef,
+					panelRef,
+					side: "top",
+					gap: 8,
+					margin: 12
+				});
+				const visible = open && position !== null;
+				react.useEffect(() => {
+					if (visible) rememberSeen();
+				}, [visible]);
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ProjectToggle, {
+					...p,
+					running,
+					buttonRef: anchorRef,
+					guideDescriptionId: open ? descriptionId : void 0
+				}), open && (0, react_dom.createPortal)(/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					ref: panelRef,
+					className: "pm-first-guide pm-guide-by-toggle",
+					"data-guide-stage": "enable",
+					style: position ?? { visibility: "hidden" },
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						id: descriptionId,
+						className: "pm-guide-description",
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: t("guideEnable") })
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+						type: "button",
+						size: "sm",
+						"aria-label": t("guideClose"),
+						onClick: dismiss,
+						icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCloseOutlineRegular, { "aria-hidden": "true" })
+					})]
+				}), document.body)] });
+			};
+		}
 		// src/client/index.tsx
 		const inject = [
 			"remote",
@@ -7434,6 +7723,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				en,
 				zh
 			}));
+			const GuidedProjectToggle = registerFirstRunGuide(ctx, client);
 			ctx.effect(() => ctx.uiConversation.events.register(humanBoundaryDefinition));
 			ctx.effect(() => ctx.uiConversation.events.register(workerTailDefinition));
 			const refreshRoots = () => {
@@ -7457,10 +7747,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
 				order: 5,
 				locale: "project-mode",
 				inject: shared
-			}, (p) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ProjectToggle, {
-				...p,
-				running: p.useSession((s) => s.running)
-			})] })));
+			}, (p) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: styles }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(GuidedProjectToggle, { ...p })] })));
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
 				key: "project-mode-workers-tail",

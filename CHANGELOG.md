@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.11 — 2026-11-22
+
+- Add a dismissible first-run hint above the MoA+ button in a blank conversation. After enabling the mode, users can fill in an editable sample task and see a completion notice after their first successful turn, with a Worker count when participation is recorded.
+- Remember the first appearance in the browser profile so refreshing the page keeps the guide dismissed. Users can reopen the guide from the sidebar menu in a blank conversation. The guide leaves sending the draft to the user.
+
 ## 0.2.10 — 2026-11-17
 
 - Pin the isolated rc.3 Web runtime’s direct `@deepseek-ai/dsh-client-ui-input-trigger` dependency to `0.2.1-rc.3`, so a fresh Linux install keeps the audited package instead of drifting through peer resolution.

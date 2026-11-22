@@ -1,6 +1,6 @@
 # Run MoA+ in an isolated DSH Web runtime
 
-Set up the **MoA+ v0.2.10 stable release** in a separate local Web environment. Use the plugin and compatibility profile from this same release; the commands below clone the published **[v0.2.10](https://github.com/Burns1028/moa-plus/tree/v0.2.10)** tag.
+Set up the **MoA+ v0.2.11 stable release** in a separate local Web environment. Use the plugin and compatibility profile from this same release. The commands below clone the published **[v0.2.11](https://github.com/Burns1028/moa-plus/tree/v0.2.11)** tag.
 
 Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. Its explicit manifest extends **22 native packages across 50 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
@@ -11,7 +11,7 @@ This release also includes an audited **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 
 Choose a new empty directory outside this checkout and your ordinary DSH home. Replace `/absolute/empty-moa-runtime` below and reuse the same `--dir` for setup, doctor, and start.
 
 ```sh
-git clone --branch v0.2.10 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.11 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
@@ -33,6 +33,10 @@ Keep the plugin build, runtime lockfile, and compatibility manifest from the sam
 ## Configure a conversation
 
 The start command opens the native DSH Web UI locally. Configure your model using its native settings, create a conversation, and select **MoA+** before sending its first message. Mode identity remains fixed after starting.
+
+In a blank conversation, the first-run guide highlights the **MoA+** button. After enabling the mode, choose **Fill in sample** to edit a sample task in the composer, or write your own. The model runs when you send the message. The guide shows a notice after your first successful turn and includes the number of Workers when participation is recorded.
+
+Close or skip the guide at any point. The browser profile remembers its first appearance even if you refresh before clicking anything. To replay it, choose **MoA+ first-run guide** from the right sidebar's panel menu in a blank conversation.
 
 You can supply the provider's `DEEPSEEK_API_KEY` in the launching environment. The launcher does not copy keys from another profile. Choose model and permissions in the native settings.
 

@@ -82,9 +82,16 @@ export function ProjectToggle({
   client,
   sessionId,
   running,
+  buttonRef,
+  guideDescriptionId,
   open,
   t,
-}: SharedProps & { sessionId: SessionId; running: boolean }) {
+}: SharedProps & {
+  sessionId: SessionId;
+  running: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+  guideDescriptionId?: string;
+}) {
   const state = useSelected(client.subscribeModes, () =>
     client.mode(sessionId),
   );
@@ -136,8 +143,10 @@ export function ProjectToggle({
     <span className="pm-toggle" aria-busy={state.busy}>
       <button
         type="button"
+        ref={buttonRef}
         className="pm-mode-button"
         aria-label={t("project")}
+        aria-describedby={guideDescriptionId}
         aria-pressed={state.value?.enabled ?? false}
         title={reason ? t(`blocked.${reason}`) : state.value?.paths?.root}
         disabled={state.busy || !state.value?.canToggle}
