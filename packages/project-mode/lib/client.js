@@ -6839,11 +6839,7 @@ body[data-ds-dark-theme] .pm-mode-button[aria-pressed=true],body[data-ds-dark-th
   font:inherit;font-size:13px;line-height:20px;animation:pm-guide-in .24s ease-out both
 }
 body[data-ds-dark-theme] .pm-first-guide{--pm-guide-accent:#cbff45;--pm-guide-bg:#23291b;--pm-guide-edge:#47562f}
-.pm-first-guide::after{
-  content:"";position:absolute;inset-inline-start:22px;bottom:-5px;width:8px;height:8px;
-  transform:rotate(45deg);background:var(--pm-guide-bg);border:solid var(--pm-guide-edge);border-width:0 1px 1px 0
-}
-.pm-first-guide[data-guide-stage="result"]::after,.pm-first-guide[data-guide-stage="workers"]::after{bottom:auto;top:-5px;transform:rotate(225deg)}
+.pm-guide-sender{color:var(--pm-guide-accent)}
 .pm-guide-line{position:relative;min-width:0;overflow-wrap:anywhere}
 .pm-guide-readable{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .pm-guide-measure{visibility:hidden}
@@ -7086,7 +7082,7 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 			guideExample: "Try a sample task, or write something of your own.",
 			guideSend: "Make the request your own, then send it when ready.",
 			guideWorkers: "Open a worker card above to see how that part is going.",
-			guideResult: "Your first task is complete. The result is right above.",
+			guideResult: "Your first task is complete.",
 			guideFill: "Fill in sample",
 			guideSkip: "Skip",
 			guideDone: "Got it",
@@ -7196,7 +7192,7 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 			guideExample: "试一条示例，也可以写自己的任务。",
 			guideSend: "这条需求可以改，准备好后点发送。",
 			guideWorkers: "点开上方的子助手卡片，就能看各自的进展。",
-			guideResult: "第一次任务完成了。上面就是这次的结果。",
+			guideResult: "第一次任务完成了。",
 			guideFill: "填入示例",
 			guideSkip: "跳过",
 			guideDone: "知道了",
@@ -7558,27 +7554,35 @@ body[data-ds-dark-theme] [data-composer-seat]:has(.pm-first-guide[data-guide-sta
 				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					className: "pm-first-guide",
 					"data-guide-stage": stage,
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: message }, message), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: "pm-guide-actions",
-						children: [stage === "example" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-							type: "button",
-							size: "sm",
-							variant: "outline",
-							onClick: () => {
-								const binding = ctx.sessions.binding(sessionId);
-								if (binding) ctx.conversation.input.requestDraftInitialization(binding, {
-									prompt: t("guideExamplePrompt"),
-									whenDraftExists: "keep"
-								});
-							},
-							children: t("guideFill")
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-							type: "button",
-							size: "sm",
-							onClick: dismiss,
-							children: t(stage === "result" ? "guideDone" : "guideSkip")
-						})]
-					})]
+					children: [
+						stage === "result" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "pm-guide-sender pm-wordmark",
+							role: "img",
+							"aria-label": t("project")
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TypedLine, { text: message }, message),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: "pm-guide-actions",
+							children: [stage === "example" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								type: "button",
+								size: "sm",
+								variant: "outline",
+								onClick: () => {
+									const binding = ctx.sessions.binding(sessionId);
+									if (binding) ctx.conversation.input.requestDraftInitialization(binding, {
+										prompt: t("guideExamplePrompt"),
+										whenDraftExists: "keep"
+									});
+								},
+								children: t("guideFill")
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								type: "button",
+								size: "sm",
+								onClick: dismiss,
+								children: t(stage === "result" ? "guideDone" : "guideSkip")
+							})]
+						})
+					]
 				}, stage);
 			}));
 			ctx.inject(["sidebarRight"], (scope) => {

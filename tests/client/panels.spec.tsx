@@ -343,6 +343,7 @@ it("guides the first real task through drafting, completion, and one-time displa
   finish(3, 51, "completed");
   const resumed = await mount();
   expect(resumed.stage()).toBe("result");
+  expect(screen.getByRole("img", { name: en.project })).toBeTruthy();
   expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
   resumed.view.unmount();
 

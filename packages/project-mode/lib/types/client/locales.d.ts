@@ -3,7 +3,7 @@ export declare const en: {
     readonly guideExample: "Try a sample task, or write something of your own.";
     readonly guideSend: "Make the request your own, then send it when ready.";
     readonly guideWorkers: "Open a worker card above to see how that part is going.";
-    readonly guideResult: "Your first task is complete. The result is right above.";
+    readonly guideResult: "Your first task is complete.";
     readonly guideFill: "Fill in sample";
     readonly guideSkip: "Skip";
     readonly guideDone: "Got it";
