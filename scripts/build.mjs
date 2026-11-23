@@ -107,7 +107,7 @@ await build({
   dts: false,
   clean: false,
   deps: {
-    neverBundle: [/^react(?:\/|$)/, "zod"],
+    neverBundle: [/^react(?:-dom)?(?:\/|$)/, "zod"],
     alwaysBundle: [/^@deepseek-ai\/dsh-(?:typert-protocol|util-workspace-path)(?:\/|$)/],
     onlyBundle: [/^@deepseek-ai\/dsh-(?:typert-protocol|util-workspace-path)(?:\/|$)/],
   },
