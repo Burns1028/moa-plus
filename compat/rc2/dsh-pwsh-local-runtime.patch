@@ -1,0 +1,18 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -138,6 +138,7 @@ function assertServiceablePwshConfig(config) {
+ * this executor supplies their configured budgets per spawn.
+ */
+ var PwshLocalExecutor = class PwshLocalExecutor extends ShellExecutor {
++	supportsManagedExecution = true;
+ 	config;
+ 	static inject = ["subprocess"];
+ 	static Config = z.object({
+@@ -344,6 +345,7 @@ var PwshLocalExecutor = class PwshLocalExecutor extends ShellExecutor {
+ 		let stderrOffset = 0;
+ 		let resultPromise;
+ 		const proc = {
++			managed: { terminate: () => running?.terminate(), waitForExit: signal => running ? running.waitForExit(signal) : Promise.resolve(true) },
+ 			status: "running",
+ 			exitCode: null,
+ 			signal: null,

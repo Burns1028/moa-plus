@@ -11,15 +11,15 @@ it("dispatches the compiled plugin through native Gateway with generated codecs 
   try {
     await f.plugin.dispose();
     const entry = new URL(
-      "../../packages/moa/lib/index.js",
+      "../../packages/project-mode/lib/index.js",
       import.meta.url,
     ).href;
     const host = new URL(
-      "../../packages/moa/lib/typert.host.js",
+      "../../packages/project-mode/lib/typert.host.js",
       import.meta.url,
     ).href;
     const remote = new URL(
-      "../../packages/moa/lib/typert.remote-client.js",
+      "../../packages/project-mode/lib/typert.remote-client.js",
       import.meta.url,
     ).href;
     await f.ctx.plugin((await import(entry)).default, {});
@@ -33,6 +33,7 @@ it("dispatches the compiled plugin through native Gateway with generated codecs 
         "catalog",
         "control",
         "follow",
+        "followWorkerParent",
         "history",
         "mode",
         "setEnabled",

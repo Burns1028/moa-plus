@@ -1,0 +1,19 @@
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -19065,7 +19065,6 @@
+ 			const intakeFiles = (0, react.useCallback)((files, directories) => {
+ 				if (locked || machineBusy || subagent !== null && !continuable || addFiles === void 0 || files.length === 0) return;
+ 				const rejected = (() => {
+-					if (continuable && files.some((file) => directories?.has(file) || !isImageMediaType(file.type))) return t("image.unsupportedType");
+ 					if (imageLimits !== void 0) {
+ 						const mediaTypes = imageLimits.mediaTypes;
+ 						const images = files.filter((file) => mediaTypes.includes(file.type));
+@@ -19271,7 +19270,7 @@
+ 											ref: fileInputRef,
+ 											type: "file",
+ 											multiple: true,
+-											disabled: subagent !== null,
++											disabled: subagent !== null && !continuable,
+ 											hidden: true,
+ 											onChange: onPickFiles
+ 										}),

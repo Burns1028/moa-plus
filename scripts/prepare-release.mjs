@@ -3,11 +3,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageRoot = resolve(root, "packages/moa");
+const packageRoot = resolve(root, "packages/project-mode");
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const bundle = await readJson(resolve(packageRoot, "package.json"));
 const workspace = await readJson(resolve(root, "package.json"));
-const prefix = "./packages/moa/";
+const prefix = "./packages/project-mode/";
 function forward(value) {
   if (typeof value === "string") {
     if (!value.startsWith("./"))
@@ -27,6 +27,10 @@ Object.assign(workspace, {
   version: bundle.version,
   description: bundle.description,
   license: bundle.license,
+  repository: bundle.repository,
+  homepage: bundle.homepage,
+  bugs: bundle.bugs,
+  keywords: bundle.keywords,
   private: true,
   main: prefix + bundle.main.replace(/^\.\//, ""),
   types: prefix + bundle.types.replace(/^\.\//, ""),
@@ -40,8 +44,8 @@ Object.assign(workspace, {
   peerDependencies: bundle.peerDependencies,
   peerDependenciesMeta: bundle.peerDependenciesMeta,
   files: [
-    "packages/moa/package.json",
-    ...bundle.files.map((file) => "packages/moa/" + file),
+    "packages/project-mode/package.json",
+    ...bundle.files.map((file) => "packages/project-mode/" + file),
     "docs",
     "README.zh.md",
     "THIRD_PARTY_NOTICES.md",

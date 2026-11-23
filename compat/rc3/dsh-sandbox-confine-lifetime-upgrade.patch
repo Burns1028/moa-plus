@@ -1,0 +1,34 @@
+===================================================================
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -77,9 +77,18 @@
+  * A {@link SandboxProvider.confine} result: the argv to spawn in place of
+  * the caller's own, plus the enforcement completeness the selected backend
+  * achieves for it.
+  */
++/** Caller acknowledgement for confinement-owned resources. */
++export interface SandboxConfineOptions {
++    /** Retain optional cleanup through all preparation and the complete native managed process range. */
++    readonly processLifetime?: 'managed';
++}
+ export interface ConfinedArgv {
++    /** Idempotent shared cleanup promise; call only after preparation/managed range quiescence and preserve rejection. */
++    readonly cleanup?: () => Promise<void>;
++    /** Attach the consumer's same native range-to-cleanup lifetime before target admission. */
++    readonly bindProcessLifetime?: (lifetime: Promise<void>) => void;
+     /** The wrapped argv (runner, profile, separator, then the caller's argv). */
+     argv: string[];
+     /** How completely the selected backend enforces the policy's file effects. */
+     enforcement: SandboxEnforcement;
+@@ -145,9 +154,9 @@
+      * @param signal - cancellation while the provider resolves the policy and runner.
+      * @returns the argv to spawn instead, plus the enforcement completeness
+      *   the selected backend achieves for it.
+      */
+-    abstract confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal): Promise<ConfinedArgv>;
++    abstract confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal, options?: SandboxConfineOptions): Promise<ConfinedArgv>;
+ }
+ export default SandboxProvider;
+ export { classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature } from './diagnostics.ts';
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file

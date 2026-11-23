@@ -11,10 +11,10 @@ import {
 } from "@testing-library/react";
 import {
   WorkerCapsuleList,
-  MoAToggle,
-} from "../../packages/moa/src/client/components.tsx";
-import { MoAClient } from "../../packages/moa/src/client/runtime.ts";
-import { en } from "../../packages/moa/src/client/locales.ts";
+  ProjectToggle,
+} from "../../packages/project-mode/src/client/components.tsx";
+import { ProjectClient } from "../../packages/project-mode/src/client/runtime.ts";
+import { en } from "../../packages/project-mode/src/client/locales.ts";
 import { snapshot, sid } from "./fixture.ts";
 afterEach(cleanup);
 const t = (key: keyof typeof en, args?: Record<string, unknown>) =>
@@ -23,7 +23,7 @@ const t = (key: keyof typeof en, args?: Record<string, unknown>) =>
     en[key] as string,
   );
 it("membership alone makes mounted tail visible and native closure avoids live historical fallback; click uses address", async () => {
-  const client = new MoAClient({} as any),
+  const client = new ProjectClient({} as any),
     open = vi.fn();
   const s = snapshot();
   const { rerender } = render(
@@ -67,9 +67,10 @@ it("membership alone makes mounted tail visible and native closure avoids live h
   );
   client.dispose();
 });
-it("native checkbox stays unchecked during request, exposes busy and localized Host error", async () => {
+it("wordmark stays stable during request, exposes busy without adjacent text and retains Host errors", async () => {
   let finish: (v: unknown) => void = () => {};
-  const client = new MoAClient({
+  const setEnabled = vi.fn(() => new Promise((r) => (finish = r)));
+  const client = new ProjectClient({
     mode: async () => ({
       ok: true,
       value: {
@@ -80,10 +81,10 @@ it("native checkbox stays unchecked during request, exposes busy and localized H
         canToggle: true,
       },
     }),
-    setEnabled: () => new Promise((r) => (finish = r)),
+    setEnabled,
   } as any);
   render(
-    <MoAToggle
+    <ProjectToggle
       client={client}
       sessionId={sid("parent")}
       running={false}
@@ -92,19 +93,26 @@ it("native checkbox stays unchecked during request, exposes busy and localized H
     />,
   );
   await act(async () => {});
-  const check = screen.getByRole("checkbox") as HTMLInputElement;
+  const check = screen.getByRole("button", { name: "MoA+" }) as HTMLButtonElement;
   fireEvent.click(check);
-  expect(check.checked).toBe(false);
+  expect(check.getAttribute("aria-pressed")).toBe("false");
   expect(check.disabled).toBe(true);
+  expect(check.parentElement?.getAttribute("aria-busy")).toBe("true");
+  expect(check.parentElement?.textContent).toBe("");
+  expect(screen.queryByRole("status")).toBeNull();
+  fireEvent.click(check);
+  expect(setEnabled).toHaveBeenCalledOnce();
   await act(async () =>
     finish({ ok: false, error: { message: "Workers active" } }),
   );
   expect(screen.getByRole("alert").textContent).toContain("Workers active");
+  expect(check.disabled).toBe(false);
+  expect(check.parentElement?.getAttribute("aria-busy")).toBe("false");
   client.dispose();
 });
 
 it("shows one completed label without duplicating a missing progress fallback", () => {
-  const client = new MoAClient({} as any);
+  const client = new ProjectClient({} as any);
   const data = snapshot();
   data.closedTurnOutcomes = [
     {

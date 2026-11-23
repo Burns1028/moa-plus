@@ -12,9 +12,10 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+import { npmInvocation } from "./moa.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const nested = join(root, "packages/moa");
+const nested = join(root, "packages/project-mode");
 const dist = join(root, "dist");
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 const workspace = await json(join(root, "package.json"));
@@ -32,13 +33,15 @@ assert.ok(
 const gitRef = process.argv
   .find((a) => a.startsWith("--git-ref="))
   ?.slice("--git-ref=".length);
-const run = (cmd, args, cwd) =>
-  execFileSync(cmd, args, {
+const run = (cmd, args, cwd) => {
+  const invocation = cmd === "npm" ? npmInvocation(args) : { command: cmd, args };
+  return execFileSync(invocation.command, invocation.args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 12 * 1024 * 1024,
   });
+};
 const temp = await mkdtemp(join(tmpdir(), "project-mode-release-"));
 const results = [];
 await mkdir(dist, { recursive: true });
@@ -47,7 +50,7 @@ try {
     ["npm", nested],
     ["forwarder", root],
   ]) {
-    const [pack] = JSON.parse(
+    const [pack] = Object.values(JSON.parse(
       run(
         "npm",
         [
@@ -60,7 +63,7 @@ try {
         ],
         cwd,
       ),
-    );
+    ));
     const files = pack.files.map((f) => f.path);
     assert.ok(files.length > 25);
     assert.ok(
@@ -71,7 +74,7 @@ try {
     assert.ok(
       !files.some((p) => /lib\/types\/(?:host|client)\/.*\.js$/.test(p)),
     );
-    const prefix = label === "npm" ? "" : "packages/moa/";
+    const prefix = label === "npm" ? "" : "packages/project-mode/";
     for (const file of [
       "lib/index.js",
       "lib/client.js",
@@ -127,7 +130,7 @@ try {
   );
   const fixture = ts.transpileModule(
     (await readFile(join(root, "tests/host/fixture.ts"), "utf8")).replace(
-      "../../packages/moa/src/host/index.ts",
+      "../../packages/project-mode/src/host/index.ts",
       bundle.name,
     ),
     {
@@ -164,7 +167,7 @@ try {
     );
     run(
       "npm",
-      ["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
+      ["install", "--prefer-offline", "--ignore-scripts", "--no-audit", "--no-fund"],
       consumer,
     );
     await writeFile(join(consumer, "native-fixture.mjs"), fixture);
@@ -202,18 +205,15 @@ try {
       join(consumer, "types.mts"),
       `import Host from 'dsh-plugin-project-mode';
 import remote from 'dsh-plugin-project-mode/remote';
-import type { MoASnapshot, ProjectSnapshot } from 'dsh-plugin-project-mode/shared';
+import type { ProjectSnapshot } from 'dsh-plugin-project-mode/shared';
 import type { Context } from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-api-gateway/client';
 declare const ctx: Context;
 const list = ctx.remote.projectMode.catalog();
 const descriptor = remote.methods['projectMode/catalog'];
 const plugin: typeof Host = Host;
-const snapshot: MoASnapshot | null = null;
-declare const legacySnapshot: ProjectSnapshot;
-const compatibleSnapshot: MoASnapshot = legacySnapshot;
-const compatibleLegacy: ProjectSnapshot = compatibleSnapshot;
-void [list, descriptor, plugin, snapshot, compatibleSnapshot, compatibleLegacy];
+const snapshot: ProjectSnapshot | null = null;
+void [list, descriptor, plugin, snapshot];
 `,
     );
     await writeFile(
@@ -245,8 +245,9 @@ void [list, descriptor, plugin, snapshot, compatibleSnapshot, compatibleLegacy];
       run(process.execPath, ["smoke.mjs"], consumer).trim(),
     );
     console.log(
-      `${result.label}: unpatched refusal, explicit native compatibility, actual install, Host import, browser factory, native Loader auto discovery (8 endpoints), Client Gateway roundtrip and disposal passed`,
+      `${result.label}: unpatched refusal, explicit native compatibility, actual install, Host import, browser factory, native Loader auto discovery (9 endpoints), Client Gateway roundtrip and disposal passed`,
     );
+    await rm(consumer, { recursive: true, force: true });
   }
   if (gitRef) {
     const checkout = join(temp, "clean-checkout");

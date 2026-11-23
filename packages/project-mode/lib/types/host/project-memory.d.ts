@@ -1,0 +1,46 @@
+import type { Context } from "@deepseek-ai/cordis";
+import type { Agent } from "@deepseek-ai/dsh-agent";
+import type { ProjectPaths } from "../shared/index.ts";
+import { FsVersion } from "@deepseek-ai/dsh-fs";
+import type { HostAccess } from "./host-access.ts";
+declare module "@deepseek-ai/dsh-llm" {
+    interface MessageSourceMap {
+        "moa-notes": {
+            kind: "moa-notes";
+            coordinatorSessionId: string;
+        };
+    }
+}
+export declare function memoryPaths(root: string): ProjectPaths & {
+    index: string;
+};
+export declare function notesInjection(text: string): string;
+export declare const contextIndexTemplate = "# Project context\n\nShared reusable knowledge, loaded when relevant to the current responsibility. Use this index to locate needed context files. Add confirmed findings only when they will help future work and the assignment permits writes; otherwise no update is needed. Link each contribution with its path and a short description. Task-local calculations and execution logs belong with the task, not here.\n\n## Context files\n";
+export declare const contextIndexPath: (paths: ProjectPaths) => string;
+export interface ProjectContextInput {
+    action: "read" | "write";
+    path: string;
+    content?: string;
+    version?: string;
+}
+/** Access the shared knowledge directory through the acting Agent's native policy. */
+export declare function accessProjectContext(host: HostAccess, agent: Agent, input: ProjectContextInput, signal: AbortSignal): Promise<{
+    content: string;
+    version: FsVersion;
+    operation?: undefined;
+} | {
+    version: FsVersion;
+    operation: "create" | "update";
+    content?: undefined;
+}>;
+export declare function readNotes(ctx: Context, agent: Agent, project: {
+    workspacePath: string;
+    paths: ProjectPaths;
+}, signal: AbortSignal): Promise<string>;
+/** Backfill only a missing index through the acting Agent's native filesystem. */
+export declare function ensureContextIndex(ctx: Context, agent: Agent, project: {
+    workspacePath: string;
+    paths: ProjectPaths;
+}, signal: AbortSignal): Promise<void>;
+/** Every inference sees the full current notes without accumulating old copies. */
+export declare function bindProjectMemory(host: HostAccess): void;

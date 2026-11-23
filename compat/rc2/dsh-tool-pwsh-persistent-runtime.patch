@@ -1,0 +1,96 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,3 +1,4 @@
++import { ReadOnlyPathUnsupportedError } from "@deepseek-ai/dsh-sandbox";
+ import { randomUUID } from "node:crypto";
+ import z from "@deepseek-ai/schemastery";
+ import { truncateWithoutSplittingSurrogatePair } from "@deepseek-ai/dsh-output-retention";
+@@ -247,7 +248,7 @@ function persistentShells(ctx, config) {
+ 		reset
+ 	};
+ }
+-async function executeCommand(ctx, shells, owner, command, config, upstream) {
++async function executeCommand(ctx, shells, owner, command, config, upstream, record) {
+ 	const env_1 = {
+ 		stack: [],
+ 		error: void 0,
+@@ -259,7 +260,7 @@ async function executeCommand(ctx, shells, owner, command, config, upstream) {
+ 		try {
+ 			id = await shells.get(owner, commandDeadline.signal);
+ 		} catch (error) {
+-			if (upstream.aborted && error === upstream.reason) return "";
++			if (upstream.aborted && error === upstream.reason) { record({ completed: false, aborted: true }); return ""; }
+ 			throw error;
+ 		}
+ 		const marker = markers();
+@@ -269,7 +270,7 @@ async function executeCommand(ctx, shells, owner, command, config, upstream) {
+ 		let fallbackTruncated = false;
+ 		while (true) {
+ 			const status = ctx.terminals.list(owner).find((session) => session.sessionId === id)?.status;
+-			if (status?.kind === "exited") return await respondToSessionExit(ctx, shells, owner, id, status, marker, wrapped, fallback, fallbackTruncated, config);
++			if (status?.kind === "exited") { record({ completed: false, exitCode: status.exitCode, signal: status.signal }); return await respondToSessionExit(ctx, shells, owner, id, status, marker, wrapped, fallback, fallbackTruncated, config); }
+ 			let operation;
+ 			let result;
+ 			try {
+@@ -293,6 +294,7 @@ async function executeCommand(ctx, shells, owner, command, config, upstream) {
+ 			});
+ 			const timedOut = timeoutOf(commandDeadline.signal, TIMEOUT_CODE);
+ 			if (timedOut !== void 0) {
++				record({ completed: false, timedOut: true });
+ 				const partial = renderCaptured(partialOutput(retainedScrollback(ctx, owner, id, latest), marker, wrapped, fallback, fallbackTruncated), config.maxOutputChars);
+ 				await shells.reset(owner, "persistent pwsh command timed out");
+ 				return [
+@@ -302,14 +304,15 @@ async function executeCommand(ctx, shells, owner, command, config, upstream) {
+ 				].join("\n");
+ 			}
+ 			if (commandDeadline.signal.aborted) {
++				record({ completed: false, aborted: true });
+ 				await shells.reset(owner, "persistent pwsh command aborted");
+ 				return "";
+ 			}
+ 			if (latest.text.includes(marker.end)) {
+ 				const complete = commandOutput(retainedScrollback(ctx, owner, id, latest), marker, wrapped);
+-				if (complete !== void 0) return renderCaptured(complete, config.maxOutputChars);
++				if (complete !== void 0) { record({ completed: true, exitCode: complete.exitCode, signal: null, timedOut: false, aborted: false }); return renderCaptured(complete, config.maxOutputChars); }
+ 			}
+-			if (result.sessionStatus.kind === "exited") return await respondToSessionExit(ctx, shells, owner, id, result.sessionStatus, marker, wrapped, fallback, fallbackTruncated, config);
++			if (result.sessionStatus.kind === "exited") { record({ completed: false, exitCode: result.sessionStatus.exitCode, signal: result.sessionStatus.signal }); return await respondToSessionExit(ctx, shells, owner, id, result.sessionStatus, marker, wrapped, fallback, fallbackTruncated, config); }
+ 			if (result.waitReason === "stdin_read") return renderCaptured(partialOutput(retainedScrollback(ctx, owner, id, latest), marker, wrapped, fallback, fallbackTruncated), config.maxOutputChars);
+ 			await pause();
+ 		}
+@@ -328,6 +331,7 @@ async function executeCommand(ctx, shells, owner, command, config, upstream) {
+ function registerPersistentPwsh(ctx, config) {
+ 	const shells = persistentShells(ctx, config);
+ 	const queues = /* @__PURE__ */ new WeakMap();
++	const completionFacts = new Map();
+ 	const serialized = async (owner, operation) => {
+ 		const run = (queues.get(owner) ?? Promise.resolve()).then(operation, operation);
+ 		const tail = run.then(() => void 0, () => void 0);
+@@ -348,6 +352,11 @@ function registerPersistentPwsh(ctx, config) {
+ 		} },
+ 		output: {
+ 			schema: { type: "string" },
++			presentationMeta(_args, _value, exec) {
++				const nativeShell = completionFacts.get(exec.token);
++				completionFacts.delete(exec.token);
++				return nativeShell ? { nativeShell } : {};
++			},
+ 			render: (_args, value) => [{
+ 				type: "text",
+ 				text: value
+@@ -358,8 +367,13 @@ function registerPersistentPwsh(ctx, config) {
+ 			const owner = exec.agent;
+ 			if (owner === void 0) throw new Error("pwsh requires an owning agent session");
+ 			return serialized(owner, async () => {
+-				if (exec.signal.aborted) return "";
+-				return executeCommand(ctx, shells, owner, args.command, config, exec.signal);
++				const record = fact => completionFacts.set(exec.token, { kind: "pwsh", completed: false, timedOut: false, aborted: false, ...fact });
++				const policy = ctx.get("sandboxPolicy")?.resolve({ session: owner.session });
++				if (policy?.readOnlyPaths?.length) throw new ReadOnlyPathUnsupportedError("persistent PowerShell cannot enforce the session's readonly paths; use a native process shell with matching record protection");
++				record({});
++				if (exec.signal.aborted) { record({ aborted: true }); return ""; }
++				try { return await executeCommand(ctx, shells, owner, args.command, config, exec.signal, record); }
++				catch (error) { completionFacts.delete(exec.token); throw error; }
+ 			});
+ 		},
+ 		presentCall: (args) => ({

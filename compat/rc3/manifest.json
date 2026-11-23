@@ -1,24 +1,5 @@
 [
   {
-    "package": "@deepseek-ai/dsh-tools",
-    "version": "0.2.1-rc.3",
-    "variant": "tools",
-    "patch": "dsh-tools.patch",
-    "runtimePatch": "dsh-tools-runtime.patch",
-    "files": [
-      {
-        "file": "lib/index.js",
-        "before": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
-        "after": "9bcecd8eba724e4b3b11d6e8535bbadc7d2d1a6293dcd6b5af3195745abd488a"
-      },
-      {
-        "file": "lib/types/index.d.ts",
-        "before": "049df0624956583b8ca05badfd6e9115c6933481571dc17965f36f407bdf95f0",
-        "after": "db86a9df8c99257e2d82baa7b2540debdd816b821553eb308261faf97eed2f67"
-      }
-    ]
-  },
-  {
     "package": "@deepseek-ai/dsh-client-ui-conversation",
     "version": "0.2.1-rc.3",
     "variant": "npm",
@@ -28,7 +9,73 @@
       {
         "file": "lib/client.js",
         "before": "b81765f0998430bbf5ab6389e89a082b799f017275c5abe1efb3c701f0fa708a",
-        "after": "04dad7417becded3280279194817795390c27c679a9cdc48e21de36e366d4f82"
+        "after": "732017a68d35f3f5d4960a8490dfb4acc33e8570a5cd88af2d0a46920e92d79b"
+      },
+      {
+        "file": "lib/types/client/service.d.ts",
+        "before": "153ffb179763a6a89973db3552cb2f17b6cde84e9aa40bcb92e65e5ab242ea6e",
+        "after": "c6ed03ed64b62b1d74fcbe83fa0672fe9828810783e19f8e060cd1897be65852"
+      },
+      {
+        "file": "lib/types/client/index.d.ts",
+        "before": "38856f09b9e0aa687342f4996396f053d4b761cb32e11e66480c89e6cc122848",
+        "after": "d54cbad4a7cff4c52f5ad81e7cdc2cafc677a930972960f5ca16cb3dc11e8247"
+      },
+      {
+        "file": "lib/types/client/input/submission-policy.d.ts",
+        "before": "189595891cfff2fe552c126efe55ecf53c9f278f7ec54953d4ba1904ce4c7557",
+        "after": "570569462760020bdc6c8b291fe9301f9239a3a17a72c035fb6fc32630505d12"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "9905606c3b4bd9cf49895403d20dc6ed9e1f90d39b7743a7691f49835cfd83c8",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-client-ui-conversation",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-0.2.0",
+    "patch": "ui-conversation-npm-moa-020-upgrade.patch",
+    "runtimePatch": "ui-conversation-npm-moa-020-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/client.js",
+        "before": "04dad7417becded3280279194817795390c27c679a9cdc48e21de36e366d4f82",
+        "after": "732017a68d35f3f5d4960a8490dfb4acc33e8570a5cd88af2d0a46920e92d79b"
+      },
+      {
+        "file": "lib/types/client/service.d.ts",
+        "before": "c6ed03ed64b62b1d74fcbe83fa0672fe9828810783e19f8e060cd1897be65852",
+        "after": "c6ed03ed64b62b1d74fcbe83fa0672fe9828810783e19f8e060cd1897be65852"
+      },
+      {
+        "file": "lib/types/client/index.d.ts",
+        "before": "d54cbad4a7cff4c52f5ad81e7cdc2cafc677a930972960f5ca16cb3dc11e8247",
+        "after": "d54cbad4a7cff4c52f5ad81e7cdc2cafc677a930972960f5ca16cb3dc11e8247"
+      },
+      {
+        "file": "lib/types/client/input/submission-policy.d.ts",
+        "before": "570569462760020bdc6c8b291fe9301f9239a3a17a72c035fb6fc32630505d12",
+        "after": "570569462760020bdc6c8b291fe9301f9239a3a17a72c035fb6fc32630505d12"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "9905606c3b4bd9cf49895403d20dc6ed9e1f90d39b7743a7691f49835cfd83c8",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-client-ui-conversation",
+    "version": "0.2.1-rc.3",
+    "variant": "desktop",
+    "patch": "ui-conversation-desktop.patch",
+    "runtimePatch": "ui-conversation-desktop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/client.js",
+        "before": "cfd9ab6e1b38e89ac9859940bce8b407240e33902d5e231fca76fc68de598bcc",
+        "after": "ecf2c76832d0f855adf8a6b6814345bf400db9354349e0f972e53225ef984043"
       },
       {
         "file": "lib/types/client/service.d.ts",
@@ -51,27 +98,27 @@
     "package": "@deepseek-ai/dsh-client-ui-conversation",
     "version": "0.2.1-rc.3",
     "variant": "desktop",
-    "patch": "ui-conversation-desktop.patch",
-    "runtimePatch": "ui-conversation-desktop-runtime.patch",
+    "patch": "ui-conversation-desktop-moa-020-upgrade.patch",
+    "runtimePatch": "ui-conversation-desktop-moa-020-upgrade-runtime.patch",
     "files": [
       {
         "file": "lib/client.js",
-        "before": "cfd9ab6e1b38e89ac9859940bce8b407240e33902d5e231fca76fc68de598bcc",
-        "after": "23b0841bb38fbafd6d0da3c649369a864a6a12101c32ad8172ec53eb49ee1d36"
+        "before": "23b0841bb38fbafd6d0da3c649369a864a6a12101c32ad8172ec53eb49ee1d36",
+        "after": "ecf2c76832d0f855adf8a6b6814345bf400db9354349e0f972e53225ef984043"
       },
       {
         "file": "lib/types/client/service.d.ts",
-        "before": "153ffb179763a6a89973db3552cb2f17b6cde84e9aa40bcb92e65e5ab242ea6e",
+        "before": "c6ed03ed64b62b1d74fcbe83fa0672fe9828810783e19f8e060cd1897be65852",
         "after": "c6ed03ed64b62b1d74fcbe83fa0672fe9828810783e19f8e060cd1897be65852"
       },
       {
         "file": "lib/types/client/index.d.ts",
-        "before": "38856f09b9e0aa687342f4996396f053d4b761cb32e11e66480c89e6cc122848",
+        "before": "d54cbad4a7cff4c52f5ad81e7cdc2cafc677a930972960f5ca16cb3dc11e8247",
         "after": "d54cbad4a7cff4c52f5ad81e7cdc2cafc677a930972960f5ca16cb3dc11e8247"
       },
       {
         "file": "lib/types/client/input/submission-policy.d.ts",
-        "before": "189595891cfff2fe552c126efe55ecf53c9f278f7ec54953d4ba1904ce4c7557",
+        "before": "570569462760020bdc6c8b291fe9301f9239a3a17a72c035fb6fc32630505d12",
         "after": "570569462760020bdc6c8b291fe9301f9239a3a17a72c035fb6fc32630505d12"
       }
     ]
@@ -108,7 +155,11 @@
         "before": "65e999076c0dad3ff2e4bc32c03af1239cd79d223e92a0717b93aac35d0dc7c3",
         "after": "f753bb18852f6f2c9f905089ceaef321eaa9bf297ac0785ed2f026c38c7c6959"
       }
-    ]
+    ],
+    "runtimeFingerprint": {
+      "package": "73547f9f5393f945d88ff85025c82e867415b5427618e174dc1aaf594013d260",
+      "files": []
+    }
   },
   {
     "package": "@deepseek-ai/dsh-client-ui-workspace",
@@ -143,5 +194,668 @@
         "after": "f753bb18852f6f2c9f905089ceaef321eaa9bf297ac0785ed2f026c38c7c6959"
       }
     ]
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-jobs",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-tool-jobs.patch",
+    "runtimePatch": "dsh-tool-jobs-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "de5707b43480ba37c8e141e6f67674978f3a46d87d58390c18eb1659bb17ec2f",
+        "after": "898f47bc6c85f414febb61c01e3475d495348ba8f4179476e26759083d8ef29a"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-jobs",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-observation-upgrade",
+    "patch": "dsh-tool-jobs-observation-upgrade-runtime.patch",
+    "runtimePatch": "dsh-tool-jobs-observation-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "9ea6ad2e6d99539b746e92196ea97a9725651266636fcce51eedd95c745f18f9",
+        "after": "898f47bc6c85f414febb61c01e3475d495348ba8f4179476e26759083d8ef29a"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-agent-loop",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-agent-loop.patch",
+    "runtimePatch": "dsh-agent-loop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "cf57e3ecd487ac5c2553455aaa5cef2c6fb41e6bd61be5aa455675d1d7193033",
+        "after": "b10bac6bb6a98d3bd873ae595adcb2e3c76a6da0f904ddaf5ced24fe71ec67c1"
+      },
+      {
+        "file": "lib/types/agent.d.ts",
+        "before": "66131a86c5f024fabb77e99103f3f07cdca5818cbce7d6aaecb058197c66589e",
+        "after": "a4734b7d718487bc798a4aa090b11a81c7d7671e9073c28370713eb95716aa19"
+      },
+      {
+        "file": "lib/types/tool-calls.d.ts",
+        "before": "b0e76195f04a2163f6c201cf6ea3afa7ccaf3e9da0b227c4072b7311cd01884a",
+        "after": "9c6cc1191f6c7fdf8aa6a52cf8af858e39fdd64e525ffbe226a9a19a93758d62"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "46c976d782f778e3d44abe8b538d93af96f966ab26ab56225d980202e4062bd7",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-jobs-local",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-jobs-local.patch",
+    "runtimePatch": "dsh-jobs-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "cecdc8a766f62b28999ffff574008d34a39e276d91c4cc648f10ccb18afbed34",
+        "after": "07227a8369c26f3a7d927264fe5b0d3fe3d74e5df2287390b7497666325e9fff"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-session",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-session.patch",
+    "runtimePatch": "dsh-session-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "8e3b1b7f54d504ca91d3496376f9ea619f99ce1afe2739d35d9c2f2f69320950",
+        "after": "58063a95c75522a2c58e00b83a4bf4777860fa2fa3f304354ef424c796990a23"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "be0f5881be6f1ca08fa4a032fed23d19e5655cb575a3c22d7086dbe486876617",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tools",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-tools.patch",
+    "runtimePatch": "dsh-tools-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "1e53932e7c4213ea24a7d87f06960b7a7702cb21f8a5741c97242b4a470a442a",
+        "after": "791c25b168884100c7c901dfac2bd64f8fec5165af32d3d414c4b42b05ed2fd0"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "049df0624956583b8ca05badfd6e9115c6933481571dc17965f36f407bdf95f0",
+        "after": "1ac667aae64eb2177141215be939c626c24d4cfe968cdd09b3d90feacbe21a9a"
+      },
+      {
+        "file": "lib/types/schema.d.ts",
+        "before": "ecb08a02eec791f3c8cec6209a27893f7b1ff58f9269abca77cfa5c173f96d14",
+        "after": "20dc75f4f8c90c7c6caeaa97d132c1179adfa509b5c0dcab0c54462274b074f1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "c4b8e5dd6065362ac2618ddae8ca98c6ab13a2abf5b5a0b6b8379cb241bb89c4",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-agent",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-agent.patch",
+    "runtimePatch": "dsh-agent-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/runtime-types.d.ts",
+        "before": "7c03f0f92be4a48cc7960ac02fc040b2088b462ae790eab1427e50bfe5e74b31",
+        "after": "e97890611a267c6a9c37e7dde046a922deebccd62f392806516bd12250d77f5e"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "ed07c61c0d7426c185284bd5694a92f66d105278cbc22da8a29e69e0cff80a6a",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "7b59cf82c2784c25bdce4e3e24e5e5303b02b9f1003efacf50255492d17baf8b"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-bash-local",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-bash-local.patch",
+    "runtimePatch": "dsh-bash-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "6d9b4426b8455198b79de398f57c0f5693e7292411059b66d5ac5eba608b59cb",
+        "after": "7ae72faf336af9c105726db6d4bcd295f42c238f5c3423b8481e55e644fcab51"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-jobs",
+    "version": "0.2.1-rc.3",
+    "variant": "moa",
+    "patch": "dsh-jobs.patch",
+    "runtimePatch": "dsh-jobs-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "049cbae42b7376be8e6afd507d36542758ac5473ed32a3da89f5b847d47491f7",
+        "after": "80f70ad2252c07ef6783f4aadf101457e71832eeea24cb55c11489e4bd96f41c"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "dfa69379032dfb95461e9e06e1a88181f12be005129b3540f78eea015fe4dcb1",
+        "after": "e804f9a6b186980f87155f5691ab039f6a9426b367df4133cfb4b5ddb0f0e1e6"
+      },
+      {
+        "file": "lib/types/view.d.ts",
+        "before": "d5ea61cf5f40b61b6f9673b944b5769f9509b0d02d18c9316bc8dca76b685d6b",
+        "after": "f87f6ddac10f62d179b7bf34a0ddd3cfe2379670e5e39e7a7d4d47a898b1b602"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "da0e9a85a80e111e1027e118a75ba12befc0f70c939b84b0aa8f82c309662b28",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "7a7531c2fb1897603fdf0ec78ae9cef63f6a32688b1023168fbe9d8f782e2887"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tools",
+    "version": "0.2.1-rc.3",
+    "variant": "legacy-tool-isolation",
+    "patch": "dsh-tools-legacy.patch",
+    "runtimePatch": "dsh-tools-legacy-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "9bcecd8eba724e4b3b11d6e8535bbadc7d2d1a6293dcd6b5af3195745abd488a",
+        "after": "791c25b168884100c7c901dfac2bd64f8fec5165af32d3d414c4b42b05ed2fd0"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "db86a9df8c99257e2d82baa7b2540debdd816b821553eb308261faf97eed2f67",
+        "after": "1ac667aae64eb2177141215be939c626c24d4cfe968cdd09b3d90feacbe21a9a"
+      },
+      {
+        "file": "lib/types/schema.d.ts",
+        "before": "ecb08a02eec791f3c8cec6209a27893f7b1ff58f9269abca77cfa5c173f96d14",
+        "after": "20dc75f4f8c90c7c6caeaa97d132c1179adfa509b5c0dcab0c54462274b074f1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "c4b8e5dd6065362ac2618ddae8ca98c6ab13a2abf5b5a0b6b8379cb241bb89c4",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-subagent",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-residency",
+    "patch": "dsh-subagent.patch",
+    "runtimePatch": "dsh-subagent-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "9a9572e70fffdb100deb63326167f32bbf63016ce49c0017495dabcb95b44168",
+        "after": "afb74954c8e6f6126a68474d9416612e1be2f4b5db785c6bca2106f8d9057c21"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "bc0a78235eeb39586769204d70ed8a69cb2a26fe2893cb716b142455c9d705a5",
+        "after": "090077c93c668e792e12817c12a8581ca71a2857962828e739e977848f2643fc"
+      },
+      {
+        "file": "lib/types/manager.d.ts",
+        "before": "25f1f59b3acf4474db3b79c5fbdb7c7044d74936ce63c4c4aea9657cf51e7189",
+        "after": "de0461ed2adae77e6cea3f05cc0fe7b675d81e4551ad17ef1b86e34846b61502"
+      },
+      {
+        "file": "lib/types/internal.d.ts",
+        "before": "d684b933526f7caec5eff267b32fa21eeb6f5ec4707a2b5fcfab4d5ec80095bb",
+        "after": "fa8096d00641b615bd51d7cbd82b5a82045c4021ea89ea9ff742f402e4c167b7"
+      },
+      {
+        "file": "lib/types/internal.js",
+        "before": "e08b14221f417b73024e62e0466ec745ab9b45ecbcdca0c302ccc800ddadca6d",
+        "after": "8b30bb284bf0a0904f79a1686e9abf768459b32e9773527818443a121daf93d9"
+      },
+      {
+        "file": "lib/types/control-types.d.ts",
+        "before": "e8b5bd2e6b58862ba67828d430e58fa6921380c39d8e7f8abc67bd6bc5188bd7",
+        "after": "634c89f2a4ad2d83f518c74033ba093b30b0d0be7def52d90464f2fc5bc5f659"
+      },
+      {
+        "file": "lib/typert.host.js",
+        "before": "58e34812ae72879e792ab3df02bc934a1b493a81f753a707e20704ae7f03fb45",
+        "after": "226634fdec14fec4fc4ef1de613b7349bd3989271687d64fff1901dc795e2455"
+      },
+      {
+        "file": "lib/typert.remote-client.js",
+        "before": "e26365131d73ce6459c57cf883a8f2e082d0009bc431e105431fe55c6c461a06",
+        "after": "659c3693bd73e7648f82f239aa6f8f6786f371587dd165b4209a479d8d7518aa"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "ae9638ace67b9a6163fc3ad133a4f65538bde349e2645848c0b4a7c00ab8d045",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-subagent",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-0.2.0",
+    "patch": "dsh-subagent-attachments-upgrade.patch",
+    "runtimePatch": "dsh-subagent-attachments-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "b10945fcf6cac446dfcf1135929d63645f84e48bdfd6c8e2a7291096fb4b2352",
+        "after": "afb74954c8e6f6126a68474d9416612e1be2f4b5db785c6bca2106f8d9057c21"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "090077c93c668e792e12817c12a8581ca71a2857962828e739e977848f2643fc",
+        "after": "090077c93c668e792e12817c12a8581ca71a2857962828e739e977848f2643fc"
+      },
+      {
+        "file": "lib/types/manager.d.ts",
+        "before": "4ec701efbb35c820a1e5322f0c5424ca94e4b380a77995b802f64dc4fe9c2cb2",
+        "after": "de0461ed2adae77e6cea3f05cc0fe7b675d81e4551ad17ef1b86e34846b61502"
+      },
+      {
+        "file": "lib/types/internal.d.ts",
+        "before": "fa8096d00641b615bd51d7cbd82b5a82045c4021ea89ea9ff742f402e4c167b7",
+        "after": "fa8096d00641b615bd51d7cbd82b5a82045c4021ea89ea9ff742f402e4c167b7"
+      },
+      {
+        "file": "lib/types/internal.js",
+        "before": "8b30bb284bf0a0904f79a1686e9abf768459b32e9773527818443a121daf93d9",
+        "after": "8b30bb284bf0a0904f79a1686e9abf768459b32e9773527818443a121daf93d9"
+      },
+      {
+        "file": "lib/types/control-types.d.ts",
+        "before": "e8b5bd2e6b58862ba67828d430e58fa6921380c39d8e7f8abc67bd6bc5188bd7",
+        "after": "634c89f2a4ad2d83f518c74033ba093b30b0d0be7def52d90464f2fc5bc5f659"
+      },
+      {
+        "file": "lib/typert.host.js",
+        "before": "58e34812ae72879e792ab3df02bc934a1b493a81f753a707e20704ae7f03fb45",
+        "after": "226634fdec14fec4fc4ef1de613b7349bd3989271687d64fff1901dc795e2455"
+      },
+      {
+        "file": "lib/typert.remote-client.js",
+        "before": "e26365131d73ce6459c57cf883a8f2e082d0009bc431e105431fe55c6c461a06",
+        "after": "659c3693bd73e7648f82f239aa6f8f6786f371587dd165b4209a479d8d7518aa"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "ae9638ace67b9a6163fc3ad133a4f65538bde349e2645848c0b4a7c00ab8d045",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-sandbox.patch",
+    "runtimePatch": "dsh-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "2738a2a57d62450251f3328ef92d0691d6c485766519013a2f3dfe72a6149182",
+        "after": "26aed6f255aacf81f01f50ecbc4a99462b0e9fdd826a2c632b11622879fc2fbf"
+      },
+      {
+        "file": "lib/index.js",
+        "before": "b56373befbfcfe281c17c8892e9a4b2cdcb96851290b3ed0ff56b08915e2f743",
+        "after": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly-confine-lifetime-upgrade",
+    "patch": "dsh-sandbox-confine-lifetime-upgrade.patch",
+    "runtimePatch": "dsh-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "0eb5b2537e34c0f873bc8bdb211301841d40054de09df9ae4c9f6425e713da60",
+        "after": "26aed6f255aacf81f01f50ecbc4a99462b0e9fdd826a2c632b11622879fc2fbf"
+      },
+      {
+        "file": "lib/index.js",
+        "before": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6",
+        "after": "8008b7d430f79d80634203757e33044dc89ff67613a12ea7739e9451eee241c6"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-policy",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-sandbox-policy.patch",
+    "runtimePatch": "dsh-sandbox-policy-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "772ca58f0f786d6cb4d839deb621634c31097c13228d81b14e3f3153d0524924",
+        "after": "04155466af113b375585692e5ca819bb7f4e4646617091929143c0251f5cf335"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "ca96d110c336d16c1285c93d544526f2b25a9c8dc176d82cc2fd2d91623b43af",
+        "after": "5a26fc2a608489e24ad2459f5f4df7249d8410958c8d8fa23d7d21a5114a542f"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-fs.patch",
+    "runtimePatch": "dsh-fs-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "e3695ded49b42d128638cc1a03163117126862af8a32e78dd08dc8dc781066d4",
+        "after": "14690f88b3fe56e250012a78870c2c91bc018c807b68ca4e3dc8f764b4a56fbd"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "1704091dad1c6c4604465a3b2a5ff82d08edf7341cf271ee20ea738b8649655a",
+        "after": "509a1420267c4d065c6cfa8bf627d22e72db784441f5757ebce0a8d8efb42a3d"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "b165659f1eff0607222a7fe761bc56bae03fec8337c2e25affd064a3047dacb9"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-fs-sandbox.patch",
+    "runtimePatch": "dsh-fs-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "cac65e21a0f0895b073cb9a447196ac265f2a171cc7f67c7434a6b3b7782caf5",
+        "after": "f613a96fb110178575ac52cbb6f65fd3eaa83a4cbaa49387783073fe94789637"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "af579ceb6ff5b93ff0b449a66fa8aa941ba00f2a6d50b5632e60e1730803519c",
+        "after": "cc545e8e570359406c22ce8cb0371079d4985bfd701e96836bcdcc39c7a84ec1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-shell",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-shell.patch",
+    "runtimePatch": "dsh-shell-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "f44ba513c50c3636b0d04c6aebdd3242f2f0e038a273a285717bae75f7291bda",
+        "after": "67fdb5c8d77143c1e0e0e6e8a0d67d6011b1cc410b625bd90a7aa44bee95e2e9"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "c432afa54a6a86709f926ee6f2fcbdaf1351c534715ede60a308c2c22a430092",
+        "after": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "6c5aa32fda2d92ef827d949480fd32cb4867f811ce06e875e70c59ab2c9261b1"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-shell",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-upgrade",
+    "patch": "dsh-shell-memory-upgrade.patch",
+    "runtimePatch": "dsh-shell-memory-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "3c293df33ada6fd2b87ff21a1d12d5e86ff0a2609dc748f0e22486c206b42deb",
+        "after": "67fdb5c8d77143c1e0e0e6e8a0d67d6011b1cc410b625bd90a7aa44bee95e2e9"
+      },
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40",
+        "after": "ca614e577c36ce6d642f4434aed6a2d2ffce6e859a8a0b66042d06db2a452e40"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "6c5aa32fda2d92ef827d949480fd32cb4867f811ce06e875e70c59ab2c9261b1"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-bash-sandbox",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-bash-sandbox.patch",
+    "runtimePatch": "dsh-bash-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "0f788f99113ba7411eb33af71cdafabd07b73cf012c1715c819e03f3f77f342d",
+        "after": "c200ef9fb3f3770dd6f1653a10f32284b1f8ee2289f5ce789c84eecae2a0fe3c"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "98ad2d9a2c7d08b5e5c9b7a479bc108ddf80390ed41b46e6a1b073833c482d52",
+        "after": "3ca207dc8df91d7af41648d49a613f5456e9410f471539468bf53d25b0856b89"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-local",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-sandbox-local.patch",
+    "runtimePatch": "dsh-sandbox-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "be6e1107871cf8d94c040090b13c405bc833822e2f51ed5280e93eececf762be",
+        "after": "50970e992a3b981b0af78764da0dd7303a1633737b301d681ffdb80efda99046"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "c8c9fa8089169c305a2d87227dafcb464bf548a5c812ef616ce78eae04b0172f",
+        "after": "a6e4ef4c382f060d85e81220e673c8fb1b698272f76bb9cd26130fe3414c9130"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-bash",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-readonly",
+    "patch": "dsh-tool-bash.patch",
+    "runtimePatch": "dsh-tool-bash-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "a1215d7bcaf82c0755be48321ef6bb45075f1cb33296d6263009e9d10fd596f6",
+        "after": "0de414e33bb95e477976dc84d6d5b7f8f8ae2972ddd5aa006dec92dc140e9920"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-bash",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-memory-upgrade",
+    "patch": "dsh-tool-bash-memory-upgrade.patch",
+    "runtimePatch": "dsh-tool-bash-memory-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "59214b5c9e81a6973584143bee9ed0574c89ff877077653451fbd9a58c60f222",
+        "after": "0de414e33bb95e477976dc84d6d5b7f8f8ae2972ddd5aa006dec92dc140e9920"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-api-session-controller",
+    "version": "0.2.1-rc.3",
+    "variant": "npm",
+    "patch": "dsh-api-session-controller-client.patch",
+    "runtimePatch": "dsh-api-session-controller-client-runtime.patch",
+    "files": [
+      {
+        "file": "lib/client.js",
+        "before": "82f2301c18f0e51340c1eedf8ecdfb939e873b3770a80632e438b86e82887d0e",
+        "after": "a0b7b5dc7e5163c729e220fdebc8224d5a53b19eee54b21ec353e2e051398ab2"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "9b1350c54b61d31440f12fb2221c675bd39c779902fd9b4ebb95a0680619e567",
+      "files": []
+    }
+  },
+  {
+    "variant": "npm",
+    "package": "@deepseek-ai/dsh-client-file-upload",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "5dd5bd2d20656a1edeb1366e6b878afb04db519d2ba400135cb020ef037912fb",
+        "after": "390efd1f78761058ae8fbcd8480ddb5072e58df2ef03b72158e15eeb66869123"
+      },
+      {
+        "file": "lib/types/index.d.ts",
+        "before": "a2167b0f9fc930cd3d47b6179539eebeb21b78e3574079e7b54dc4efaf915ade",
+        "after": "5a138c9e7c4d2ab4fb39fc8a33cb8c6a62ee1ca6a0be9c9fd2675a004733f565"
+      }
+    ],
+    "version": "0.2.1-rc.3",
+    "patch": "dsh-client-file-upload.patch",
+    "runtimePatch": "dsh-client-file-upload-runtime.patch",
+    "runtimeFingerprint": {
+      "package": "dec23e04cde3fe7a7642d1c226e2005b2df27df7286ac6a36564a6dfd566cb8a",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-subprocess",
+    "version": "0.2.1-rc.3",
+    "variant": "moa-native-managed-range",
+    "patch": "dsh-subprocess-managed-range.patch",
+    "runtimePatch": "dsh-subprocess-managed-range.patch",
+    "files": [
+      {
+        "file": "lib/types/types.d.ts",
+        "before": "d3c79f91d4a52ca09046d1f4af48ee220d3fe8f1f2efae24f7b12cda3bd2848d",
+        "after": "eb98b244b6990df61d258cb1714089660715a6a028cd42cc2ce4b72264877df1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "2c44a3fd4e9d54380a5348e8af28277cb87dce1d7fdc12fbbea0724c445814ee",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "0ea9e95a73639f9e69b48aa48f373f34881adffa2ee2ac2acd4702728da9592b"
+        }
+      ]
+    }
   }
 ]

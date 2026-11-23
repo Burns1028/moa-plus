@@ -1,0 +1,420 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,3 +1,4 @@
++import { TOOL_RUNTIME_SCHEDULER, startToolActivity } from "./pipeline.js";
+ import { a as ToolNotFoundError, c as assertObjectJsonSchema, d as isPlainJsonArray, f as isPlainJsonRecord, h as ToolExecutorUnavailableError, i as ToolActivationError, l as assertSupportedJsonSchema, m as ToolBatchExecutionError, n as TOOL_ABORTED, o as ToolOutputError, p as validateJsonSchemaValue, r as TOOL_ABORTED_BEFORE_DISPATCH, s as JsonSchemaError, t as RUN_CODE_NAME, u as isJsonSchemaRecord } from "./shared-DTdn5dXO.js";
+ import { Service } from "@deepseek-ai/cordis";
+ import z from "@deepseek-ai/schemastery";
+@@ -329,10 +330,13 @@ function defineTool(options) {
+ 			render(args, value) {
+ 				return userRender(args, value);
+ 			},
+-			...userPresentationMeta !== void 0 ? { presentationMeta(args, value) {
+-				return userPresentationMeta(args, value);
++			...userPresentationMeta !== void 0 ? { presentationMeta(args, value, exec) {
++				return userPresentationMeta(args, value, exec);
+ 			} } : {}
+ 		},
++		...options.nativeOnly === true ? { nativeOnly: true } : {},
++		...options.backgroundOnMessage === true ? { backgroundOnMessage: true } : {},
++		...options.supportsBackgroundProducer === true ? { supportsBackgroundProducer: true } : {},
+ 		...options.deferLoading === true ? { deferLoading: options.deferLoading } : {},
+ 		...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
+ 		async execute(args, exec) {
+@@ -381,12 +385,13 @@ function projectToolSchema(definition, detachParameters) {
+ var ToolLayer = class {
+ 	tools;
+ 	restrictions = new AnonymousEntries();
++	suppressions = new AnonymousEntries();
+ 	constructor(scope) {
+ 		this.tools = new NamedEntries((name) => /* @__PURE__ */ new Error(scope === void 0 ? `tool "${name}" is already registered (for a per-agent variant, register through that agent's \`agent.ctx\` instead)` : `tool "${name}" is already registered in this scope`));
+ 	}
+ 	/** Whether every contribution table in this aggregate layer is empty. */
+ 	isEmpty() {
+-		return this.tools.isEmpty() && this.restrictions.isEmpty();
++		return this.tools.isEmpty() && this.restrictions.isEmpty() && this.suppressions.isEmpty();
+ 	}
+ 	/** Whether every compiled restriction in this layer admits a global tool name. */
+ 	admits(name) {
+@@ -402,6 +407,7 @@ var GuardLayer = class {
+ };
+ /** Concrete tool registry and scoped executor dispatcher. */
+ var ToolsService = class extends Service {
++	[TOOL_RUNTIME_SCHEDULER] = { start: startToolActivity };
+ 	static inject = ["systemPrompt"];
+ 	static Config = z.object({
+ 		mode: z.never().description("Removed. Mount a native or PTC tool executor instead."),
+@@ -450,6 +456,12 @@ var ToolsService = class extends Service {
+ 	* @param filter - global-tool mask: `allow` (keep only) and/or `deny` (remove).
+ 	* @returns the exact disposer that lifts this restriction.
+ 	*/
++	suppress({ deny }) {
++		if (scopeOf(this.ctx) === void 0) throw new Error("tools.suppress() requires a scoped context");
++		if (!Array.isArray(deny) || deny.length === 0 || deny.some(name => typeof name !== "string" || !name)) throw new Error("tools.suppress() requires nonempty tool names");
++		if (deny.includes(RUN_CODE_NAME)) throw new Error("tools.suppress() cannot name the reserved presentation transport");
++		return this.layers.effect(this.ctx, layer => layer.suppressions.append(new Set(deny)), { label: "tools.suppress()" });
++	}
+ 	restrict(filter) {
+ 		const scope = scopeOf(this.ctx);
+ 		if (scope === void 0) throw new Error("tools.restrict() requires a scoped context (agent.ctx): a context-global restriction would mask every agent — deny the tool for the intended agent instead");
+@@ -499,6 +511,7 @@ var ToolsService = class extends Service {
+ 			visible.set(name, registration.definition);
+ 			registrations.set(name, registration);
+ 		}
++		if (own !== void 0) for (const names of own.suppressions.values()) for (const name of names) { visible.delete(name); registrations.delete(name); }
+ 		return {
+ 			visible,
+ 			registrations,
+@@ -662,4 +675,4 @@ var ToolsService = class extends Service {
+ 	}
+ };
+ //#endregion
+-export { JsonSchemaError, RUN_CODE_NAME, TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH, ToolActivationError, ToolArgsError, ToolBatchExecutionError, ToolExecutorUnavailableError, ToolNotFoundError, ToolOutputError, ToolsService as ToolRuntime, ToolsService, ToolsService as default, assertObjectJsonSchema, assertSupportedJsonSchema, defineTool, isJsonSchemaRecord, isPlainJsonArray, isPlainJsonRecord, parameterSchemaSpecToJsonSchema, projectToolSchema, validateArgs, validateJsonSchemaValue, valueSchemaSpecToJsonSchema };
++export { TOOL_RUNTIME_SCHEDULER, JsonSchemaError, RUN_CODE_NAME, TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH, ToolActivationError, ToolArgsError, ToolBatchExecutionError, ToolExecutorUnavailableError, ToolNotFoundError, ToolOutputError, ToolsService as ToolRuntime, ToolsService, ToolsService as default, assertObjectJsonSchema, assertSupportedJsonSchema, defineTool, isJsonSchemaRecord, isPlainJsonArray, isPlainJsonRecord, parameterSchemaSpecToJsonSchema, projectToolSchema, validateArgs, validateJsonSchemaValue, valueSchemaSpecToJsonSchema };
+--- a/lib/pipeline.js
++++ b/lib/pipeline.js
+@@ -25,6 +25,14 @@ import { assertNever, deepFreeze, snapshotJsonValue } from "@deepseek-ai/dsh-uti
+ * @returns model-ordered outcomes after every started body has settled.
+ * @throws RangeError when the explicit concurrency override is not a positive integer.
+ */
++const TOOL_RUNTIME_SCHEDULER = Symbol("dsh.tool.runtime.scheduler");
++const activityPipelines = new WeakMap();
++function startToolActivity(exec) {
++ const pipeline = activityPipelines.get(exec);
++ if (!pipeline) throw new Error("Unprepared native tool execution");
++ return pipeline.start(exec);
++}
++
+ async function executeToolBatch(input, pipeline, maxParallel) {
+ 	const { calls: toolCalls, signal, agent, toolSet, maxParallelToolCalls } = input;
+ 	if (maxParallelToolCalls !== void 0 && (!Number.isInteger(maxParallelToolCalls) || maxParallelToolCalls < 1)) throw new RangeError("maxParallelToolCalls must be a positive integer");
+@@ -42,6 +50,7 @@ async function executeToolBatch(input, pipeline, maxParallel) {
+ 			}
+ 		}));
+ 		let next = 0;
++		const transfers = [];
+ 		let concluded = false;
+ 		while (next < planned.length) {
+ 			const first = planned[next];
+@@ -50,12 +59,14 @@ async function executeToolBatch(input, pipeline, maxParallel) {
+ 			const outcome = await runGroup(pipeline, settlement, maxParallelToolCalls ?? maxParallel(), group, mode, signal);
+ 			next += outcome.consumed;
+ 			concluded ||= outcome.concluded;
++			transfers.push(...outcome.transfers);
+ 			if (outcome.aborted) {
+ 				for (const call of planned.slice(next)) settlement.skip(call.block);
+ 				return settlement.result(concluded);
+ 			}
+ 		}
+-		return settlement.result(concluded);
++		const calls = transfers.filter(receipt => receipt.cause.kind === "new-message" || receipt.cause.kind === "llm-judge");
++		return { ...settlement.result(concluded), ...(calls.length ? { handoff: { kind: "handoff", cause: "background-message", calls, triggeringMessageIds: [...new Set(calls.flatMap(receipt => receipt.cause.messageIds))] } } : {}) };
+ 	} catch (error) {
+ 		throw new ToolBatchExecutionError(error, settlement.result());
+ 	}
+@@ -77,7 +88,125 @@ function parseArguments(raw) {
+ * returns an aborted outcome. Scheduler failure drains dispatches and rejects
+ * for the owning step to record recovery results.
+ */
++/** One logged root's transferable lifetime. Jobs own admission; the batch owns pairing. */
++class MoaRootActivity {
++ constructor(pipeline, agent, identity, block, signal) {
++  Object.assign(this, { pipeline, ctx: pipeline.ctx, agent, identity, block, signal });
++  this.producers = []; this.settled = false;
++  this.completion = Promise.withResolvers(); this.placeholder = Promise.withResolvers();
++  this.placeholder.promise.catch(() => {});
++  this.finished = this.completion.promise;
++  this.finished.catch(error => agent.dispatch.emit("agent/error", { turn: identity.turn, step: identity.step, error }));
++  agent.moaActivities.add(this);
++  this.finished.then(() => agent.moaActivities.delete(this), () => {});
++  const self = this;
++  this.background = {
++   get detached() { return self.receipt !== undefined; },
++   bindProducer(producer) {
++    self.producers.push(producer);
++    if (self.cancelled) producer.cancel("tool call aborted");
++   },
++   promote: () => this.requestBackground({ kind: "producer-promotion" })
++  };
++ }
++ cancel(reason) {
++  this.cancelled = true;
++  this.activity?.cancel(reason);
++  const errors = [];
++  for (const producer of this.producers) try { producer.cancel(typeof reason === "string" ? reason : "tool call aborted"); } catch (error) { errors.push(error); }
++  if (errors.length) throw new AggregateError(errors, "producer cancellation failed");
++ }
++ async joinProducers() { await Promise.all(this.producers.map(p => p.exited)); }
++ async complete() {
++  try { await this.joinProducers(); this.completion.resolve(); }
++  catch (error) { this.completion.reject(error); throw error; }
++ }
++ start(exec) {
++  this.exec = exec;
++  this.slot = Promise.withResolvers();
++  this.activity = this.pipeline.start(exec);
++  if (this.cancelled) this.activity.cancel(this.signal.reason);
++  this.activity.dispatch.then(async outcome => {
++   this.settled = true;
++   if (!this.receipt) {
++    this.slot.resolve({ ...outcome, exec, root: this });
++    return;
++   }
++   try {
++    const result = await this.pipeline.complete(exec, outcome);
++    this.resultFailed = result.isError;
++    await this.joinProducers();
++    try { await this.placeholder.promise; }
++    catch { this.completion.resolve(); return; } // driver reports the failed acknowledgment
++    try { await this.agent.dispatch.serial("agent/tool-background-result", { receipt: this.receipt, result }); }
++    catch (error) { this.agent.dispatch.emit("agent/error", { turn: this.identity.turn, step: this.identity.step, error }); }
++    // Result persistence is a controller obligation, not a live process.
++    this.completion.resolve();
++   } catch (error) { this.completion.reject(error); }
++  }, error => { this.slot.reject(error); this.completion.reject(error); });
++  this.agent.dispatch.emit("agent/tool-activity-started", {
++   identity: this.identity, execution: exec, finished: this.finished,
++   requestBackground: cause => this.requestBackground(cause)
++  });
++  return this.slot.promise;
++ }
++ requestBackground(cause) {
++  if (this.transfer) return this.transfer;
++  const pending = Promise.withResolvers();
++  this.transfer = pending.promise;
++  this.admitBackground(cause).then(result => {
++   if (result.kind === "foreground") this.transfer = undefined;
++   pending.resolve(result);
++  }, pending.reject);
++  return pending.promise;
++ }
++ async admitBackground(cause) {
++  if (this.receipt) return { kind: "background", receipt: this.receipt };
++  if (this.cancelled || this.exec?.signal.aborted || this.signal.aborted) return { kind: "foreground", reason: "aborted" };
++  if (this.settled || !this.activity) return { kind: "foreground", reason: "settled" };
++  const jobs = this.ctx.get("jobs");
++  if (!jobs) return { kind: "foreground", reason: "unavailable" };
++  let jobId;
++  try {
++   const direct = this.block.name !== "run_code" && this.producers.length === 1 ? this.producers[0] : undefined;
++   jobId = direct?.jobId ?? jobs.start({
++    kind: "moa-tool", label: this.block.name, owner: this.agent.id,
++    completionNotice: "producer",
++    toolCall: { callId: this.identity.callId, rootCallId: this.identity.rootCallId },
++    output: direct?.output,
++    run: () => ({ cancel: reason => this.cancel(reason), done: this.finished.then(() => ({ status: this.cancelled ? "killed" : this.resultFailed ? "failed" : "completed" }), error => ({ status: "failed", detail: String(error) })) })
++   });
++   if (this.cancelled || this.exec.signal.aborted || this.signal.aborted) {
++    jobs.kill(jobId, this.agent.id, "aborted during transfer");
++    return { kind: "foreground", reason: "aborted" };
++   }
++  } catch { return { kind: "foreground", reason: "unavailable" }; }
++  this.activity.releaseCaller();
++  this.receipt = { ...this.identity, jobId, cause };
++  this.slot.resolve({ root: this, background: this.receipt });
++  return { kind: "background", receipt: this.receipt };
++ }
++ async commitPlaceholder(settlement, block, callSeq) {
++  try {
++   const handle = JSON.stringify([this.identity.owner, this.identity.callSeq]);
++   settlement.commit(block, {
++    content: [{ type: "text", text: `Tool running in background. tool_call_id: ${handle}; native job: ${this.receipt.jobId}. Use query_background_tool or cancel_background_tool. The complete result will be delivered automatically.` }],
++    isError: false, meta: { moaBackground: this.receipt, tool_call_id: handle }
++   }, callSeq);
++   await this.ctx.get("sessions").flush(this.agent.session);
++   this.placeholderCommitted = true;
++   this.placeholder.resolve();
++  } catch (error) {
++   this.placeholder.reject(error); this.placeholder.promise.catch(() => {});
++   this.cancel(error); await this.activity.exited; await this.joinProducers();
++   throw error;
++  }
++ }
++}
++
+ async function runGroup(pipeline, settlement, maxParallelToolCalls, group, mode, signal) {
++	const roots = [];
++	const transfers = [];
+ 	const slots = group.map(() => void 0);
+ 	const callSeqs = group.map(() => void 0);
+ 	let nextToStart = 0;
+@@ -94,9 +223,14 @@ async function runGroup(pipeline, settlement, maxParallelToolCalls, group, mode,
+ 			const slot = slots[committed];
+ 			if (slot === void 0) break;
+ 			const call = group[committed];
++			if (slot.background) {
++				await slot.root.commitPlaceholder(settlement, call.block, callSeqs[committed]);
++				transfers.push(slot.background); committed++; continue;
++			}
+ 			const result = await pipeline.complete(slot.exec, slot);
+ 			settlement.commit(call.block, result, callSeqs[committed]);
+ 			concluded ||= result.concludesTurn === true;
++			await slot.root?.complete();
+ 			committed++;
+ 		}
+ 	};
+@@ -105,10 +239,26 @@ async function runGroup(pipeline, settlement, maxParallelToolCalls, group, mode,
+ 		const call = group[index];
+ 		callSeqs[index] = settlement.start(call.block);
+ 		started++;
+-		const prepared = await pipeline.prepare(call.exec);
+-		throwSchedulerFailure();
++		const agent = call.exec.agent;
++		const log = settlement.input.log;
++		const root = agent?.toolBackgroundEnabled && log ? new MoaRootActivity(pipeline, agent, {
++			owner: agent.id, turn: log.turn, step: log.step, callSeq: callSeqs[index], callId: call.block.id, rootCallId: call.block.id
++		}, call.block, signal) : undefined;
++		if (root) roots.push(root);
++		// An admitted root retains precisely this step's capabilities after step disposal.
++		const admitted = root && call.exec.toolSet ? new Map(call.exec.toolSet.view(agent)) : undefined;
++		const heldInput = admitted ? { ...call.exec, toolSet: { view: scope => scope === agent ? new Map(admitted) : new Map() } } : call.exec;
++		let prepared;
++		try {
++			prepared = await pipeline.prepare(heldInput, root ? { transferable: true, background: root.background } : undefined);
++			throwSchedulerFailure();
++		} catch (error) { root?.cancel(error); await root?.complete(); throw error; }
+ 		switch (prepared.kind) {
+ 			case "dispatch": {
++				if (root) {
++					inFlight.set(index, root.start(prepared.exec).then(slot => { slots[index] = slot; return index; }, error => { schedulerFailure ??= { error }; return index; }));
++					break;
++				}
+ 				const promise = pipeline.dispatch(prepared.exec).then((outcome) => {
+ 					slots[index] = {
+ 						...outcome,
+@@ -124,7 +274,7 @@ async function runGroup(pipeline, settlement, maxParallelToolCalls, group, mode,
+ 			}
+ 			case "post-result":
+ 			case "final-result":
+-				slots[index] = prepared;
++				slots[index] = { ...prepared, root };
+ 				break;
+ 			/* v8 ignore next -- closed-union exhaustiveness guard */
+ 			default: assertNever(prepared, "tool-call scheduler prepare result");
+@@ -156,11 +306,19 @@ async function runGroup(pipeline, settlement, maxParallelToolCalls, group, mode,
+ 	} catch (error) {
+ 		schedulerFailure ??= { error };
+ 		await Promise.allSettled(inFlight.values());
++		const cleanup = await Promise.allSettled(roots.map(async root => {
++			if (!root.receipt) return root.complete();
++			if (root.placeholderCommitted) return;
++			root.placeholder.reject(schedulerFailure.error); root.cancel(schedulerFailure.error); await root.finished;
++		}));
++		const failures = cleanup.filter(item => item.status === "rejected").map(item => item.reason);
++		if (failures.length) throw new AggregateError([schedulerFailure.error, ...failures], "tool scheduler cleanup failed");
+ 		throw schedulerFailure.error;
+ 	}
+ 	if (aborted) {
+ 		for (const call of group.slice(started)) settlement.skip(call.block);
+ 		return {
++			transfers,
+ 			consumed: group.length,
+ 			aborted: true,
+ 			concluded
+@@ -169,6 +327,7 @@ async function runGroup(pipeline, settlement, maxParallelToolCalls, group, mode,
+ 	/* v8 ignore next -- unreachable: a non-aborted group commits every started call */
+ 	if (committed !== started) throw new Error("tool-call scheduler: uncommitted settled calls");
+ 	return {
++		transfers,
+ 		consumed: started,
+ 		aborted: false,
+ 		concluded
+@@ -262,7 +421,7 @@ var ToolExecutionPipeline = class {
+ 	}
+ 	resolveExecution(name, scope, nested, toolSet) {
+ 		const tool = this.get(name, scope, toolSet);
+-		return tool !== void 0 && this.source.reject?.(name, nested) === void 0 ? tool : void 0;
++		return tool !== void 0 && this.source.reject?.(name, nested, tool) === void 0 ? tool : void 0;
+ 	}
+ 	/** Context deferred by a running tool body, keyed by its scheduler-owned execution. */
+ 	deferredContexts = /* @__PURE__ */ new WeakMap();
+@@ -290,7 +449,7 @@ var ToolExecutionPipeline = class {
+ 			return { kind: "exclusive" };
+ 		}
+ 	}
+-	createExecution(exec) {
++	createExecution(exec, options) {
+ 		const deferredContexts = [];
+ 		const token = createExecutionToken();
+ 		const callId = exec.callId;
+@@ -298,15 +457,21 @@ var ToolExecutionPipeline = class {
+ 		const name = exec.name;
+ 		const agent = exec.agent;
+ 		const parent = exec.parent;
+-		const signal = exec.signal;
++		const controller = options?.transferable ? new AbortController() : undefined;
++		const relay = () => controller.abort(exec.signal.reason);
++		if (controller) { exec.signal.addEventListener("abort", relay, { once: true }); if (exec.signal.aborted) relay(); }
++		const signal = controller?.signal ?? exec.signal;
++		const releaseCaller = () => exec.signal.removeEventListener("abort", relay);
+ 		const visible = this.get(name, agent, exec.toolSet);
+-		const rejection = visible === void 0 ? void 0 : this.source.reject?.(name, parent !== void 0);
++		const rejection = visible === void 0 ? void 0 : this.source.reject?.(name, parent !== void 0, visible);
+ 		const rejected = rejection !== void 0;
+ 		const concludingExecutions = this.concludingExecutions;
+ 		const base = {
+ 			token,
+ 			callId,
+ 			rootCallId,
++			background: options?.background ?? exec.background,
++			backgroundOnMessage: visible?.backgroundOnMessage === true,
+ 			name,
+ 			signal,
+ 			...agent !== void 0 ? { agent } : {},
+@@ -333,7 +498,9 @@ var ToolExecutionPipeline = class {
+ 			this.deferredContexts.set(execution, deferredContexts);
+ 			this.contentFinalizers.set(execution, finalizerFor());
+ 			if (!rejected) this.contentProjectors.set(execution, capturedProjector);
++			activityPipelines.set(execution, this);
+ 			this.cancellationStates.set(execution, {
++				controller, releaseCaller,
+ 				callerSignal: signal,
+ 				bodyInvoked: false
+ 			});
+@@ -372,8 +539,8 @@ var ToolExecutionPipeline = class {
+ 	* @param input - the caller-supplied execution input.
+ 	* @returns the prepared execution plus the next scheduler stage.
+ 	*/
+-	async prepare(input) {
+-		const created = this.createExecution(input);
++	async prepare(input, options) {
++		const created = this.createExecution(input, options);
+ 		if (created.kind !== "ready") return created;
+ 		const exec = created.exec;
+ 		if (this.callerCancelled(exec)) return {
+@@ -433,6 +600,12 @@ var ToolExecutionPipeline = class {
+ 			};
+ 		}
+ 	}
++	start(exec) {
++		const state = this.cancellationStates.get(exec);
++		if (!state) throw new Error("Unprepared native tool execution");
++		const dispatch = this.dispatch(exec);
++		return { dispatch, exited: dispatch.then(() => undefined), cancel: reason => state.controller?.abort(reason), releaseCaller: state.releaseCaller };
++	}
+ 	/** Whether the original caller signal is currently aborted. */
+ 	callerCancelled(exec) {
+ 		const state = this.cancellationStates.get(exec);
+@@ -561,6 +734,7 @@ var ToolExecutionPipeline = class {
+ 		} catch (error) {
+ 			finalResult = this.materializeFinalResult(toolErrorResult(error));
+ 		}
++		this.cancellationStates.get(exec)?.releaseCaller?.();
+ 		this.notifyResult(exec, finalResult);
+ 		return finalResult;
+ 	}
+@@ -723,7 +897,7 @@ var ToolExecutionPipeline = class {
+ 		if (tool.output.presentationMeta !== void 0) {
+ 			let projected;
+ 			try {
+-				projected = tool.output.presentationMeta(exec.arguments, value);
++				projected = tool.output.presentationMeta(exec.arguments, value, exec);
+ 			} catch (error) {
+ 				throw projectionError(tool.name, "presentationMeta", error);
+ 			}
+@@ -945,4 +1119,4 @@ function toolAbortedBeforeDispatchResult(prior) {
+ 	};
+ }
+ //#endregion
+-export { ToolExecutionPipeline, executeToolBatch, toolErrorMessage };
++export { TOOL_RUNTIME_SCHEDULER, startToolActivity, ToolExecutionPipeline, executeToolBatch, toolErrorMessage };

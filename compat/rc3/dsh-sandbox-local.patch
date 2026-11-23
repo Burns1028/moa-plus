@@ -1,0 +1,136 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,11 +1,12 @@
+ import { spawnSync } from "node:child_process";
+-import { existsSync, mkdtempSync, rmSync } from "node:fs";
++import { existsSync, mkdtempSync, rmSync, lstatSync, realpathSync } from "node:fs";
++
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { join, dirname, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { LAUNCHER_BIN, LAUNCHER_FAILURE_EXIT, grantArgs, launcherPath, probe } from "@deepseek-ai/node-addon-system/landlock-run";
+ import z from "@deepseek-ai/schemastery";
+-import { SandboxProvider, SandboxUnavailableError, canonicalPath, writableRoots } from "@deepseek-ai/dsh-sandbox";
++import { ReadOnlyPathUnsupportedError, SandboxProvider, SandboxUnavailableError, canonicalPath, writableRoots } from "@deepseek-ai/dsh-sandbox";
+ import { AclWriteGrant, assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid } from "@deepseek-ai/dsh-sandbox-windows-acl";
+ import { assertNever } from "@deepseek-ai/dsh-util-values";
+ //#region lib/types/profiles.js
+@@ -19,9 +20,35 @@
+ * @param policy - file-effect policy to express as bwrap mounts.
+ * @returns profile arguments before the trailing separator and command argv.
+ */
++function pathUnder(path, root) {
++ return path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
++}
++function protectedAncestors(paths) {
++ const result = new Set();
++ for (const path of paths ?? []) {
++  let parent = dirname(path);
++  while (true) { result.add(parent); const next = dirname(parent); if (next === parent) break; parent = next; }
++ }
++ return [...result].sort((a, b) => a.length - b.length);
++}
++function canonicalRestriction(path) {
++ let ancestor = path; const suffix = [];
++ while (true) {
++  try { return join(realpathSync.native(ancestor), ...suffix.reverse()); }
++  catch (error) {
++   if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
++   const parent = dirname(ancestor);
++   if (parent === ancestor) throw error;
++   suffix.push(ancestor.slice(parent.endsWith(sep) ? parent.length : parent.length + 1)); ancestor = parent;
++  }
++ }
++}
++function restrictionUnsupported(detail) {
++ return new ReadOnlyPathUnsupportedError(detail);
++}
+ function bwrapProfileArgs(policy) {
+ 	const args = [
+-		"--ro-bind",
++		policy.mode === "danger-full-access" ? "--bind" : "--ro-bind",
+ 		"/",
+ 		"/",
+ 		"--dev",
+@@ -31,10 +58,17 @@
+ 		"/proc",
+ 		"--die-with-parent"
+ 	];
++	const ancestors = protectedAncestors(policy.readOnlyPaths).filter((path) => path !== "/");
+ 	if (policy.mode === "workspace-write") {
+ 		args.push("--tmpfs", "/tmp");
++		// Preserve the ephemeral temp mount; expose external shared records read-only.
++		for (const path of ancestors) if (path !== "/tmp" && !pathUnder(path, policy.workspaceRoot)) args.push("--ro-bind", path, path);
+ 		args.push("--bind", policy.workspaceRoot, policy.workspaceRoot);
+-	}
++		for (const path of ancestors) if (path !== policy.workspaceRoot && pathUnder(path, policy.workspaceRoot)) args.push("--bind", path, path);
++	} else if (policy.mode === "danger-full-access") {
++		for (const path of ancestors) args.push("--bind", path, path);
++	}
++	for (const path of policy.readOnlyPaths ?? []) args.push("--ro-bind", path, path);
+ 	return args;
+ }
+ /**
+@@ -66,11 +100,15 @@
+ 	const forms = [
+ 		"(version 1)",
+ 		"(allow default)",
+-		"(deny file-write*)",
++		...policy.mode === "danger-full-access" ? [] : ["(deny file-write*)"],
+ 		`(allow file-write* (literal ${sbplString("/dev/null")}))`
+ 	];
+ 	const roots = writableRoots(policy);
+ 	if (roots.length > 0) forms.push(`(allow file-write* ${roots.map((root) => `(subpath ${sbplString(root)})`).join(" ")})`);
++	if (policy.readOnlyPaths?.length) {
++		forms.push(`(deny file-write* ${policy.readOnlyPaths.map((path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`).join(" ")})`);
++		forms.push(`(deny file-write-unlink ${protectedAncestors(policy.readOnlyPaths).map((path) => `(literal ${sbplString(path)})`).join(" ")})`);
++	}
+ 	return ["-p", forms.join(" ")];
+ }
+ //#endregion
+@@ -250,6 +288,7 @@
+ * else.
+ */
+ var LocalSandboxProvider = class extends SandboxProvider {
++	supportsReadOnlyPaths = true;
+ 	static Config = z.object({
+ 		runnerCommand: z.array(z.string()).default([]),
+ 		runnerFailureSignatures: z.array(z.string()).default([]),
+@@ -308,6 +347,7 @@
+ 			...policy,
+ 			workspaceRoot: canonicalPath(policy.workspaceRoot)
+ 		};
++		if (this.runnerCommand !== void 0 && policy.readOnlyPaths?.length) throw restrictionUnsupported("the configured custom runner has no reviewed readonly-path dialect");
+ 		if (this.runnerCommand !== void 0) return Promise.resolve({
+ 			argv: [
+ 				...this.runnerCommand,
+@@ -320,6 +360,18 @@
+ 			runnerFailureRules: [{ fatalSignatures: this.configuredRunnerFailureSignatures }]
+ 		});
+ 		const selected = this.selectRunner(policy.mode);
++		if (policy.readOnlyPaths?.length) {
++			if (selected.runner !== "seatbelt" && selected.runner !== "bwrap") throw restrictionUnsupported(`${selected.runner} cannot exclude records from a writable workspace; use the native Seatbelt or bwrap backend`);
++			const paths = [];
++			for (const path of policy.readOnlyPaths) {
++				let info;
++				try { info = lstatSync(path); } catch (error) { if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error; }
++				if (info && (!info.isFile() || info.nlink !== 1)) throw restrictionUnsupported(`record ${JSON.stringify(path)} must be a regular file with one hard link`);
++				if (!info && selected.runner === "bwrap") throw restrictionUnsupported(`record ${JSON.stringify(path)} is missing; the Coordinator must recreate it before restricted Bash runs`);
++				paths.push(canonicalRestriction(path));
++			}
++			policy = { ...policy, readOnlyPaths: [...new Set(paths)] };
++		}
+ 		const runnerArgv = this.runnerArgv(selected.runner, policy);
+ 		return Promise.resolve({
+ 			argv: [
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -86,6 +86,7 @@
+  * else.
+  */
+ export declare class LocalSandboxProvider extends SandboxProvider {
++    readonly supportsReadOnlyPaths: true;
+     static Config: z<Config>;
+     /** Test hook (mirrors the bash executors' `internals`). */
+     internals: SandboxInternals;

@@ -1,0 +1,23 @@
+diff --git a/lib/index.js b/lib/index.js
+index ddbe0a0..f528fa3 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -340,6 +340,12 @@ const SANDBOX_UNAVAILABLE = "SANDBOX_UNAVAILABLE";
+ * mode. Carries {@link SANDBOX_UNAVAILABLE} through the structured error
+ * channel.
+ */
++var ReadOnlyPathUnsupportedError = class extends HarnessError {
++  constructor(detail) {
++    super(`Readonly path policy is unsupported: ${detail}. Session readonly paths remain protected in every sandbox mode.`, "READ_ONLY_PATH_UNSUPPORTED");
++    this.name = "ReadOnlyPathUnsupportedError";
++  }
++};
+ var SandboxUnavailableError = class extends HarnessError {
+ 	constructor(mode, detail) {
+ 		super(`sandbox mode "${mode}" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL restricted-token runner can start (Windows) — otherwise switch the consumer to danger-full-access.` + (detail === void 0 ? "" : ` Runner failure: ${detail}`), SANDBOX_UNAVAILABLE);
+@@ -366,4 +372,4 @@ var SandboxProvider = class extends Service {
+ 	}
+ };
+ //#endregion
+-export { ESCALATION_TARGETS, SANDBOX_UNAVAILABLE, SandboxInvalidRootError, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, SandboxUnsupportedPolicyError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, workspaceWritableRoots, writableRoots };
++export { ESCALATION_TARGETS, ReadOnlyPathUnsupportedError, SANDBOX_UNAVAILABLE, SandboxInvalidRootError, SandboxProvider, SandboxProvider as default, SandboxUnavailableError, SandboxUnsupportedPolicyError, WIDER_MODES, approveEscalation, canonicalPath, classifyRunnerFailure, escalationHintMarker, isRunnerSpawnFailure, matchesSignature, sandboxDenialMarker, sandboxPermissionsDescription, validateEscalationArgs, workspaceWritableRoots, writableRoots };

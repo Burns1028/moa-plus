@@ -29,7 +29,7 @@ it("auto-discovers the compiled bare package through public native Loader and wi
     ).toHaveLength(1);
     expect(
       f.ctx.typert.local.list().filter((p) => p.namespace === "projectMode"),
-    ).toHaveLength(8);
+    ).toHaveLength(9);
     const peer = new Peer(f.ctx, { principal: { kind: "owner" } });
     expect(
       await f.ctx.typertGateway.invoke({

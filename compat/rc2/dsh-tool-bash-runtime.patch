@@ -1,0 +1,131 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -23,7 +23,7 @@ function sandboxNotes(sandbox, escalationModes) {
+ 	if (sandbox?.runnerFailed) return [`[sandbox: the sandbox runner itself failed under ${sandbox.mode} mode — the command did not run; this is a sandbox problem, not a command failure]`];
+ 	if (sandbox?.denied) {
+ 		const notes = [sandboxDenialMarker(sandbox.mode)];
+-		if (escalationModes.length > 0) notes.push(escalationHintMarker("command"));
++		if (escalationModes.length > 0 && sandbox.mode !== "danger-full-access") notes.push(escalationHintMarker("command"));
+ 		return notes;
+ 	}
+ 	return [];
+@@ -159,7 +159,7 @@ function renderResult(result, escalationModes = []) {
+ 	const markers = [];
+ 	if (result.sandbox?.denied) {
+ 		markers.push(sandboxDenialMarker(result.sandbox.mode));
+-		if (escalationModes.length > 0) markers.push(escalationHintMarker("command"));
++		if (escalationModes.length > 0 && result.sandbox.mode !== "danger-full-access") markers.push(escalationHintMarker("command"));
+ 	}
+ 	if (result.timedOut) markers.push(`[timed out after ${result.timeoutMs}ms]`);
+ 	if (result.stopped !== void 0) markers.push(`[stopped: ${result.stopped}]`);
+@@ -200,7 +200,7 @@ function renderJobRead(delta, lossy, spillPaths, sandbox, escalationModes = [])
+ 	if (sandbox?.runnerFailed) notices.push(`[sandbox: the sandbox runner itself failed under ${sandbox.mode} mode — the command did not run; this is a sandbox problem, not a command failure]`);
+ 	else if (sandbox?.denied) {
+ 		notices.push(sandboxDenialMarker(sandbox.mode));
+-		if (escalationModes.length > 0) notices.push(escalationHintMarker("command"));
++		if (escalationModes.length > 0 && sandbox.mode !== "danger-full-access") notices.push(escalationHintMarker("command"));
+ 	}
+ 	if (notices.length === 0) return delta;
+ 	return `${delta}${delta.length > 0 && !delta.endsWith("\n") ? "\n" : ""}${notices.join("\n")}`;
+@@ -390,9 +390,13 @@ function apply(ctx, config = {}) {
+ 		const startJob = (registry, args, exec, spec) => {
+ 			let proc;
+ 			let stopped;
+-			return {
++			let managedDone;
++			let cancelManaged;
++			const managed = exec.background && args.run_in_background !== true;
++			const attached = {
+ 				id: registry.start({
+ 					kind: "bash",
++					...(managed ? { completionNotice: "producer" } : {}),
+ 					label: args.command,
+ 					toolCall: {
+ 						callId: exec.callId,
+@@ -406,23 +410,43 @@ function apply(ctx, config = {}) {
+ 								...spec,
+ 								signal
+ 							});
++							if (managed && !proc.managed) { proc.kill(); await proc.done; throw new Error("MOA requires managed shell exit capability"); }
+ 							return proc;
+ 						}, (started) => processOutcome(started, escalationModes));
+-						return {
+-							done: hooks.done,
+-							cancel: (reason) => {
+-								stopped = reason;
+-								hooks.cancel(reason);
+-							}
+-						};
++						managedDone = hooks.done.then(async outcome => {
++							if (managed && proc?.managed && !await proc.managed.waitForExit()) throw new Error("managed shell range did not exit");
++							return outcome;
++						});
++						cancelManaged = reason => { stopped = reason; hooks.cancel(reason); if (managed) proc?.managed?.terminate(); };
++						return { done: managedDone, cancel: cancelManaged };
+ 					}
+ 				}),
+ 				process: () => proc,
+-				stopped: () => stopped
++				stopped: () => stopped,
++				exited: () => managedDone.then(() => undefined)
+ 			};
++			if (managed) exec.background.bindProducer({ jobId: attached.id, exited: attached.exited(), cancel: cancelManaged });
++			return attached;
+ 		};
+ 		/** Wait on a registered foreground command until it settles or the timeout passes. */
+ 		const waitOnJob = async (registry, attached, exec, spec) => {
++			if (exec.background) {
++				const owner = exec.agent?.id;
++				const abort = () => registry.kill(attached.id, owner, "tool call aborted");
++				exec.signal.addEventListener("abort", abort, { once: true });
++				if (exec.signal.aborted) abort();
++				try {
++					try {
++						const view = await registry.wait(attached.id, spec.timeoutMs, owner, exec.signal);
++						if (view.status === "running" || view.status === "stopping") await exec.background.promote();
++					} finally { await attached.exited(); }
++					const process = attached.process();
++					if (!process) throw new Error("bash preparation failed");
++					const result = await process.result();
++					if (!exec.background.detached) registry.remove(attached.id, owner);
++					return { kind: "foreground", ...canonicalBashResult(result, spec.workdir), ...(attached.stopped() !== undefined ? { stopped: attached.stopped() } : {}) };
++				} finally { exec.signal.removeEventListener("abort", abort); }
++			}
+ 			const owner = exec.agent?.id;
+ 			const timeoutMs = spec.timeoutMs;
+ 			/**
+@@ -491,6 +515,7 @@ function apply(ctx, config = {}) {
+ 		};
+ 		return defineTool({
+ 			name: "bash",
++			supportsBackgroundProducer: true,
+ 			description: bashDescription(),
+ 			parameters: {
+ 				description: {
+@@ -652,6 +677,9 @@ function apply(ctx, config = {}) {
+ 				}],
+ 				presentationMeta: (_args, value) => ({ cwd: value.cwd })
+ 			},
++			projectContent(exec, result) {
++				return result.value?.sandbox?.denied && resolveSandboxPolicy(exec)?.readOnlyPaths?.length ? [...result.content, { type: "text", text: "Session read-only paths remain protected after escalation." }] : result.content;
++			},
+ 			async execute(args, exec) {
+ 				const standingPolicy = resolveSandboxPolicy(exec);
+ 				validateBashArgs(args, standingPolicy?.mode);
+@@ -701,7 +729,15 @@ function apply(ctx, config = {}) {
+ 					...request,
+ 					signal: exec.signal
+ 				});
+-				const result = await (await ctx.shell.execute(spec)).result();
++				const process = await ctx.shell.execute(spec);
++				let exited;
++				if (exec.background) {
++					if (!process.managed) { process.kill(); await process.done; throw new Error("MOA requires managed shell exit capability"); }
++					exited = process.managed.waitForExit().then(ok => { if (!ok) throw new Error("managed shell range did not exit"); });
++					exec.background.bindProducer({ exited, output: processSources(() => process), cancel: () => process.managed.terminate() });
++				}
++				let result;
++				try { result = await process.result(); } finally { await exited; }
+ 				if (result.aborted) throw toolAborted();
+ 				return {
+ 					kind: "foreground",

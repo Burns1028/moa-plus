@@ -1,0 +1,26 @@
+--- a/lib/types/types.d.ts
++++ b/lib/types/types.d.ts
+@@ -164,6 +164,7 @@
+  * Why a turn ended. Merge-extensible sum type.
+  */
+ export interface TurnEndReasonMap {
++    handoff: { kind: 'handoff'; cause: 'background-message'; calls: readonly BackgroundReceipt[]; triggeringMessageIds: readonly import('@deepseek-ai/dsh-llm/types').MessageId[] };
+     completed: {
+         kind: 'completed';
+     };
+@@ -554,4 +555,13 @@
+         };
+     }
+ }
+-//# sourceMappingURL=types.d.ts.map
+\ No newline at end of file
++//# sourceMappingURL=types.d.ts.map
++export interface ToolActivityIdentity {
++ readonly owner: SessionId;
++ readonly turn: number; readonly step: number;
++ readonly callSeq: SessionSeq;
++ readonly callId: import('@deepseek-ai/dsh-llm/types').ToolCallId;
++ readonly rootCallId: import('@deepseek-ai/dsh-llm/types').ToolCallId;
++}
++export type BackgroundCause = { readonly kind: 'after-seconds' | 'producer-promotion' } | { readonly kind: 'new-message' | 'llm-judge'; readonly messageIds: readonly import('@deepseek-ai/dsh-llm/types').MessageId[] };
++export interface BackgroundReceipt extends ToolActivityIdentity { readonly jobId: import('@deepseek-ai/dsh-jobs/brand').JobId; readonly cause: BackgroundCause; }

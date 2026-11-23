@@ -1,0 +1,39 @@
+--- a/lib/types/runtime-types.d.ts
++++ b/lib/types/runtime-types.d.ts
+@@ -155,6 +155,12 @@
+        * @param options - cancellation options; `keepInbox` preserves pending work.
+        */
+         cancel(cause: AgentCancelCause, options?: CancelOptions): void;
++        cancelAndJoin(cause: AgentCancelCause, options?: { continuation?: UserMessage }): Promise<void>;
++        enableToolBackground(options?: { readonly hasPendingResult?: () => boolean }): () => void;
++        readonly moaStopped: boolean;
++        readonly moaAborting: boolean;
++        readonly moaHasPendingBackground: boolean;
++
+         /**
+        * Resolve after the current whole-agent activity reaches quiescence. This
+        * follows replacement work started before the observed driver retires,
+@@ -407,4 +413,21 @@
+         }): void;
+     }
+ }
+-//# sourceMappingURL=runtime-types.d.ts.map
+\ No newline at end of file
++//# sourceMappingURL=runtime-types.d.ts.map
++import type { ToolActivityIdentity, BackgroundCause, BackgroundReceipt } from '@deepseek-ai/dsh-session/types';
++export type { ToolActivityIdentity, BackgroundCause, BackgroundReceipt } from '@deepseek-ai/dsh-session/types';
++export type BackgroundAdmission = { readonly kind: 'background'; readonly receipt: BackgroundReceipt } | { readonly kind: 'foreground'; readonly reason: 'settled' | 'aborted' | 'unavailable' };
++export interface ToolActivityStarted {
++ readonly agent: Agent; readonly identity: ToolActivityIdentity;
++ readonly execution: Readonly<import('@deepseek-ai/dsh-tools').ToolExecution>;
++ readonly finished: Promise<void>;
++ requestBackground(cause: BackgroundCause): Promise<BackgroundAdmission>;
++}
++declare module '@deepseek-ai/cordis' {
++ interface Events {
++  /** @mode emit */
++  'agent/tool-activity-started'(this: Scoped<Agent>, payload: ToolActivityStarted): void;
++  /** Canonical result, after paired placeholder durability and actual resource exit. @mode serial */
++  'agent/tool-background-result'(this: Scoped<Agent>, payload: { agent: Agent; receipt: BackgroundReceipt; result: import('@deepseek-ai/dsh-tools').ToolExecutionResult }): Promise<void>;
++ }
++}

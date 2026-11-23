@@ -93,6 +93,7 @@ assert.deepEqual(
   [
     "@deepseek-ai/dsh-client-ui-primitives",
     "react",
+    "react-dom",
     "react/jsx-runtime",
     "zod",
   ],
@@ -150,7 +151,7 @@ try {
   assert.equal(
     f.ctx.typert.local.list().filter((p) => p.namespace === "projectMode")
       .length,
-    8,
+    9,
   );
   const peer = new Peer(f.ctx, { principal: { kind: "owner" } });
   const calls = [];
@@ -208,7 +209,7 @@ try {
       nearestManifest: nearest.slice(process.cwd().length + 1),
       host: true,
       factory: true,
-      autoDiscoveredEndpoints: 8,
+      autoDiscoveredEndpoints: 9,
       clientGatewayRoundtrip: true,
       disposal: true,
     }),

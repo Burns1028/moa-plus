@@ -1,75 +1,102 @@
 import { expect, it } from "vitest";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { createUserMessage } from "@deepseek-ai/dsh-llm";
-import { fixture, response } from "./fixture.ts";
+import { fixture } from "./fixture.ts";
+import { identityMessage } from "../../packages/project-mode/src/host/prompts/identity.ts";
+import {
+  ensureContextIndex,
+  readNotes,
+  memoryPaths,
+  notesInjection,
+  contextIndexTemplate,
+} from "../../packages/project-mode/src/host/project-memory.ts";
 
-it("bootstraps an index for new projects and legacy context before either role's first request without loading document bodies", async () => {
+it("preserves every note character and warns only above 8000 Unicode code points", () => {
+  const exact = "🚀".repeat(8000);
+  expect(notesInjection(exact)).toBe(exact);
+  const over = exact + "\n末";
+  const injected = notesInjection(over);
+  expect(injected.startsWith(over)).toBe(true);
+  expect(injected.slice(over.length)).toMatch(/clean|prune|archiv/i);
+});
+
+it("places identity facts and reporting instructions in history content", () => {
+  const message = identityMessage({
+    id: "worker-1",
+    workdir: "/tmp/work",
+    isolated: true,
+    reportTo: "parent-1",
+    reportingInstructions: "Report evidence and blockers.",
+  });
+  expect(message).toContain("worker-1");
+  expect(message).toContain("/tmp/work");
+  expect(message).toContain("Isolated");
+  expect(message).toContain("parent-1");
+  expect(message).toContain("Report evidence and blockers.");
+  expect(
+    identityMessage({
+      id: "w",
+      workdir: "/tmp",
+      isolated: false,
+      reportTo: "p",
+      reportingInstructions: "done",
+    }),
+  ).toContain("Shared");
+});
+
+it("creates an index alongside legacy files through the acting agent filesystem without changing them", async () => {
   const f = await fixture();
   try {
     const { agent } = await f.ctx.agents.create({
-      sessionId: SessionId("memory-parent"),
+      sessionId: SessionId("moa-memory"),
       meta: { cwd: f.root },
       agentOptions: { provider: "test", model: "test" },
     });
-    const mode = await f.ctx.projectMode.setEnabled(agent.id, true, 0, "on");
-    const index = join(mode.paths!.context, "context.md");
-    expect(await readFile(index, "utf8")).toContain("# MoA context");
-    await rm(index);
-    await writeFile(
-      join(mode.paths!.context, "README.md"),
-      "LEGACY_DOCUMENT_BODY",
+    const paths = memoryPaths(join(f.root, "legacy"));
+    await mkdir(paths.context, { recursive: true });
+    await writeFile(join(paths.context, "context.md"), "legacy\r\n正文\n");
+    await writeFile(join(paths.context, "topic.md"), "topic body\n");
+    await writeFile(paths.notes, "full notes\r\n");
+    const { index: _index, ...legacyPaths } = paths;
+    const project = { workspacePath: f.root, paths: legacyPaths };
+    const signal = new AbortController().signal;
+    await ensureContextIndex(f.ctx, agent, project, signal);
+    expect(await readFile(paths.index, "utf8")).toContain(contextIndexTemplate);
+    expect(await readFile(paths.index, "utf8")).toContain("context.md");
+    expect(await readFile(paths.index, "utf8")).toContain("topic.md");
+    expect(await readNotes(f.ctx, agent, project, signal)).toBe(
+      "full notes\r\n",
     );
-    await writeFile(
-      join(mode.paths!.context, "findings.md"),
-      "DEFERRED_CONTEXT_BODY",
+    await writeFile(paths.index, "curated index\n");
+    await ensureContextIndex(f.ctx, agent, project, signal);
+    expect(await readFile(paths.index, "utf8")).toBe("curated index\n");
+    expect(await readFile(join(paths.context, "context.md"), "utf8")).toBe(
+      "legacy\r\n正文\n",
     );
-    f.adapter.handler = async (request) => {
-      const text = await readFile(index, "utf8");
-      expect(text).toContain("README.md");
-      expect(text).toContain("findings.md");
-      expect(text).not.toContain("DOCUMENT_BODY");
-      const prompt = JSON.stringify(request.messages);
-      expect(prompt).toContain(index);
-      expect(prompt).toContain("Read");
-      expect(prompt).not.toContain("DEFERRED_CONTEXT_BODY");
-      if (request.sessionId !== agent.id) {
-        expect(prompt).toContain("shared index");
-        // A worker's edits are retained when the coordinator resumes.
-        await writeFile(
-          index,
-          text + "\n- [worker.md](worker.md) — Worker findings.\n",
-        );
-      }
-      return response("done");
+    expect(await readFile(join(paths.context, "topic.md"), "utf8")).toBe(
+      "topic body\n",
+    );
+  } finally {
+    await f.dispose();
+  }
+});
+
+it("rejects memory paths outside the acting workspace", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("moa-escape"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    const project = {
+      workspacePath: f.root,
+      paths: memoryPaths(join(f.root, "..", "outside")),
     };
-    agent.followup(
-      createUserMessage({
-        source: { kind: "user" },
-        content: [{ type: "text", text: "Continue the project" }],
-      }),
-    );
-    await agent.whenIdle();
-    expect(await readFile(join(mode.paths!.context, "README.md"), "utf8")).toBe(
-      "LEGACY_DOCUMENT_BODY",
-    );
-    // A worker can encounter an older project without an index too.
-    await rm(index);
-    const receipt = (await f.ctx.projectMode.controlForAgent(
-      agent,
-      { action: "spawn", name: "writer", task: "Update shared knowledge" },
-      "spawn",
-      new AbortController().signal,
-    )) as { workerId: SessionId };
-    await f.ctx.agents.get(receipt.workerId)?.whenIdle();
-    await f.ctx.projectMode.snapshot(agent.id);
-    await agent.whenIdle();
-    expect(await readFile(index, "utf8")).toContain("Worker findings");
-    expect(
-      f.adapter.requests.some((r) => r.sessionId === receipt.workerId),
-    ).toBe(true);
-    expect(await readFile(mode.paths!.notes, "utf8")).toContain("Active tasks");
+    await expect(
+      ensureContextIndex(f.ctx, agent, project, new AbortController().signal),
+    ).rejects.toThrow("project-mode/path-escape");
   } finally {
     await f.dispose();
   }

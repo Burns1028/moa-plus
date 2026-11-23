@@ -1,0 +1,14 @@
+===================================================================
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -368,9 +368,9 @@
+ 			await ctx.subprocess.resolveExecutable(config.gitCommand, void 0, timeout.signal),
+ 			...GIT_PREFIX,
+ 			...args
+ 		];
+-		const argv = policy.mode === "danger-full-access" ? command : (await ctx.sandbox.confine(command, {
++		const argv = policy.mode === "danger-full-access" && !policy.readOnlyPaths?.length ? command : (await ctx.sandbox.confine(command, {
+ 			...policy,
+ 			mode: policy.mode
+ 		}, timeout.signal)).argv;
+ 		timeout.signal.throwIfAborted();

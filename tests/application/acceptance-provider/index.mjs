@@ -55,7 +55,7 @@ export class AcceptanceAdapter extends LlmAdapter {
     this.workerCalls = new Map();
   }
   providerInfo(provider) {
-    return { id: provider, name: "MoA Acceptance (scripted model)" };
+    return { id: provider, name: "Project Mode Acceptance (scripted model)" };
   }
   async listModels(provider) {
     return [
@@ -93,7 +93,7 @@ export class AcceptanceAdapter extends LlmAdapter {
   async *toolCalls(requests, options) {
     if (!(options.tools ?? []).some((t) => t.name === "control_workers")) {
       throw new Error(
-        "Acceptance requires native direct control_workers presentation; choose Standard preset and enable MoA.",
+        "Acceptance requires native direct control_workers presentation; choose Standard preset and enable Project Mode.",
       );
     }
     for (let index = 0; index < requests.length; index++) {
@@ -141,7 +141,9 @@ export class AcceptanceAdapter extends LlmAdapter {
       /\[PM WORK (normal|queue|stop|reuse|steer) ([\w-]+)\]/,
     );
     if (!marker)
-      throw new Error("MoA worker request has no acceptance assignment marker");
+      throw new Error(
+        "Project worker request has no acceptance assignment marker",
+      );
     const [, scenario, label] = marker;
     const sequence = (this.workerCalls.get(options.sessionId) ?? 0) + 1;
     this.workerCalls.set(options.sessionId, sequence);
@@ -253,7 +255,7 @@ export class AcceptanceAdapter extends LlmAdapter {
     }
     if (scenario === "probe") {
       yield* this.text(
-        `PM_PROBE effective_tools=${toolsOf(options.tools ?? []).join(",")}\nMoA role present=${options.messages.some((m) => textOf(m).includes("MoA coordinator"))}`,
+        `PM_PROBE effective_tools=${toolsOf(options.tools ?? []).join(",")}\nProject role present=${options.messages.some((m) => textOf(m).includes("Project's coordinator"))}`,
         options.signal,
       );
       return;
@@ -343,7 +345,7 @@ export class AcceptanceAdapter extends LlmAdapter {
       });
       if (!expected || !content.includes(expected))
         throw new Error(
-          "Canonical MoA result omitted part of the scripted worker final.",
+          "Canonical Project result omitted part of the scripted worker final.",
         );
     }
     if (results.length >= wanted) {
@@ -382,13 +384,15 @@ export class AcceptanceAdapter extends LlmAdapter {
       count,
       purpose: options.purpose ?? null,
       background: !!options.purpose,
-      role: roleText.includes("MoA worker")
+      role: roleText.includes("Project worker")
         ? "worker"
-        : roleText.includes("MoA coordinator")
+        : roleText.includes("Project's coordinator")
           ? "coordinator"
           : "ordinary",
       firstRolePresent:
-        count === 1 ? /MoA worker|MoA coordinator/.test(roleText) : undefined,
+        count === 1
+          ? /Project worker|Project's coordinator/.test(roleText)
+          : undefined,
       messageKinds: options.messages.map((m) => ({
         role: m.role,
         sourceKind: m.source?.kind ?? null,
@@ -398,11 +402,11 @@ export class AcceptanceAdapter extends LlmAdapter {
       signalAborted: options.signal?.aborted ?? false,
     });
     if (options.purpose) {
-      yield* this.text("MoA acceptance", options.signal, false);
+      yield* this.text("Project acceptance", options.signal, false);
       return;
     }
     try {
-      if (roleText.includes("MoA worker")) yield* this.worker(options);
+      if (roleText.includes("Project worker")) yield* this.worker(options);
       else yield* this.parent(options);
     } catch (error) {
       await this.record({

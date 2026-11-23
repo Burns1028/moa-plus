@@ -1,0 +1,65 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -364,6 +364,7 @@ function apply(ctx, config = {}) {
+ 		const startJob = (registry, args, exec, spec) => {
+ 			let proc;
+ 			let stopped;
++			let preparationFailure;
+ 			let managedDone;
+ 			let cancelManaged;
+ 			const managed = exec.background && args.run_in_background !== true;
+@@ -380,10 +381,15 @@ function apply(ctx, config = {}) {
+ 					output: processSources(() => proc),
+ 					run: () => {
+ 						const hooks = processJob(async (signal) => {
+-							proc = await ctx.shell.execute({
+-								...spec,
+-								signal
+-							});
++							try {
++								proc = await ctx.shell.execute({
++									...spec,
++									signal
++								});
++							} catch (error) {
++								preparationFailure = { error };
++								throw error;
++							}
+ 							if (managed && !proc.managed) { proc.kill(); await proc.done; throw new Error("MOA requires managed shell exit capability"); }
+ 							return proc;
+ 						}, (started) => processOutcome(started, escalationModes));
+@@ -396,6 +402,7 @@ function apply(ctx, config = {}) {
+ 					}
+ 				}),
+ 				process: () => proc,
++				preparationFailure: () => preparationFailure,
+ 				stopped: () => stopped,
+ 				exited: () => managedDone.then(() => undefined)
+ 			};
+@@ -415,7 +422,12 @@ function apply(ctx, config = {}) {
+ 						if (view.status === "running" || view.status === "stopping") await exec.background.promote();
+ 					} finally { await attached.exited(); }
+ 					const process = attached.process();
+-					if (!process) throw new Error("pwsh preparation failed");
++					if (!process) {
++						if (!exec.background.detached) registry.remove(attached.id, owner);
++						const failure = attached.preparationFailure();
++						if (failure) throw failure.error;
++						throw new Error("pwsh preparation failed");
++					}
+ 					const result = await process.result();
+ 					if (!exec.background.detached) registry.remove(attached.id, owner);
+ 					return { kind: "foreground", ...canonicalPwshResult(result, spec.workdir), ...(attached.stopped() !== undefined ? { stopped: attached.stopped() } : {}) };
+@@ -478,7 +490,11 @@ function apply(ctx, config = {}) {
+ 			}
+ 			registry.remove(attached.id, owner);
+ 			const process = attached.process();
+-			if (process === void 0) throw new Error(view.detail);
++			if (process === void 0) {
++				const failure = attached.preparationFailure();
++				if (failure) throw failure.error;
++				throw new Error(view.detail);
++			}
+ 			const result = await process.result();
+ 			const stopped = attached.stopped();
+ 			return {

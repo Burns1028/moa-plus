@@ -66,8 +66,11 @@ function safeDirectory(path) {
     "/bin",
     "/sbin",
     "/etc",
+    ...(process.platform === "win32"
+      ? [process.env.WINDIR, process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean)
+      : []),
     repository,
-  ];
+  ].map((path) => resolve(path));
   if (
     protectedPaths.some(
       (protectedPath) =>
@@ -264,7 +267,9 @@ function prerequisites(paths) {
 
 function nativeEntries() {
   return json(join(repository, "compat/rc3/manifest.json")).filter(
-    (entry) => entry.variant !== "desktop",
+    (entry, index, entries) =>
+      entry.variant !== "desktop" &&
+      entries.findIndex((other) => other.package === entry.package) === index,
   );
 }
 
@@ -303,7 +308,7 @@ function verifyNative(paths) {
   );
   if (!/Preflight passed for 0 native package patches;/.test(output))
     throw new Error(
-      "Runtime is unpatched or incomplete; setup must apply all three native compatibility patches.",
+      "Runtime is unpatched or incomplete; setup must apply all reviewed native compatibility extensions.",
     );
 }
 
@@ -447,10 +452,23 @@ function verifyRetry(paths, source) {
         `Refusing to overwrite changed owned profile ${name}; use a fresh --dir.`,
       );
   }
+  const variants = json(join(repository, "compat/rc3/manifest.json")).filter(
+    (entry) => entry.variant !== "desktop",
+  );
   for (const entry of nativeEntries())
     for (const file of entry.files) {
       const path = noSymlinks(join(paths.backup, entry.package, file.file));
-      if (stat(path) && hash(path) !== file.before)
+      if (
+        stat(path) &&
+        !variants
+          .filter((candidate) => candidate.package === entry.package)
+          .some((candidate) =>
+            candidate.files.some(
+              (preimage) =>
+                preimage.file === file.file && preimage.before === hash(path),
+            ),
+          )
+      )
         throw new Error(
           "Original native backup integrity changed; refusing to overwrite it.",
         );
@@ -492,7 +510,7 @@ function setup(paths) {
     run("npm", ["ci", "--no-audit", "--no-fund"], paths);
     stage = "plugin";
     const packDirectory = mkdtempSync(join(paths.artifacts, "pack-"));
-    const packed = JSON.parse(
+    const packed = Object.values(JSON.parse(
       run(
         "npm",
         [
@@ -506,7 +524,7 @@ function setup(paths) {
         paths,
         { cwd: repository, capture: true },
       ),
-    );
+    ));
     const pluginVersion = json(join(repository, "package.json")).version;
     const filename = packed[0]?.filename;
     if (
@@ -621,7 +639,7 @@ async function start(paths, args) {
   }
 }
 
-export async function main(argv) {
+async function main(argv) {
   const split = argv.indexOf("--");
   const options = split < 0 ? argv : argv.slice(0, split);
   const forwarded = split < 0 ? [] : argv.slice(split + 1);
@@ -631,7 +649,7 @@ export async function main(argv) {
     options.length === 0
   ) {
     console.log(
-      "Usage: node scripts/moa.mjs setup|start|doctor [--dir PATH] [-- WEB_ARGS]\n\nRequires Node 24.9+; setup also requires npm and Git. Default: ~/.dsh-project-mode/rc3\nsetup  Install the pinned Web runtime and the three audited compatibility patches.\nstart  Check and launch the isolated official DSH Web runtime.\ndoctor Check ownership, exact native versions, lock, archive and applied patch hashes.\n\nArguments after -- are forwarded to start; --host defaults to 127.0.0.1 and --port to 0.\nAll child processes use the isolated DSH_HOME; personal ~/.dsh and applications are untouched.",
+      "Usage: node scripts/moa.mjs setup|start|doctor [--dir PATH] [-- WEB_ARGS]\n\nRequires Node 24.9+; setup also requires npm and Git. Default: ~/.dsh-project-mode/rc3\nsetup  Install the pinned Web runtime and the reviewed compatibility extensions.\nstart  Check and launch the isolated official DSH Web runtime.\ndoctor Check ownership, exact native versions, lock, archive and applied patch hashes.\n\nArguments after -- are forwarded to start; --host defaults to 127.0.0.1 and --port to 0.\nAll child processes use the isolated DSH_HOME; personal ~/.dsh and applications are untouched.",
     );
     return 0;
   }
@@ -668,16 +686,15 @@ export async function main(argv) {
   if (command === "doctor") {
     inspect(paths);
     console.log(
-      `MoA+ runtime is ready; all three native patches are applied: ${paths.directory}`,
+      `MoA+ runtime is ready; all reviewed native extensions are applied: ${paths.directory}`,
     );
   }
   return command === "start" ? start(paths, forwarded) : 0;
 }
 
-if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+export async function runLauncher(moduleUrl) {
+  if (!process.argv[1] || resolve(process.argv[1]) !== fileURLToPath(moduleUrl))
+    return;
   try {
     process.exitCode = await main(process.argv.slice(2));
   } catch (error) {
@@ -685,3 +702,5 @@ if (
     process.exitCode = 1;
   }
 }
+
+await runLauncher(import.meta.url);

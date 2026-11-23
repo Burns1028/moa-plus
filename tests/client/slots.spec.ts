@@ -9,7 +9,7 @@ import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/clie
 import {
   apply,
   inject,
-} from "../../packages/moa/src/client/index.tsx";
+} from "../../packages/project-mode/src/client/index.tsx";
 import { nativeLoader } from "./native-loader.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { submissionFixture } from "./submission-fixture.ts";
@@ -164,7 +164,10 @@ it("registers on real native SlotRegistry without taking child owners, and unloa
             select({
               nodes: { values: () => [seat] },
               timeline: {
-                turns: new Map([[3, { end: closed ? {} : undefined }]]),
+                turns: new Map([[3, { end: closed ? {
+                  type: "turn/end", seq: 16, time: 16000,
+                  data: { turn: 3, reason: { kind: "completed" } },
+                } : undefined }]]),
               },
             }),
           useSession: (select: any) =>

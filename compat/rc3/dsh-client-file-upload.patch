@@ -1,0 +1,38 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -261,7 +261,7 @@ let FileUploads = (() => {
+ 			this.retire(agent.session, requestId);
+ 		}
+ 		async commit(agent, save) {
+-			this.assertOrdinaryAgent(agent);
++			this.assertUploadAgent(agent);
+ 			let file;
+ 			try {
+ 				file = await save();
+@@ -289,8 +289,13 @@ let FileUploads = (() => {
+ 			if (resolver === void 0) throw new RemoteError("session/not-found", `session "${sessionId}" is not attached`, { sessionId });
+ 			return resolver(sessionId);
+ 		}
+-		assertOrdinaryAgent(agent) {
+-			if (agent.session.header.origin === "subagent") throw new RemoteError("subagent/attachment-invalid", "subagent conversations do not accept file uploads", { reason: "SUBAGENT_FILE_UNSUPPORTED" });
++		assertUploadAgent(agent) {
++			if (agent.session.header.origin !== "subagent") return;
++			const parentId = agent.session.header.parentSession;
++			const parent = parentId === void 0 ? void 0 : this.ctx.agents.get(parentId);
++			const identity = this.ctx.get("sessionProjections")?.snapshot(agent.session, ["subagent"]).values.subagent;
++			if (this.ctx.agents.get(agent.id) === agent && parent !== void 0 && this.ctx.agents.isOwnedBy(agent.id, parent) && identity?.mode === "continuable" && identity.seq >= agent.session.inheritedEventCount) return;
++			throw new RemoteError("subagent/attachment-invalid", "file uploads require a live continuable child and its actual parent", { reason: "SUBAGENT_FILE_UNSUPPORTED" });
+ 		}
+ 		observeSessionEvent(session, event) {
+ 			if (event.type !== "user/message" || event.data.source.kind !== "user" || !("rpcId" in event.data.source)) return;
+--- a/lib/types/index.d.ts
++++ b/lib/types/index.d.ts
+@@ -75,7 +75,7 @@ export declare class FileUploads extends TypertRemoteService {
+     retirePrompt(agent: Agent, requestId: string): void;
+     private commit;
+     private resolveAgent;
+-    private assertOrdinaryAgent;
++    private assertUploadAgent;
+     private observeSessionEvent;
+     private retire;
+ }

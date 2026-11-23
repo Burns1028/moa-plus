@@ -1,0 +1,340 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -39,6 +39,7 @@ var SubagentError = class extends HarnessError {
+ const SESSION_ID_SCHEMA = z$1.string().min(1);
+ const CONTROL_ID_SCHEMAS = {
+ 	"subagent.prompt": z$1.object({
++		requestId: z$1.string().min(1),
+ 		parentSessionId: SESSION_ID_SCHEMA,
+ 		childSessionId: SESSION_ID_SCHEMA,
+ 		mode: z$1.literal("continuable"),
+@@ -74,6 +75,7 @@ function validateControlRequest(method, payload) {
+ function rejectPrompt(error, childSessionId, signal) {
+ 	if (isCancellation(error, signal)) throw new RemoteError("gateway/cancelled", "subagent prompt was cancelled", {}, { cause: error });
+ 	if (error instanceof AttachmentError) throw new RemoteError("subagent/attachment-invalid", error.message, { reason: error.code }, { cause: error });
++	if (error?.code === "subagent/attachment-invalid") throw error;
+ 	if (error instanceof SubagentError) switch (error.code) {
+ 		case "MODEL_DOES_NOT_SUPPORT_IMAGES": throw new RemoteError("subagent/attachment-invalid", error.message, { reason: error.code }, { cause: error });
+ 		case "NOT_RESUMABLE": throw new RemoteError("subagent/not-resumable", "subagent cannot be resumed", { childSessionId }, { cause: error });
+@@ -862,6 +864,7 @@ function isAdjacentAgentSendMessageTool(definition) {
+ * @internal
+ */
+ const deliverSubagentPrompt = Symbol.for("dsh.subagent.deliverPrompt");
++const withResidentChild = Symbol.for("dsh.subagent.withResidentChild");
+ //#endregion
+ //#region lib/types/structured.js
+ /**
+@@ -1851,7 +1854,9 @@ var SubagentManager = class {
+ 			ancestry: new WeakSet(resource.kind === "external" ? parentLineage : [resource.handle.agent, ...parentLineage]),
+ 			ownedChildren: /* @__PURE__ */ new Set(),
+ 			observer,
+-			announced: false
++			announced: false,
++			quiet: inputs.quiet === true,
++			hostUsers: 0
+ 		};
+ 		activation.result.promise.catch(() => void 0);
+ 		this.resident.set(childId, activation);
+@@ -1865,17 +1870,28 @@ var SubagentManager = class {
+ 			};
+ 			if (activation.kind === "local") {
+ 				observeLocalFailure(activation, wakeSettlement);
+-				activation.handle.agent.ctx.on("agent/inbox/inserted", wakeSettlement);
++				activation.handle.agent.ctx.on("agent/inbox/inserted", () => {
++					if (activation.quiet) {
++						activation.quiet = false;
++						activation.observer.start(activation.handle.agent);
++						this.announce(activation);
++					}
++					wakeSettlement();
++				});
+ 				activation.handle.agent.ctx.on("agent/inbox/claimed", () => {
+ 					activation.omitClosingText = false;
+ 					wakeSettlement();
+ 				});
+ 				activation.handle.agent.ctx.on("agent/inbox/discarded", wakeSettlement);
++				activation.handle.agent.ctx.on("agent/tool-activity-started", ({ finished }) => {
++					void finished.then(wakeSettlement, wakeSettlement);
++				});
++				activation.handle.agent.ctx.on("agent/tool-background-result", wakeSettlement);
+ 				activation.handle.agent.ctx.on("session/event", (_session, event) => {
+ 					if (event.type === "tool/call") activation.omitClosingText = false;
+ 				});
+ 			}
+-			observer.start(activationAgent(activation));
++			if (!activation.quiet) observer.start(activationAgent(activation));
+ 		} catch (error) {
+ 			/* v8 ignore next -- rollback failure must not mask the admission failure
+ 			* that prevented this operation from returning an accepted message id. */
+@@ -1983,7 +1999,7 @@ var SubagentManager = class {
+ 		if (activation.closing !== void 0) return "closed";
+ 		if (activation.poke !== observation) return "retry";
+ 		const inbox = activation.handle.agent.inbox;
+-		if (activation.ownedChildren.size > 0) return "wait";
++		if (activation.hostUsers > 0 || activation.ownedChildren.size > 0 || activation.handle.agent.moaHasPendingBackground) return "wait";
+ 		if (activation.failureAt === void 0 && (inbox.nextTurn.length > 0 || inbox.nextStep.length > 0)) return "wait";
+ 		return "ready";
+ 	}
+@@ -2052,14 +2068,14 @@ var SubagentManager = class {
+ 		};
+ 		this.notifySettlement(activation, result);
+ 		this.releaseOwnership(childId);
+-		activation.observer.settle(terminal);
++		if (!activation.quiet) activation.observer.settle(terminal);
+ 		if (resultFailure === void 0) activation.result.resolve(result);
+ 		else activation.result.reject(resultFailure.error);
+ 		if (failure !== void 0) throw failure;
+ 	}
+ 	/** Deliver the captured execution result to the durable direct parent after cleanup. */
+ 	notifySettlement(activation, terminal) {
+-		if (!activation.announced || activation.delivery === "caller") return;
++		if (activation.quiet || !activation.announced || activation.delivery === "caller") return;
+ 		try {
+ 			const parent = this.ctx.agents.get(activation.parent.id);
+ 			if (parent !== activation.parent) return;
+@@ -2148,11 +2164,100 @@ var SubagentManager = class {
+ 			throw new SubagentError("direct parent is not live; the message was not delivered", "PARENT_UNAVAILABLE", { cause: error });
+ 		}
+ 	}
++	/** Admit browser content against one exact child while its native lock is held. */
++	async prompt(parent, request, source, signal) {
++		const childId = request.childSessionId;
++		return this.withResidentChild(parent, childId, signal, async (agent) => this.locks.run(childId, async () => {
++			signal.throwIfAborted();
++			this.assertAdmitting(parent);
++			const activation = this.resident.get(childId);
++			if (activation === void 0 || requireLocalActivation(activation).handle.agent !== agent) throw new SubagentError("child residency changed before prompt admission", "ACTIVATION_CLOSING");
++			this.authorizeLineage(parent, childId, activation.parent.id);
++			if (activation.closing !== void 0) throw new SubagentError("child activation is closing", "ACTIVATION_CLOSING");
++			const ownEvents = agent.session.snapshotEvents().slice(agent.session.inheritedEventCount);
++			const descriptor = foldSubagentDescriptor(ownEvents);
++			if (descriptor?.mode !== "continuable") throw new SubagentError("child does not support continuation", "NOT_RESUMABLE");
++			const matches = (message) => message.source.kind === "user" && message.source.rpcId === request.requestId;
++			let accepted = agent.inbox.nextStep.find(matches) ?? agent.inbox.nextTurn.find(matches);
++			// Claim removes pending input before user/message commits. The durable
++			// insertion remains its acceptance receipt through that native window.
++			for (const event of ownEvents) {
++				if (accepted !== void 0) break;
++				accepted = event.type === "user/message" && matches(event.data) ? event.data : event.type === "agent/inbox/spliced" ? event.data.inserted.find(matches) : void 0;
++			}
++			if (accepted !== void 0) return { messageId: accepted.id };
++			const receiptIds = new Set();
++			const files = this.ctx.get("fileUploads");
++			const parts = request.content.map((part) => {
++				if (part.type !== "file") return part;
++				const attachment = files?.resolve(agent, part.receiptId);
++				if (attachment === void 0) throw new RemoteError("subagent/attachment-invalid", "File was not uploaded for this child session.", { reason: "FILE_NOT_STAGED" });
++				receiptIds.add(part.receiptId);
++				return attachment;
++			});
++			let content;
++			if (parts.every((part) => part.type === "text")) content = parts.map((part) => ({ type: "text", text: part.text }));
++			else {
++				const attachments = this.ctx.get("attachments");
++				if (attachments === void 0) throw new Error("subagent attachment prompt requires an attachment store");
++				content = await attachments.admitPromptContent(parts);
++			}
++			if (contentHasImage(content)) await this.assertImageCapable(agent, signal);
++			signal.throwIfAborted();
++			if (this.ctx.agents.get(childId) !== agent) throw new SubagentError("child was disposed during prompt admission", "ACTIVATION_CLOSING");
++			const binding = receiptIds.size === 0 ? void 0 : files.bindPrompt(agent, [...receiptIds], request.requestId);
++			try {
++				const messageId = this.submitAdmitted(activation, content, { source, signal, delivery: request.delivery }, parent);
++				binding?.commit();
++				this.announce(activation);
++				return { messageId };
++			} finally { binding?.[Symbol.dispose](); }
++		}), "parent");
++	}
++	/** Borrow one exact native residency for a Host callback, without a prompt. */
++	async withResidentChild(parent, childId, signal, use, settlementDelivery = "caller") {
++		this.assertAdmitting(parent);
++		this.assertLiveParent(parent, childId);
++		const releaseHold = this.holdOwnership(parent, childId);
++		let activation;
++		try {
++			while (!activation) {
++				signal.throwIfAborted();
++				const candidate = await this.locks.run(childId, async () => {
++					this.assertAdmitting(parent);
++					this.assertLiveParent(parent, childId);
++					let current = this.resident.get(childId);
++					if (current?.closing) return { closing: current.closing };
++					if (!current) current = await this.restoreLocal(parent, childId, { signal, settlementDelivery }, true);
++					requireLocalActivation(current);
++					this.authorizeLineage(parent, childId, current.parent.id);
++					current.hostUsers++;
++					return { activation: current };
++				});
++				if (candidate.closing) await Promise.allSettled([candidate.closing]);
++				else activation = candidate.activation;
++			}
++			signal.throwIfAborted();
++			return await use(requireLocalActivation(activation).handle.agent);
++		} finally {
++			if (activation) await this.locks.run(childId, async () => {
++				activation.hostUsers--;
++				this.announce(activation);
++				this.wake(activation);
++			});
++			releaseHold();
++		}
++	}
+ 	/**
+ 	* Cold-resume a persisted child and submit the waiting turn. The descriptor
+ 	* supplies every reconstruction input; no subagent provider is dispatched.
+ 	*/
+ 	async coldResume(parent, childId, content, options) {
++		const activation = await this.restoreLocal(parent, childId, options);
++		return this.submitMaterialized(activation, content, options, parent);
++	}
++	/** Reconstruct the native child without admitting invented input. */
++	async restoreLocal(parent, childId, options, quiet = false) {
+ 		const env_1 = {
+ 			stack: [],
+ 			error: void 0,
+@@ -2183,6 +2288,8 @@ var SubagentManager = class {
+ 					childId,
+ 					provider: descriptor.provider,
+ 					parent,
++					quiet,
++					...(quiet ? { delivery: options.settlementDelivery ?? "caller" } : {}),
+ 					agentOptions: {
+ 						...descriptor.agentProvider !== void 0 ? { provider: descriptor.agentProvider } : {},
+ 						...descriptor.agentModel !== void 0 ? { model: descriptor.agentModel } : {},
+@@ -2200,7 +2307,7 @@ var SubagentManager = class {
+ 				if (error instanceof SubagentError) throw error;
+ 				throw new SubagentError(`subagent "${childId}" is unavailable`, "NOT_RESUMABLE", { cause: error });
+ 			}
+-			return await this.submitMaterialized(activation, content, options, parent);
++			return activation;
+ 		} catch (e_1) {
+ 			env_1.error = e_1;
+ 			env_1.hasError = true;
+@@ -3099,6 +3206,9 @@ let SubagentRuntime = (() => {
+ 		* @param delivery - Queue as a distinct turn or Steer at the nearest step.
+ 		* @returns the accepted message's inbox id.
+ 		*/
++		[withResidentChild](parent, childId, signal, use) {
++			return this.requireManager().withResidentChild(parent, childId, signal, use);
++		}
+ 		[deliverSubagentPrompt](parent, childId, content, source, signal, delivery) {
+ 			return delivery === "steer" ? this.requireManager().steerPrompt(parent, childId, content, source, signal) : this.requireManager().queuePrompt(parent, childId, content, source, signal);
+ 		}
+@@ -3214,17 +3324,7 @@ let SubagentRuntime = (() => {
+ 				...principal === void 0 ? {} : { principal }
+ 			};
+ 			try {
+-				let content;
+-				if (request.content.every((part) => part.type === "text")) content = request.content.map((part) => ({
+-					type: "text",
+-					text: part.text
+-				}));
+-				else {
+-					const attachments = this.ctx.get("attachments");
+-					if (attachments === void 0) throw new Error("subagent image prompt requires an attachment store");
+-					content = await attachments.admitPromptContent(request.content);
+-				}
+-				return { messageId: await this[deliverSubagentPrompt](parent, childSessionId, content, source, signal, delivery) };
++				return await this.requireManager().prompt(parent, request, source, signal);
+ 			} catch (error) {
+ 				return rejectPrompt(error, childSessionId, signal);
+ 			}
+--- a/lib/typert.host.js
++++ b/lib/typert.host.js
+@@ -28,6 +28,9 @@ const _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0$schema = () => (_de
+   'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).readonly(),
+   'data': z.string().readonly(),
+   'name': z.string().readonly().optional(),
++}), z.object({
++  'type': z.literal("file").readonly(),
++  'receiptId': z.string().readonly(),
+ })])).readonly().describe('Browser prompt parts delivered as the child\'s user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate.'),
+   'clientTimeZone': z.string().readonly().optional().describe('Optional browser zone sampled for this exact human prompt.'),
+ }))
+@@ -56,6 +59,9 @@ const _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0_strict$schema = ()
+   'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).readonly(),
+   'data': z.string().readonly(),
+   'name': z.string().readonly().optional(),
++}), z.strictObject({
++  'type': z.literal("file").readonly(),
++  'receiptId': z.string().readonly(),
+ })])).readonly().describe('Browser prompt parts delivered as the child\'s user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate.'),
+   'clientTimeZone': z.string().readonly().optional().describe('Optional browser zone sampled for this exact human prompt.'),
+ }))
+@@ -142,13 +148,13 @@ const $remote = createTypertRemoteInfo({
+             mode: 'strict',
+             typeSymbol: '@deepseek-ai/dsh-subagent/client#SubagentPromptRequest',
+             create: _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0$schema,
+-            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":true}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":true},
++            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":true}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":true},
+           },
+           strictCodec: {
+             mode: 'strict',
+             typeSymbol: '@deepseek-ai/dsh-subagent/client#SubagentPromptRequest',
+             create: _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0_strict$schema,
+-            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":false}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":false},
++            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":false}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":false},
+           },
+         },
+       ],
+@@ -874,7 +880,7 @@ export const TYPERT = {
+           },
+           {
+             "name": "SubagentPromptRequest",
+-            "declaration": "export interface SubagentPromptRequest {\n    readonly requestId: SubagentPromptRequestId;\n    readonly parentSessionId: SessionId;\n    readonly childSessionId: SessionId;\n    readonly mode: 'continuable';\n    readonly delivery: 'queue' | 'steer';\n    readonly content: readonly PromptContentPart[];\n    readonly clientTimeZone?: string;\n}"
++            "declaration": "export interface SubagentPromptRequest {\n    readonly requestId: SubagentPromptRequestId;\n    readonly parentSessionId: SessionId;\n    readonly childSessionId: SessionId;\n    readonly mode: 'continuable';\n    readonly delivery: 'queue' | 'steer';\n    readonly content: readonly (PromptContentPart | { readonly type: 'file'; readonly receiptId: Branded<'file-upload-receipt-id'>; })[];\n    readonly clientTimeZone?: string;\n}"
+           },
+           {
+             "name": "SubagentPromptRequestId",
+--- a/lib/typert.remote-client.js
++++ b/lib/typert.remote-client.js
+@@ -28,6 +28,9 @@ const _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0$schema = () => (_de
+   'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).readonly(),
+   'data': z.string().readonly(),
+   'name': z.string().readonly().optional(),
++}), z.object({
++  'type': z.literal("file").readonly(),
++  'receiptId': z.string().readonly(),
+ })])).readonly().describe('Browser prompt parts delivered as the child\'s user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate.'),
+   'clientTimeZone': z.string().readonly().optional().describe('Optional browser zone sampled for this exact human prompt.'),
+ }))
+@@ -56,6 +59,9 @@ const _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0_strict$schema = ()
+   'mediaType': z.union([z.literal("image/png"), z.literal("image/jpeg"), z.literal("image/webp"), z.literal("image/gif")]).readonly(),
+   'data': z.string().readonly(),
+   'name': z.string().readonly().optional(),
++}), z.strictObject({
++  'type': z.literal("file").readonly(),
++  'receiptId': z.string().readonly(),
+ })])).readonly().describe('Browser prompt parts delivered as the child\'s user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate.'),
+   'clientTimeZone': z.string().readonly().optional().describe('Optional browser zone sampled for this exact human prompt.'),
+ }))
+@@ -142,13 +148,13 @@ export const TYPERT_REMOTE = createTypertRemoteInfo({
+             mode: 'strict',
+             typeSymbol: '@deepseek-ai/dsh-subagent/client#SubagentPromptRequest',
+             create: _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0$schema,
+-            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":true}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":true},
++            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":true}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":true},
+           },
+           strictCodec: {
+             mode: 'strict',
+             typeSymbol: '@deepseek-ai/dsh-subagent/client#SubagentPromptRequest',
+             create: _deepseek_ai_dsh_subagent_subagents_prompt_parameter_0_strict$schema,
+-            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":false}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":false},
++            jsonSchema: {"type":"object","properties":{"requestId":{"type":"string","description":"Identity persisted on the accepted message, minted before the call."},"parentSessionId":{"type":"string"},"childSessionId":{"type":"string"},"mode":{"type":"string","const":"continuable","description":"Required discriminator retained from the browser control address."},"delivery":{"type":"string","enum":["queue","steer"],"description":"Whether this message queues a later turn or targets the nearest step."},"content":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"text"},"text":{"type":"string"}},"required":["type","text"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"image"},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"]},"data":{"type":"string"},"name":{"type":"string"}},"required":["type","mediaType","data"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"file"},"receiptId":{"type":"string"}},"required":["type","receiptId"],"additionalProperties":false}]},"description":"Browser prompt parts delivered as the child's user message. The Host admits and persists image parts before delivery, so the wire never carries a durable attachment reference the caller could fabricate."},"clientTimeZone":{"type":"string","description":"Optional browser zone sampled for this exact human prompt."}},"required":["requestId","parentSessionId","childSessionId","mode","delivery","content"],"additionalProperties":false},
+           },
+         },
+       ],
+--- a/lib/types/internal.js
++++ b/lib/types/internal.js
+@@ -55,4 +55,8 @@ export function queueHostSubagentPrompt(runtime, parent, childId, content, sourc
+ export function steerHostSubagentPrompt(runtime, parent, childId, content, source, signal) {
+     return runtime[deliverSubagentPrompt](parent, childId, content, source, signal, 'steer');
+ }
+-//# sourceMappingURL=internal.js.map
+\ No newline at end of file
++//# sourceMappingURL=internal.js.map
++export const withResidentChild = Symbol.for("dsh.subagent.withResidentChild");
++export function withResidentSubagent(runtime, parent, childId, signal, use) {
++    return runtime[withResidentChild](parent, childId, signal, use);
++}

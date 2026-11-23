@@ -8,13 +8,13 @@ import { typertPlugin } from "@deepseek-ai/dsh-typert-generator/tsdown";
 import { execFileSync } from "node:child_process";
 import { withProtocolWorkspace } from "./typert-workspace.mjs";
 import { resolve } from "node:path";
-const cwd = resolve("packages/moa");
+const cwd = resolve("packages/project-mode");
 execFileSync(
   process.execPath,
   [
     "node_modules/typescript/bin/tsc",
     "-p",
-    "packages/moa/tsconfig.json",
+    "packages/project-mode/tsconfig.json",
   ],
   { stdio: "inherit" },
 );
@@ -54,7 +54,7 @@ await withProtocolWorkspace(async () => {
 // A syntactically valid but empty artifact is not a successful Remote build.
 const { default: remote } = await import(
   new URL(
-    "../packages/moa/lib/typert.remote-client.js",
+    "../packages/project-mode/lib/typert.remote-client.js",
     import.meta.url,
   )
 );
@@ -62,6 +62,7 @@ const expected = [
   "catalog",
   "control",
   "follow",
+  "followWorkerParent",
   "history",
   "mode",
   "setEnabled",
@@ -84,14 +85,14 @@ execFileSync(
   [
     "node_modules/typescript/bin/tsc",
     "-p",
-    "packages/moa/tsconfig.client.json",
+    "packages/project-mode/tsconfig.client.json",
     "--noEmit",
     "false",
     "--declaration",
     "--outDir",
-    "packages/moa/lib/types",
+    "packages/project-mode/lib/types",
     "--rootDir",
-    "packages/moa/src",
+    "packages/project-mode/src",
   ],
   { stdio: "inherit" },
 );
@@ -102,10 +103,11 @@ await build({
   format: "cjs",
   platform: "browser",
   target: "es2024",
+  loader: { ".png": "dataurl" },
   dts: false,
   clean: false,
   deps: {
-    neverBundle: [/^react(?:\/|$)/, "zod"],
+    neverBundle: [/^react(?:-dom)?(?:\/|$)/, "zod"],
     alwaysBundle: [/^@deepseek-ai\/dsh-(?:typert-protocol|util-workspace-path)(?:\/|$)/],
     onlyBundle: [/^@deepseek-ai\/dsh-(?:typert-protocol|util-workspace-path)(?:\/|$)/],
   },

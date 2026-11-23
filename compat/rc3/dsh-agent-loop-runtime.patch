@@ -1,0 +1,347 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -503,6 +503,124 @@
+ * @param signal - abort signal shared by the step.
+ * @param acceptContext - accepts committed result context for the next step boundary.
+ */
++
++/** One logged root's transferable lifetime. Jobs own admission; the batch owns pairing. */
++class MoaRootActivity {
++ constructor(ctx, agent, identity, block, signal) {
++  Object.assign(this, { ctx, agent, identity, block, signal });
++  this.producers = []; this.settled = false;
++  this.completion = Promise.withResolvers(); this.placeholder = Promise.withResolvers();
++  this.placeholder.promise.catch(() => {});
++  this.finished = this.completion.promise;
++  this.finished.catch(error => agent.dispatch.emit("agent/error", { turn: identity.turn, step: identity.step, error }));
++  agent.moaActivities.add(this);
++  this.finished.then(() => agent.moaActivities.delete(this), () => {});
++  const self = this;
++  this.background = {
++   get detached() { return self.receipt !== undefined; },
++   bindProducer(producer) {
++    self.producers.push(producer);
++    if (self.cancelled) producer.cancel("tool call aborted");
++   },
++   promote: () => this.requestBackground({ kind: "producer-promotion" })
++  };
++ }
++ cancel(reason) {
++  this.cancelled = true;
++  this.activity?.cancel(reason);
++  const errors = [];
++  for (const producer of this.producers) try { producer.cancel(typeof reason === "string" ? reason : "tool call aborted"); } catch (error) { errors.push(error); }
++  if (errors.length) throw new AggregateError(errors, "producer cancellation failed");
++ }
++ async joinProducers() { await Promise.all(this.producers.map(p => p.exited)); }
++ async complete() {
++  try { await this.joinProducers(); this.completion.resolve(); }
++  catch (error) { this.completion.reject(error); throw error; }
++ }
++ start(exec) {
++  this.exec = exec;
++  this.slot = Promise.withResolvers();
++  this.activity = this.ctx.tools[TOOL_RUNTIME_SCHEDULER].start(exec);
++  if (this.cancelled) this.activity.cancel(this.signal.reason);
++  this.activity.dispatch.then(async outcome => {
++   this.settled = true;
++   if (!this.receipt) {
++    this.slot.resolve({ exec, result: outcome.result, needsPost: outcome.kind === "post-result", root: this });
++    return;
++   }
++   try {
++    const runtime = this.ctx.tools[TOOL_RUNTIME_SCHEDULER];
++    const result = outcome.kind === "post-result" ? await runtime.finalize(exec, outcome.result) : runtime.finish(exec, outcome.result);
++    this.resultFailed = result.isError;
++    await this.joinProducers();
++    try { await this.placeholder.promise; }
++    catch { this.completion.resolve(); return; } // driver reports the failed acknowledgment
++    try { await this.agent.dispatch.serial("agent/tool-background-result", { receipt: this.receipt, result }); }
++    catch (error) { this.agent.dispatch.emit("agent/error", { turn: this.identity.turn, step: this.identity.step, error }); }
++    // Result persistence is a controller obligation, not a live process.
++    this.completion.resolve();
++   } catch (error) { this.completion.reject(error); }
++  }, error => { this.slot.reject(error); this.completion.reject(error); });
++  this.agent.dispatch.emit("agent/tool-activity-started", {
++   identity: this.identity, execution: exec, finished: this.finished,
++   requestBackground: cause => this.requestBackground(cause)
++  });
++  return this.slot.promise;
++ }
++ requestBackground(cause) {
++  if (this.transfer) return this.transfer;
++  const pending = Promise.withResolvers();
++  this.transfer = pending.promise;
++  this.admitBackground(cause).then(result => {
++   if (result.kind === "foreground") this.transfer = undefined;
++   pending.resolve(result);
++  }, pending.reject);
++  return pending.promise;
++ }
++ async admitBackground(cause) {
++  if (this.receipt) return { kind: "background", receipt: this.receipt };
++  if (this.cancelled || this.exec?.signal.aborted || this.signal.aborted) return { kind: "foreground", reason: "aborted" };
++  if (this.settled || !this.activity) return { kind: "foreground", reason: "settled" };
++  const jobs = this.ctx.get("jobs");
++  if (!jobs) return { kind: "foreground", reason: "unavailable" };
++  let jobId;
++  try {
++   const direct = this.block.name !== "run_code" && this.producers.length === 1 ? this.producers[0] : undefined;
++   jobId = direct?.jobId ?? jobs.start({
++    kind: "moa-tool", label: this.block.name, owner: this.agent.id,
++    completionNotice: "producer",
++    toolCall: { callId: this.identity.callId, rootCallId: this.identity.rootCallId },
++    output: direct?.output,
++    run: () => ({ cancel: reason => this.cancel(reason), done: this.finished.then(() => ({ status: this.cancelled ? "killed" : this.resultFailed ? "failed" : "completed" }), error => ({ status: "failed", detail: String(error) })) })
++   });
++   if (this.cancelled || this.exec.signal.aborted || this.signal.aborted) {
++    jobs.kill(jobId, this.agent.id, "aborted during transfer");
++    return { kind: "foreground", reason: "aborted" };
++   }
++  } catch { return { kind: "foreground", reason: "unavailable" }; }
++  this.activity.releaseCaller();
++  this.receipt = { ...this.identity, jobId, cause };
++  this.slot.resolve({ root: this, background: this.receipt });
++  return { kind: "background", receipt: this.receipt };
++ }
++ async commitPlaceholder(session, turn, step, block, callSeq) {
++  try {
++   const handle = JSON.stringify([this.identity.owner, this.identity.callSeq]);
++   appendToolResult(session, turn, step, block, {
++    content: [{ type: "text", text: `Tool running in background. tool_call_id: ${handle}; native job: ${this.receipt.jobId}. Use query_background_tool or cancel_background_tool. The complete result will be delivered automatically.` }],
++    isError: false, meta: { moaBackground: this.receipt, tool_call_id: handle }
++   }, callSeq);
++   await this.ctx.sessions.flush(session);
++   this.placeholderCommitted = true;
++   this.placeholder.resolve();
++  } catch (error) {
++   this.placeholder.reject(error); this.placeholder.promise.catch(() => {});
++   this.cancel(error); await this.activity.exited; await this.joinProducers();
++   throw error;
++  }
++ }
++}
++
+ async function executeToolCalls(ctx, turn, step, toolCalls, signal, acceptContext) {
+ 	const agent = ctx.agents.requireInitiator();
+ 	const { session } = agent;
+@@ -517,6 +635,7 @@
+ 		}
+ 	}));
+ 	let next = 0;
++	const transfers = [];
+ 	let concluded = false;
+ 	while (next < planned.length) {
+ 		const first = planned[next];
+@@ -524,12 +643,14 @@
+ 		const outcome = await runGroup(ctx, turn, step, mode === "parallel" ? planned.slice(next) : [first], mode, signal, acceptContext);
+ 		next += outcome.consumed;
+ 		concluded ||= outcome.concluded;
++		transfers.push(...outcome.transfers);
+ 		if (outcome.aborted) {
+ 			for (const call of planned.slice(next)) appendSkippedToolCall(session, turn, step, call.block);
+ 			return { concluded };
+ 		}
+ 	}
+-	return { concluded };
++	const calls = transfers.filter(r => r.cause.kind === "new-message" || r.cause.kind === "llm-judge");
++	return { concluded, ...(calls.length ? { handoff: { kind: "handoff", cause: "background-message", calls, triggeringMessageIds: [...new Set(calls.flatMap(r => r.cause.messageIds))] } } : {}) };
+ }
+ /** Parse model arguments, preserving invalid JSON as text and mapping empty input to `{}`. */
+ function parseArguments(raw) {
+@@ -551,6 +672,8 @@
+ async function runGroup(ctx, turn, step, group, mode, signal, acceptContext) {
+ 	const { session } = ctx.agents.requireInitiator();
+ 	const maxParallelToolCalls = ctx.agentLoop.config.maxParallelToolCalls.get();
++	const transfers = [];
++	const roots = [];
+ 	const slots = group.map(() => void 0);
+ 	const callSeqs = group.map(() => void 0);
+ 	let nextToStart = 0;
+@@ -567,10 +690,15 @@
+ 			const slot = slots[committed];
+ 			if (slot === void 0) break;
+ 			const call = group[committed];
++			if (slot.background) {
++				await slot.root.commitPlaceholder(session, turn, step, call.block, callSeqs[committed]);
++				transfers.push(slot.background); committed++; continue;
++			}
+ 			const result = slot.needsPost ? await ctx.tools[TOOL_RUNTIME_SCHEDULER].finalize(slot.exec, slot.result) : ctx.tools[TOOL_RUNTIME_SCHEDULER].finish(slot.exec, slot.result);
+ 			appendToolResult(session, turn, step, call.block, result, callSeqs[committed]);
+ 			for (const context of result.additionalContexts ?? []) acceptContext(context);
+ 			concluded ||= result.concludesTurn === true;
++			await slot.root?.complete();
+ 			committed++;
+ 		}
+ 	};
+@@ -579,10 +707,27 @@
+ 		const call = group[index];
+ 		callSeqs[index] = appendToolCall(session, turn, step, call.block);
+ 		started++;
+-		const prepared = await ctx.tools[TOOL_RUNTIME_SCHEDULER].prepare(call.exec);
+-		throwSchedulerFailure();
++		const agent = call.exec.agent;
++		const root = agent.toolBackgroundEnabled ? new MoaRootActivity(ctx, agent, {
++			owner: agent.id, turn, step, callSeq: callSeqs[index], callId: call.block.id, rootCallId: call.block.id
++		}, call.block, signal) : undefined;
++		if (root) roots.push(root);
++		let prepared;
++		try {
++			prepared = await ctx.tools[TOOL_RUNTIME_SCHEDULER].prepare(call.exec, root ? { transferable: true, background: root.background } : undefined);
++			throwSchedulerFailure();
++		} catch (error) {
++			// No body was dispatched; release the admission and any policy-bound resources.
++			root?.cancel(error);
++			await root?.complete();
++			throw error;
++		}
+ 		switch (prepared.kind) {
+ 			case "dispatch": {
++				if (root) {
++					inFlight.set(index, root.start(prepared.exec).then(slot => { slots[index] = slot; return index; }, error => { schedulerFailure ??= { error }; return index; }));
++					break;
++				}
+ 				const promise = ctx.tools[TOOL_RUNTIME_SCHEDULER].dispatch(prepared.exec).then((outcome) => {
+ 					slots[index] = {
+ 						exec: prepared.exec,
+@@ -600,6 +745,7 @@
+ 			case "post-result":
+ 				slots[index] = {
+ 					exec: prepared.exec,
++					root,
+ 					result: prepared.result,
+ 					needsPost: true
+ 				};
+@@ -607,6 +753,7 @@
+ 			case "final-result":
+ 				slots[index] = {
+ 					exec: prepared.exec,
++					root,
+ 					result: prepared.result,
+ 					needsPost: false
+ 				};
+@@ -641,11 +788,23 @@
+ 	} catch (error) {
+ 		schedulerFailure ??= { error };
+ 		await Promise.allSettled(inFlight.values());
++		// The normal commit lane did not visit all roots. Release their native
++		// resource lifetimes while the driver repairs any missing Tool Messages.
++		const cleanup = await Promise.allSettled(roots.map(async root => {
++			if (!root.receipt) return root.complete();
++			if (root.placeholderCommitted) return;
++			root.placeholder.reject(schedulerFailure.error);
++			root.cancel(schedulerFailure.error);
++			await root.finished;
++		}));
++		const failures = cleanup.filter(item => item.status === "rejected").map(item => item.reason);
++		if (failures.length) throw new AggregateError([schedulerFailure.error, ...failures], "tool scheduler cleanup failed");
+ 		throw schedulerFailure.error;
+ 	}
+ 	if (aborted) {
+ 		for (const call of group.slice(started)) appendSkippedToolCall(session, turn, step, call.block);
+ 		return {
++			transfers,
+ 			consumed: group.length,
+ 			aborted: true,
+ 			concluded
+@@ -654,6 +813,7 @@
+ 	/* v8 ignore next -- unreachable: a non-aborted group commits every started call */
+ 	if (committed !== started) throw new Error("tool-call scheduler: uncommitted settled calls");
+ 	return {
++		transfers,
+ 		consumed: started,
+ 		aborted: false,
+ 		concluded
+@@ -752,6 +912,47 @@
+ 	inbox;
+ 	phase;
+ 	activityDone = Promise.resolve();
++	moaActivities = new Set();
++	toolBackgroundEnabled = false;
++	joinBoundary;
++	moaStopped = false;
++	get moaAborting() {
++		return this.joinBoundary !== undefined || (this.phase.kind !== "idle" && this.phase.abort.signal.aborted);
++	}
++	get moaHasPendingBackground() {
++		return [...this.moaActivities].some(root => root.receipt !== undefined) || this.moaPendingResult?.() === true;
++	}
++	enableToolBackground(options = {}) {
++		if (!this.ctx.get("jobs")) throw new Error("MOA background requires native jobs");
++		this.toolBackgroundEnabled = true;
++		this.moaPendingResult = options.hasPendingResult;
++		return () => { this.toolBackgroundEnabled = false; this.moaPendingResult = undefined; };
++	}
++	cancelAndJoin(cause, options = {}) {
++		if (this.joinBoundary) return this.joinBoundary.then(() => this.cancelAndJoin(cause, options));
++		const boundary = Promise.withResolvers();
++		this.joinBoundary = boundary.promise;
++		this.moaStopped = true;
++		const oldDriver = this.activityDone;
++		this.cancel(cause);
++		const roots = [...this.moaActivities];
++		const cancellations = [];
++		for (const root of roots) try { root.cancel(cause); } catch (error) { cancellations.push(error); }
++		(async () => {
++			await oldDriver;
++			const joined = await Promise.allSettled(roots.map(root => root.finished));
++			for (const result of joined) if (result.status === "rejected") cancellations.push(result.reason);
++			if (cancellations.length) throw new AggregateError(cancellations, "MOA resource join failed");
++			await this.loopCtx.sessions.flush(this.session);
++			if (options.continuation) {
++				this.inbox.prepend("next-step", options.continuation);
++				await this.loopCtx.sessions.flush(this.session);
++			}
++			this.joinBoundary = undefined;
++			if (options.continuation) { this.moaStopped = false; this.wakeDriver(); }
++		})().then(boundary.resolve, boundary.reject);
++		return boundary.promise;
++	}
+ 	/** The agent-scoped registration boundary; the lifecycle owner unwinds it after the driver exits. */
+ 	scope;
+ 	ctx;
+@@ -798,6 +999,7 @@
+ 		if (status !== previousStatus) this.dispatch.emit("agent/status", { status });
+ 	}
+ 	send(message, target, wakeup) {
++		if (wakeup && !this.joinBoundary) this.moaStopped = false;
+ 		const wakingAfterAbort = wakeup && this.phase.kind !== "idle" && this.phase.abort.signal.aborted;
+ 		const resolvedTarget = wakingAfterAbort ? "next-turn" : target;
+ 		this.inbox.splice(resolvedTarget, Infinity, 0, [message]);
+@@ -852,6 +1054,7 @@
+ 	*   the inbox insertion so a reentrant cancel cannot reclassify it.
+ 	*/
+ 	wakeDriver(wakeAfterAbort = false) {
++		if (this.joinBoundary || this.moaStopped) return;
+ 		if (this.phase.kind !== "idle") {
+ 			if (abortedCancelCause(this.phase.abort.signal)?.kind !== "disposed" && (this.phase.kind === "maintenance" || wakeAfterAbort)) this.phase.wakeRequested = true;
+ 			return;
+@@ -997,6 +1200,7 @@
+ 					});
+ 				}
+ 				signal.throwIfAborted();
++				if (turnEnds?.kind === "handoff") break;
+ 				if (turnEnds && this.inbox.nextStep.length === 0) {
+ 					await this.dispatch.serial("agent/turn-stopping", {
+ 						turn,
+@@ -1163,8 +1367,8 @@
+ 				if (finish.kind === "max-tokens") return { kind: "max-tokens" };
+ 				const toolCalls = message.content.filter((block) => block.type === "tool-call");
+ 				if (toolCalls.length === 0) return { kind: "completed" };
+-				const { concluded } = await executeToolCalls(this.loopCtx, turn, step, toolCalls, signal, (context) => this.inbox.splice("next-step", this.inbox.nextStep.length, 0, [context]));
+-				return concluded ? { kind: "completed" } : null;
++				const { concluded, handoff } = await executeToolCalls(this.loopCtx, turn, step, toolCalls, signal, (context) => this.inbox.splice("next-step", this.inbox.nextStep.length, 0, [context]));
++				return handoff ?? (concluded ? { kind: "completed" } : null);
+ 			} catch (error) {
+ 				if (!live.ended) live.abandon();
+ 				throw error;
+@@ -1711,8 +1915,7 @@
+ 				if (machine === void 0) await machineReady.promise;
+ 				/* v8 ignore next -- setup failure untracks this disposer before resolving without a machine. */
+ 				if (machine !== void 0) {
+-					machine.cancel({ kind: "disposed" });
+-					await machine.whenIdle();
++					await machine.cancelAndJoin({ kind: "disposed" });
+ 				}
+ 			} catch (error) {
+ 				failures.push(error);

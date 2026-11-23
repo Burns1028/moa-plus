@@ -1,0 +1,724 @@
+[
+  {
+    "package": "@deepseek-ai/dsh-agent-loop",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-agent-loop-runtime.patch",
+    "runtimePatch": "dsh-agent-loop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "a6fa8e0c7c90191caf5f4a3bb5c624a86e9845cf3c79d020b71420d0e20ae4c1",
+        "after": "4802d139bb777ccfb2c6119a6f16ce60676da240ea14555e938a6dd89c321742"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "46c976d782f778e3d44abe8b538d93af96f966ab26ab56225d980202e4062bd7",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-bash-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-bash-local-runtime.patch",
+    "runtimePatch": "dsh-bash-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "6d9b4426b8455198b79de398f57c0f5693e7292411059b66d5ac5eba608b59cb",
+        "after": "7ae72faf336af9c105726db6d4bcd295f42c238f5c3423b8481e55e644fcab51"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "d467c78c43a8fa74a78bc58e838af661dd8748f4f8e568b5f528993b0a9d8bed",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-jobs-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-jobs-local-runtime.patch",
+    "runtimePatch": "dsh-jobs-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "cecdc8a766f62b28999ffff574008d34a39e276d91c4cc648f10ccb18afbed34",
+        "after": "07227a8369c26f3a7d927264fe5b0d3fe3d74e5df2287390b7497666325e9fff"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-pwsh-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-pwsh-local-runtime.patch",
+    "runtimePatch": "dsh-pwsh-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "6bea799112c6c2821ad41430acb2b3b5195abd1c6863ba507e1c494b29382be3",
+        "after": "cb04d8e10f5d17583b25ba01ca81d5d72cf94832e0539c9a55242a7e94282663"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "d467c78c43a8fa74a78bc58e838af661dd8748f4f8e568b5f528993b0a9d8bed",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-bash",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-tool-bash-runtime.patch",
+    "runtimePatch": "dsh-tool-bash-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "ae6be2d8b287b5e410d026acd2fdfc553ebb95565f7b361029c7fb5bcda5fd27",
+        "after": "4f6e85a5b65d87617be02ce7d4b4f7da5c77ee6edbc9520eff062bc44a2102a7"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-jobs",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-tool-jobs-runtime.patch",
+    "runtimePatch": "dsh-tool-jobs-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "7461570ac5d29f85b27b228d551911f392e5082651e93b83723b77e9b87de0b6",
+        "after": "636a0f147c77333d0850febefa1857895c15cd321b1c10570c2fb42c5e9438db"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-jobs",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-observation-upgrade",
+    "patch": "dsh-tool-jobs-observation-upgrade-runtime.patch",
+    "runtimePatch": "dsh-tool-jobs-observation-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "81c4f9f7a31e99757ae90667e922298312fdc39b9a56f9d1b7994941c4a77928",
+        "after": "636a0f147c77333d0850febefa1857895c15cd321b1c10570c2fb42c5e9438db"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-pwsh",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-tool-pwsh-runtime.patch",
+    "runtimePatch": "dsh-tool-pwsh-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "157aa3964db76e64d3013e63daed72a61d7fc5f86b247b0103753290d7dd6ed9",
+        "after": "40b0bc20d2a0e60818f20fff67ada3e6757e3b26f36c76c29b309f0dbf240d5b"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-pwsh",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-job-error-upgrade",
+    "patch": "dsh-tool-pwsh-job-error-upgrade-runtime.patch",
+    "runtimePatch": "dsh-tool-pwsh-job-error-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "6423b1fa123bfb4dcdc94954e1aa83b0f4df1b3846271bd50debca3cdb9ca395",
+        "after": "40b0bc20d2a0e60818f20fff67ada3e6757e3b26f36c76c29b309f0dbf240d5b"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-pwsh-persistent",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-tool-pwsh-persistent-runtime.patch",
+    "runtimePatch": "dsh-tool-pwsh-persistent-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "b9ecb0e226244bf7da74519a9d725feaab6efbc6ce1e74e97f1c7d68261499a9",
+        "after": "47f2cacb439cb6e4680ab12e05e3f2ad5dfa9e0e1226998d9c57072467c37dc1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "46c976d782f778e3d44abe8b538d93af96f966ab26ab56225d980202e4062bd7",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tools",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-tools-runtime.patch",
+    "runtimePatch": "dsh-tools-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd",
+        "after": "66ecc9c1b40516ed8dd28e48e32dd60380b2d3c35ce4bc9c4dece33bb96f07b5"
+      },
+      {
+        "file": "lib/pipeline.js",
+        "before": "f6c850cefce30831c4c5f160e831856b105935331bacd1ae0823129001614bc6",
+        "after": "9c41beec32f77ee71a5db3e61d39b8c07ab86561f8bece456dc00be3447d6279"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "d4fed716d62532c83018a0f578354bc77333f8724550a5da5876d8c33ea8f79c",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-api-session-controller",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-2.0.22",
+    "patch": "dsh-api-session-controller-desktop-runtime.patch",
+    "runtimePatch": "dsh-api-session-controller-desktop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/client.js",
+        "before": "13a1b441f7fe7fa7698a3352b1904e5645fd844e6f63a7c1c5fcef415cfcae4c",
+        "after": "9807f18d97996f380ad8af56b65cb6d9e54d6742db319114ed6e64fe8edcaf31"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "9b1350c54b61d31440f12fb2221c675bd39c779902fd9b4ebb95a0680619e567",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-client-file-upload",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-2.0.22",
+    "patch": "dsh-client-file-upload-desktop-runtime.patch",
+    "runtimePatch": "dsh-client-file-upload-desktop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "b17e3621ce127ceb4f68919acdeeac64c54cf64c5d42429be8a7a65b5d20bbfe",
+        "after": "bca40f219fd1d85a84ebb5f44c42b5bc022f66475cdbd2d08a19a63753c9afab"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "dec23e04cde3fe7a7642d1c226e2005b2df27df7286ac6a36564a6dfd566cb8a",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-client-ui-conversation",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-2.0.22",
+    "patch": "dsh-client-ui-conversation-desktop-runtime.patch",
+    "runtimePatch": "dsh-client-ui-conversation-desktop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/client.js",
+        "before": "b2b7439f354a9850963f1ef72ee0e63761709a5555d74bbc543bc1ed8888e2f5",
+        "after": "7ad07e0b8a05263bdf90d58073a06534baced280a8a72d2b0192a1dc63e71dfc"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "1646026ae997e4d612ca33f8115df0e36329d85f37788a03c94f4559257648ee",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-client-ui-workspace",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-2.0.22",
+    "patch": "dsh-client-ui-workspace-desktop-runtime.patch",
+    "runtimePatch": "dsh-client-ui-workspace-desktop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/client.js",
+        "before": "89b32d7916cb56dacb40d36d91fadbd627c1890fe84eb357a5ba9bfdd21c901b",
+        "after": "b98927100a6ac470235088a5dd2766fbb33a73d9dca8ae7b18b6e19d9e77f3d5"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "f297536fbdb07001c47d16e65d7a439fe4489a4362cffb99e076fe04d397ebeb",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-subagent",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-2.0.22",
+    "patch": "dsh-subagent-desktop-runtime.patch",
+    "runtimePatch": "dsh-subagent-desktop-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "5aad8aadee1879f1e8a878431630f885adbe6f9ee9cb1832838abbc56bc1fbea",
+        "after": "925e64c51c17d3dd69f5ea934e60320bca7fc051dd9c8a1dcea6324417705bdb"
+      },
+      {
+        "file": "lib/typert.host.js",
+        "before": "e9352006100139a00f468b9b3bfbe4fce13e2fa4aa8e75cf901da7333a81246e",
+        "after": "c7cc4f775dbb14946c8761d77fff9eb3a1968647017114631dc057d6df15cf87"
+      },
+      {
+        "file": "lib/typert.remote-client.js",
+        "before": "516f97739c4d1b9cfc80a37f83a56de07c2fa0aaf52b325090d898da4f1bff80",
+        "after": "ac035807e8566863d7ab616a98a48245ec571291f562b3afca20c0efeda023d9"
+      },
+      {
+        "file": "lib/types/internal.js",
+        "before": "e08b14221f417b73024e62e0466ec745ab9b45ecbcdca0c302ccc800ddadca6d",
+        "after": "8b30bb284bf0a0904f79a1686e9abf768459b32e9773527818443a121daf93d9"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "ae9638ace67b9a6163fc3ad133a4f65538bde349e2645848c0b4a7c00ab8d045",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-sandbox-runtime.patch",
+    "runtimePatch": "dsh-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "9ece3e7b04d5526441e2439431d769acf67abc46fa49de000dd9c792893eb5e7",
+        "after": "2ab3cb85017fa668bcbc41f9a3fd84518d9a30cd011d5f0e640c3c0de6316201"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-policy",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-sandbox-policy-runtime.patch",
+    "runtimePatch": "dsh-sandbox-policy-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "8eb1674f9c3c2e336efae7ecc734d5197dc8b80bc29f1f1d61bfe0b5a1472188",
+        "after": "d2dc010907cfd12ef09ac9aed44a6c2e2fcab9ce0e367d0b22b4109dedccbf68"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs-sandbox",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-fs-sandbox-runtime.patch",
+    "runtimePatch": "dsh-fs-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "f4edd14bf48f8d5bfdea10a61c6651ccde99f2d08a79855746ad2a8d89c6fb73",
+        "after": "1fdb141d577494eb6d7d7c54f56e3423719871c16a1be761b03d7400ed8fcb6b"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-bash-sandbox",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-bash-sandbox-runtime.patch",
+    "runtimePatch": "dsh-bash-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "0f788f99113ba7411eb33af71cdafabd07b73cf012c1715c819e03f3f77f342d",
+        "after": "aaa8449d1cd6fc969a68854ade901e992c52425bc6cbe69b249701d06ebabaa1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-bash-sandbox",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-record-protection-upgrade",
+    "patch": "dsh-bash-sandbox-record-protection-upgrade-runtime.patch",
+    "runtimePatch": "dsh-bash-sandbox-record-protection-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "cd3573a90d5f8bb1210500e0c1a9cf2c81056b18adf56906307ebe18fa8f8b90",
+        "after": "aaa8449d1cd6fc969a68854ade901e992c52425bc6cbe69b249701d06ebabaa1"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-pwsh-sandbox",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-pwsh-sandbox-runtime.patch",
+    "runtimePatch": "dsh-pwsh-sandbox-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "bed19d2cea875b152f9e811116b59c2a45e6711b1c6cf1d8bacc4d20e15c6783",
+        "after": "b2a59428d221a3e9213b0408cedccfd1ebb3cde00f93bc620f0561415e8d27d0"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-pwsh-sandbox",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-record-protection-upgrade",
+    "patch": "dsh-pwsh-sandbox-record-protection-upgrade-runtime.patch",
+    "runtimePatch": "dsh-pwsh-sandbox-record-protection-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "235599574d859e2cce0d0fb5be01dea0b401654bc20b10235defed40e4c337c7",
+        "after": "b2a59428d221a3e9213b0408cedccfd1ebb3cde00f93bc620f0561415e8d27d0"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-sandbox-local-runtime.patch",
+    "runtimePatch": "dsh-sandbox-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "e0c94d075333b1e2c43f20975be5f840db7335f374df85b303cb674067605b9b",
+        "after": "b6db18fb94468283ac9fe8a95c2bc4f6716e266967e33c6edaebab1439a179c9"
+      },
+      {
+        "file": "package.json",
+        "before": "b44fdfd2dbb3dd1b7cfaf598390652db1ccbfa47e0935c7673ae8031416cd9e1",
+        "after": "9590a63efede92c7f055a34ccf7aa739a3209baa0ca4911ef91cdbf40f2d9405"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next-record-protection-upgrade",
+    "patch": "dsh-sandbox-local-record-protection-upgrade-runtime.patch",
+    "runtimePatch": "dsh-sandbox-local-record-protection-upgrade-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "1c9423dbcd51ad1445f03e4c828f5bcda9e7a3db651374b4214623528c3d1653",
+        "after": "b6db18fb94468283ac9fe8a95c2bc4f6716e266967e33c6edaebab1439a179c9"
+      },
+      {
+        "file": "package.json",
+        "before": "b44fdfd2dbb3dd1b7cfaf598390652db1ccbfa47e0935c7673ae8031416cd9e1",
+        "after": "9590a63efede92c7f055a34ccf7aa739a3209baa0ca4911ef91cdbf40f2d9405"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-fs-runtime.patch",
+    "runtimePatch": "dsh-fs-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "b749b4d67d0249d7416a8a409ee171c453f928f7920a9bc26a23451369280761",
+        "after": "e33ec987be6b126d9ccb8f830ea65f90960d2fc58f1e3703313a7c5b263209c5"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-tool-executor-ptc",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-tool-executor-ptc-desktop.patch",
+    "runtimePatch": "dsh-tool-executor-ptc-desktop.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "aab21d46e71316a97ad2a071ab7d8d21aa876c4192a4cd98094f61b2800cad9a",
+        "after": "50eadb8d4ecdc86d7ce7fa62b9991fff7f9fce20bf9eda340a320a8882c16093"
+      },
+      {
+        "file": "lib/types/index.js",
+        "before": "f087461d30c17018530b8fd6f3670083c21a2c9b77205e050e196b6e02816484",
+        "after": "32b678b48a1f71f61560a970b298f26287a4e86dd1f0f1ef2ae3f9b36aa40b7c"
+      },
+      {
+        "file": "lib/types/ptc.js",
+        "before": "b6e9ebda4104c21069688cef2be4524814f0b7d48ca71e01362a11b15cc31c05",
+        "after": "5b2a17dc79db54db99a365d267fa86ce3d57a2544613686c59286a1e46b2f668"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "a928a8e3fd397eabaf55fdec5e2344ce1ec659db81c77fae59b6ee4551ee03ba",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-agent",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "files": [],
+    "runtimeFingerprint": {
+      "package": "ed07c61c0d7426c185284bd5694a92f66d105278cbc22da8a29e69e0cff80a6a",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "8673b5cfadfbb6e6ce0bcb341d0ea2877adc2986eab1c2b6c8baf32726534c92"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-session",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "files": [],
+    "runtimeFingerprint": {
+      "package": "be0f5881be6f1ca08fa4a032fed23d19e5655cb575a3c22d7086dbe486876617",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "6fad466aa1f7aa64bfa038681ead5721f66c88e9891e25d357d2b8edbccd5494"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-jobs",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "files": [],
+    "runtimeFingerprint": {
+      "package": "da0e9a85a80e111e1027e118a75ba12befc0f70c939b84b0aa8f82c309662b28",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "7a7531c2fb1897603fdf0ec78ae9cef63f6a32688b1023168fbe9d8f782e2887"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-shell",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "files": [],
+    "runtimeFingerprint": {
+      "package": "4e35dd645180374c75a07c1bd39c6af7ecdf67eee0d2169cda3ead0053a92e52",
+      "files": [
+        {
+          "file": "lib/index.js",
+          "sha256": "6c5aa32fda2d92ef827d949480fd32cb4867f811ce06e875e70c59ab2c9261b1"
+        }
+      ]
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-sandbox-windows-acl",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-sandbox-windows-acl-runtime.patch",
+    "runtimePatch": "dsh-sandbox-windows-acl-runtime.patch",
+    "files": [
+      {
+        "file": "lib/types-DFdfvhLN.js",
+        "before": "f978bf3db9b0c204b82a313d29c80a5e54727be9d7d444c8cff5f06433e24b1b",
+        "after": "f3cbe89773e9053102744b4aa3fa8ed2a7171ce87801d0c867770b59bad01c22"
+      },
+      {
+        "file": "lib/index.js",
+        "before": "39521d34ebf042c43355d6756ef689b8da05a89c1724f5182d758f94cee4c6c2",
+        "after": "527574d4dd346134b981bf57924122a0a59b81b8f6c83e97bf3dd6d16d0a0dce"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "560ff582267375b829545883718f08be3326096e9cdff75f17e6f8634a827afa",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-fs-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-fs-local-runtime.patch",
+    "runtimePatch": "dsh-fs-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "8988540a9e1cec5706f1a69b582cd2f479f3e8c09accde278eca7309842265e1",
+        "after": "5ef8cf310bcb19354802ea6c842ce370d8d72533b495d7fdea4d7c5a55545cd6"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "d467c78c43a8fa74a78bc58e838af661dd8748f4f8e568b5f528993b0a9d8bed",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-subprocess-local",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-subprocess-local-runtime.patch",
+    "runtimePatch": "dsh-subprocess-local-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "2964d94d6aa735f79e5cd5f54035a9d73b371e8060dda7e3bf666593428c04f4",
+        "after": "92c89e5ff4ba32e8f624995b154a03cfc743a8fd072e678c169c7fd71a16d43f"
+      },
+      {
+        "file": "package.json",
+        "before": "4e2825116c763d364d659b08915a3e53b1d532f390a1e289d56cc57354ad8563",
+        "after": "90d7d7fdbd930c629d59a298db38d4c91a4a6bc2e0ac9859fa5eeea5dfd80eb7"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "2480851c9d31d53df9f237fd4e6a25ff41c683592813a2af1a42e55f0e224fd0",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-ptc-runtime-node",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-ptc-runtime-node-runtime.patch",
+    "runtimePatch": "dsh-ptc-runtime-node-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "0fd248bdc955604db5e1c741963e343a5234aba39f792ad0df8cdac0489d073b",
+        "after": "50c28d84860baf448775204d7aa96c4d83bbfe40e6c30aa2c5cbccd3d083c294"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "5ccc1b3fed0cd2f65330f4bff2000c571bd4653cad9a3bde1a7ed4138f275e65",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-terminal-bash",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-terminal-bash-runtime.patch",
+    "runtimePatch": "dsh-terminal-bash-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "5f018757298e7a1995e2f8d7c47ecd7f016207da1d078394a3c6b38b13ae048b",
+        "after": "ec2146542e12e8f8c3053b37fdf8839fe0c4c2aa43d45f25074d3b957a463022"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "7a7de9f136bc27b3f690b894f9faeb6150a479016652f48725241860e1200bdd",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-experimental-worktree",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-experimental-worktree-runtime.patch",
+    "runtimePatch": "dsh-experimental-worktree-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "aa0f2f39ed653a1bfa761f93f759279b9251d68e69344db61b0f20d797cc2e58",
+        "after": "a51f7cf4ad1499b773caebc5a09ba3b22f67117603081b3f762a61952d9ac8a4"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "d467c78c43a8fa74a78bc58e838af661dd8748f4f8e568b5f528993b0a9d8bed",
+      "files": []
+    }
+  },
+  {
+    "package": "@deepseek-ai/dsh-experimental-client-ui-forge",
+    "version": "0.2.2-rc.1",
+    "variant": "desktop-next",
+    "patch": "dsh-experimental-client-ui-forge-runtime.patch",
+    "runtimePatch": "dsh-experimental-client-ui-forge-runtime.patch",
+    "files": [
+      {
+        "file": "lib/index.js",
+        "before": "1c94962b75b1d397d2f67f6be01f3f6a9c38f8a7b72d848fc9ad4b733d0b65a6",
+        "after": "7d2354e0af26482ec61d0139753fcfc236c8bc5a55f2784c2d4cf65cd8b19de5"
+      }
+    ],
+    "runtimeFingerprint": {
+      "package": "d4c4d388fa38d9f484bfab4ade22482bea9ffa179ec34f7c3fd9bbe52df007cb",
+      "files": []
+    }
+  }
+]

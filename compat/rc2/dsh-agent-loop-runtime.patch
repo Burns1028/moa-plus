@@ -1,0 +1,93 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -517,6 +517,47 @@ var ReactLoopAgent = class {
+ 	inbox;
+ 	phase;
+ 	activityDone = Promise.resolve();
++	moaActivities = new Set();
++	toolBackgroundEnabled = false;
++	joinBoundary;
++	moaStopped = false;
++	get moaAborting() {
++		return this.joinBoundary !== undefined || (this.phase.kind !== "idle" && this.phase.abort.signal.aborted);
++	}
++	get moaHasPendingBackground() {
++		return [...this.moaActivities].some(root => root.receipt !== undefined) || this.moaPendingResult?.() === true;
++	}
++	enableToolBackground(options = {}) {
++		if (!this.ctx.get("jobs")) throw new Error("MOA background requires native jobs");
++		this.toolBackgroundEnabled = true;
++		this.moaPendingResult = options.hasPendingResult;
++		return () => { this.toolBackgroundEnabled = false; this.moaPendingResult = undefined; };
++	}
++	cancelAndJoin(cause, options = {}) {
++		if (this.joinBoundary) return this.joinBoundary.then(() => this.cancelAndJoin(cause, options));
++		const boundary = Promise.withResolvers();
++		this.joinBoundary = boundary.promise;
++		this.moaStopped = true;
++		const oldDriver = this.activityDone;
++		this.cancel(cause, { keepInbox: options.keepInbox });
++		const roots = [...this.moaActivities];
++		const cancellations = [];
++		for (const root of roots) try { root.cancel(cause); } catch (error) { cancellations.push(error); }
++		(async () => {
++			await oldDriver;
++			const joined = await Promise.allSettled(roots.map(root => root.finished));
++			for (const result of joined) if (result.status === "rejected") cancellations.push(result.reason);
++			if (cancellations.length) throw new AggregateError(cancellations, "MOA resource join failed");
++			await this.loopCtx.sessions.flush(this.session);
++			if (options.continuation) {
++				this.inbox.prepend("next-step", options.continuation);
++				await this.loopCtx.sessions.flush(this.session);
++			}
++			this.joinBoundary = undefined;
++			if (options.continuation) { this.moaStopped = false; this.wakeDriver(); }
++		})().then(boundary.resolve, boundary.reject);
++		return boundary.promise;
++	}
+ 	/** The agent-scoped registration boundary; the lifecycle owner unwinds it after the driver exits. */
+ 	scope;
+ 	ctx;
+@@ -562,6 +603,7 @@ var ReactLoopAgent = class {
+ 		if (status !== previousStatus) this.dispatch.emit("agent/status", { status });
+ 	}
+ 	send(message, target, wakeup) {
++		if (wakeup && !this.joinBoundary) this.moaStopped = false;
+ 		const wakingAfterAbort = wakeup && this.phase.kind !== "idle" && this.phase.abort.signal.aborted;
+ 		const resolvedTarget = wakingAfterAbort ? "next-turn" : target;
+ 		this.inbox.splice(resolvedTarget, Infinity, 0, [message]);
+@@ -616,6 +658,7 @@ var ReactLoopAgent = class {
+ 	*   the inbox insertion so a reentrant cancel cannot reclassify it.
+ 	*/
+ 	wakeDriver(wakeAfterAbort = false) {
++		if (this.joinBoundary || this.moaStopped) return;
+ 		if (this.phase.kind !== "idle") {
+ 			if (abortedCancelCause(this.phase.abort.signal)?.kind !== "disposed" && (this.phase.kind === "maintenance" || wakeAfterAbort)) this.phase.wakeRequested = true;
+ 			return;
+@@ -787,6 +830,7 @@ var ReactLoopAgent = class {
+ 					decision.toolSet.dispose();
+ 				}
+ 				signal.throwIfAborted();
++				if (turnEnds?.kind === "handoff") break;
+ 				if (turnEnds && this.inbox.nextStep.length === 0) {
+ 					await this.dispatch.serial("agent/turn-stopping", {
+ 						turn,
+@@ -970,7 +1014,7 @@ var ReactLoopAgent = class {
+ 						toolSet: decision.toolSet
+ 					});
+ 					for (const context of result.additionalContexts) this.inbox.splice("next-step", this.inbox.nextStep.length, 0, [context]);
+-					return result.concluded ? { kind: "completed" } : null;
++					return result.handoff ?? (result.concluded ? { kind: "completed" } : null);
+ 				} catch (error) {
+ 					if (!(error instanceof ToolBatchExecutionError)) throw error;
+ 					for (const context of error.partial.additionalContexts) this.inbox.splice("next-step", this.inbox.nextStep.length, 0, [context]);
+@@ -1483,8 +1527,7 @@ var AgentLoop = class extends Service {
+ 				if (machine === void 0) await machineReady.promise;
+ 				/* v8 ignore next -- setup failure untracks this disposer before resolving without a machine. */
+ 				if (machine !== void 0) {
+-					machine.cancel({ kind: "disposed" }, { keepInbox: !ready });
+-					await machine.whenIdle();
++					await machine.cancelAndJoin({ kind: "disposed" }, { keepInbox: !ready });
+ 				}
+ 			} catch (error) {
+ 				failures.push(error);

@@ -1,0 +1,28 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,5 +1,6 @@
+-import { SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature, matchesSignature as matchesSignature$1 } from "@deepseek-ai/dsh-sandbox";
++import { ReadOnlyPathUnsupportedError, SandboxUnavailableError, classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature, matchesSignature as matchesSignature$1 } from "@deepseek-ai/dsh-sandbox";
+ import { LocalBashExecutor } from "@deepseek-ai/dsh-bash-local";
++
+ //#region lib/types/helpers.js
+ /**
+ * Classify a failed run against the selected backend's denial dialect.
+@@ -36,6 +37,7 @@
+ 		"sandboxPolicy"
+ 	];
+ 	mode;
++	get supportsReadOnlyPaths() { return this.ctx.sandbox.supportsReadOnlyPaths === true ? true : void 0; }
+ 	/**
+ 	* Per-process confinement facts retained until settlement. Providers may
+ 	* vary enforcement and diagnostic dialect between overlapping calls, so a
+@@ -65,7 +67,8 @@
+ 	async execute(spec) {
+ 		const policy = spec.sandboxPolicy;
+ 		const { mode } = policy;
+-		if (mode === "danger-full-access") return SandboxBashExecutor.decorateResult(await super.execute(spec), (result) => ({
++		if (policy.readOnlyPaths?.length && !this.supportsReadOnlyPaths) throw new ReadOnlyPathUnsupportedError("the selected process sandbox cannot enforce session readonly paths; use the matching native sandbox provider");
++		if (mode === "danger-full-access" && !policy.readOnlyPaths?.length) return SandboxBashExecutor.decorateResult(await super.execute(spec), (result) => ({
+ 			...result,
+ 			sandbox: {
+ 				mode,

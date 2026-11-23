@@ -1,7 +1,7 @@
-import type { MoASnapshot } from "../../packages/moa/src/shared/index.ts";
+import type { ProjectSnapshot } from "../../packages/project-mode/src/shared/index.ts";
 import type { SessionId } from "@deepseek-ai/dsh-session/types";
 export const sid = (s: string) => s as SessionId;
-export const snapshot = (): MoASnapshot => ({
+export const snapshot = (): ProjectSnapshot => ({
   project: {
     version: 1,
     id: "p",

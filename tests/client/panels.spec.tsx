@@ -6,18 +6,27 @@ import {
   screen,
   fireEvent,
   act,
-  waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Context } from "@deepseek-ai/cordis";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type * as Renderer from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type * as Conversation from "@deepseek-ai/dsh-client-ui-conversation/client";
-import { apply, inject } from "../../packages/moa/src/client/index.tsx";
+import {
+  apply,
+  inject,
+} from "../../packages/project-mode/src/client/index.tsx";
 import { nativeLoader } from "./native-loader.ts";
 import { submissionFixture } from "./submission-fixture.ts";
 import { snapshot, sid } from "./fixture.ts";
-import { en } from "../../packages/moa/src/client/locales.ts";
+import { en } from "../../packages/project-mode/src/client/locales.ts";
+import type {
+  SessionModeView,
+  WorkerMessageAttachment,
+  WorkerTimelineTurn,
+} from "../../packages/project-mode/src/shared/index.ts";
+import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 
 const dispose: (() => unknown)[] = [];
 afterEach(async () => {
@@ -26,7 +35,11 @@ afterEach(async () => {
   localStorage.clear();
   delete (window as any).__ModuleLoader__;
 });
-async function bench(inputText?: string) {
+async function bench(
+  inputText?: string,
+  attachments?: WorkerMessageAttachment[],
+  initialTurns?: WorkerTimelineTurn[],
+) {
   const load = nativeLoader(),
     root = new Context();
   dispose.push(() => root.fiber.dispose());
@@ -42,6 +55,7 @@ async function bench(inputText?: string) {
       name: "root",
       children: {
         "conversation.input.left": { kind: "list", scope: "session" },
+        "conversation.input.dock": { kind: "list", scope: "session" },
         "conversation.chat.node": { kind: "keyed", scope: "session" },
         "conversation.composer": { kind: "chain", scope: "session" },
         "conversation.session.header.actions": {
@@ -82,6 +96,9 @@ async function bench(inputText?: string) {
   } as any);
   const streamSignals: AbortSignal[] = [],
     streamDisposals = vi.fn();
+  let turns = initialTurns,
+    revision = 0;
+  const frameListeners = new Set<() => void>();
   const remote = {
     catalog: async () => ({ ok: true, value: [snapshot()] }),
     timeline: vi.fn((_parent, workerId, limit, signal) => {
@@ -89,42 +106,57 @@ async function bench(inputText?: string) {
       return {
         dispose: streamDisposals,
         async *[Symbol.asyncIterator]() {
-          yield {
-            workerId,
-            total: 11,
-            hasMore: limit < 11,
-            turns: [
-              {
-                turn: 2,
-                startedAt: 1700000000000,
-                finishedAt: 1700000001000,
-                outcome: "completed",
-                inputs: [
-                  {
-                    id: "in",
-                    time: 1700000000000,
-                    text:
-                      inputText ??
-                      `## Input ${workerId}\n\n- **Keep** this input as written.`,
-                    actor: "user",
-                  },
-                ],
-                outputs: [
-                  {
-                    id: "out",
-                    time: 1700000001000,
-                    text: `Output ${workerId}`,
-                  },
-                ],
-                artifacts: [
-                  { path: "report.md", kind: "changed", time: 1700000001000 },
-                ],
-              },
-            ],
-          };
-          await new Promise<void>((resolve) =>
-            signal.addEventListener("abort", () => resolve(), { once: true }),
-          );
+          let observedRevision = -1;
+          while (!signal.aborted) {
+            if (observedRevision === revision) {
+              await new Promise<void>((resolve) => {
+                const finish = () => {
+                  frameListeners.delete(finish);
+                  signal.removeEventListener("abort", finish);
+                  resolve();
+                };
+                frameListeners.add(finish);
+                signal.addEventListener("abort", finish, { once: true });
+                if (signal.aborted || observedRevision !== revision) finish();
+              });
+              continue;
+            }
+            observedRevision = revision;
+            yield {
+              workerId,
+              total: turns?.length ?? 11,
+              hasMore: limit < (turns?.length ?? 11),
+              turns: turns ?? [
+                {
+                  turn: 2,
+                  startedAt: 1700000000000,
+                  finishedAt: 1700000001000,
+                  outcome: "completed",
+                  inputs: [
+                    {
+                      id: "in",
+                      time: 1700000000000,
+                      text:
+                        inputText ??
+                        `## Input ${workerId}\n\n- **Keep** this input as written.`,
+                      actor: "user",
+                      ...(attachments ? { attachments } : {}),
+                    },
+                  ],
+                  outputs: [
+                    {
+                      id: "out",
+                      time: 1700000001000,
+                      text: `Output ${workerId}`,
+                    },
+                  ],
+                  artifacts: [
+                    { path: "report.md", kind: "changed", time: 1700000001000 },
+                  ],
+                },
+              ],
+            };
+          }
         },
       };
     }),
@@ -144,7 +176,9 @@ async function bench(inputText?: string) {
   await fiber;
   const client = (slots.entries("conversation.input.left")[0].inject?.() as any)
     .client;
-  await vi.waitFor(() => expect(client.store.get(sid("parent"))).toBeDefined());
+  await vi.waitFor(() =>
+    expect(client.store.project(sid("parent"))).toBeDefined(),
+  );
   return {
     root,
     fiber,
@@ -155,12 +189,307 @@ async function bench(inputText?: string) {
     remote,
     streamSignals,
     streamDisposals,
+    emitTimeline(next: WorkerTimelineTurn[]) {
+      turns = next;
+      revision++;
+      for (const notify of [...frameListeners]) notify();
+    },
   };
 }
 const t = (key: keyof typeof en, args?: Record<string, any>) =>
   String(en[key] ?? key).replace(/\{(\w+)\}/g, (_, key) =>
     String(args?.[key] ?? key),
   );
+
+function drawTimeline(
+  b: Awaited<ReturnType<typeof bench>>,
+  openResource = vi.fn(),
+) {
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((entry: any) => entry.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  const signal = new AbortController().signal;
+  return {
+    openResource,
+    ...render(
+      <Component
+        {...entry.inject?.()}
+        sessionId={sid("parent")}
+        t={t}
+        useTabInfo={() => ({
+          tab: { visible: true, signal, actions: { openResource } },
+        })}
+      />,
+    ),
+  };
+}
+
+function timelineTurn(
+  turn: number,
+  patch: Partial<WorkerTimelineTurn> = {},
+): WorkerTimelineTurn {
+  return {
+    turn,
+    startedAt: 1700000000000 + turn * 1000,
+    finishedAt: 1700000000500 + turn * 1000,
+    outcome: "completed",
+    inputs: [
+      {
+        id: `in-${turn}`,
+        seq: turn * 10,
+        time: 1700000000000 + turn * 1000,
+        actor: "coordinator",
+        text: `### Assignment ${turn}\n\nExact task ${turn}.`,
+      },
+    ],
+    outputs: [
+      {
+        id: `out-${turn}`,
+        seq: turn * 10 + 1,
+        time: 1700000000500 + turn * 1000,
+        text: `### Findings ${turn}\n\nExact result ${turn}.`,
+      },
+    ],
+    artifacts: [
+      {
+        path: `report-${turn}.md`,
+        kind: "changed",
+        seq: turn * 10 + 2,
+        time: 1700000000500 + turn * 1000,
+      },
+    ],
+    ...patch,
+  };
+}
+
+function timelineEntry(turn: number): HTMLElement {
+  return screen
+    .getByText(t("timelineTurn", { turn }))
+    .closest<HTMLElement>("article")!;
+}
+
+function guideToggle(
+  b: Awaited<ReturnType<typeof bench>>,
+  sessionId: ReturnType<typeof sid>,
+  session: { openState: string; blank: boolean; running: boolean; subagent: null },
+  input: { draft: string; attachmentIds: unknown[]; phase: string },
+) {
+  const entry = b.slots.entries("conversation.input.left")
+    .find((item) => item.options.id === "project-mode.toggle")!;
+  const Toggle = entry.component as any;
+  return <Toggle {...entry.inject?.()} sessionId={sessionId} t={t}
+    useSession={(select: (snapshot: typeof session) => unknown) => select(session)}
+    useInput={(select: (snapshot: typeof input) => unknown) => select(input)} />;
+}
+
+it("closes the guide beside the off button and remembers the dismissal", async () => {
+  const sessionId = sid("parent");
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, {
+      mode: async () => ({ ok: true, value: { sessionId, enabled: false, role: "ordinary", canToggle: true, revision: 1 } }),
+    });
+    await b.client.refreshMode(sessionId);
+    return { b, view: render(guideToggle(b, sessionId, session, input)) };
+  }
+  const first = await mount();
+  const toggle = screen.getByRole("button", { name: en.project });
+  const guide = document.querySelector('[data-guide-stage="enable"]');
+  expect(guide?.querySelector(".pm-guide-readable")?.textContent).toBe(en.guideEnable);
+  expect(document.getElementById(toggle.getAttribute("aria-describedby")!)).toBe(guide?.querySelector(".pm-guide-description"));
+  input.draft = "My own task";
+  first.view.rerender(guideToggle(first.b, sessionId, session, input));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  input.draft = "";
+  first.view.rerender(guideToggle(first.b, sessionId, session, input));
+  fireEvent.click(screen.getByRole("button", { name: en.guideClose }));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  first.view.unmount();
+  await mount();
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+});
+
+it("remembers the first guide appearance without a click or dismissal", async () => {
+  const sessionId = sid("parent");
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, {
+      mode: async () => ({ ok: true, value: { sessionId, enabled: false, role: "ordinary", canToggle: true, revision: 1 } }),
+    });
+    await b.client.refreshMode(sessionId);
+    return render(guideToggle(b, sessionId, session, input));
+  }
+  const first = await mount();
+  expect(screen.getByRole("button", { name: en.guideClose })).toBeTruthy();
+  first.unmount();
+
+  await mount();
+  expect(screen.getByRole("button", { name: en.project }).getAttribute("aria-pressed")).toBe("false");
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+});
+
+it.each([
+  [0, en.guideResult],
+  [1, en.guideResultOneWorker],
+  [2, en.guideResultWorkers.replace("{count}", "2")],
+] as const)("shows the first real task's result once with %i participating workers", async (workerCount, resultCopy) => {
+  const sessionId = sid("parent");
+  let mode: SessionModeView = {
+    sessionId,
+    role: "ordinary",
+    enabled: false,
+    canToggle: true,
+    revision: 1,
+  };
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  const turns = new Map<number, { end: { seq: number; data: { reason: { kind: string } } } }>();
+  let inputSource = "project-mode-assignment";
+  const chat = {
+    nodes: { values: () => [{ kind: "user", data: { seq: 10, source: { kind: inputSource } } }] },
+    timeline: { turns, get turnOrder() { return [...turns.keys()]; } },
+  };
+  const finish = (turn: number, seq: number, kind: string) => {
+    turns.set(turn, { end: { seq, data: { reason: { kind } } } });
+  };
+  async function mount() {
+    const b = await bench();
+    const initial = snapshot();
+    const [worker] = initial.workers;
+    const [membership] = initial.turnMemberships;
+    const deleted = sid("removed");
+    const participants = [sid("exporter"), sid("reviewer")].slice(0, workerCount);
+    b.client.store.accept({
+      ...initial,
+      revision: initial.revision + 1,
+      workers: [
+        worker,
+        { ...worker, workerId: deleted, lifecycle: "deleted" },
+        ...participants.map(workerId => ({ ...worker, workerId })),
+      ],
+      turnMemberships: [
+        { ...membership, coordinatorTurn: 2 },
+        { ...membership, workerId: deleted },
+        ...participants.flatMap(workerId => [
+          { ...membership, workerId, segmentStartSeq: 10 },
+          { ...membership, workerId, segmentStartSeq: 40 },
+        ]),
+      ],
+    });
+    const setEnabled = vi.fn(async (_id: typeof sessionId, enabled: boolean) => {
+      mode = { ...mode, enabled, role: enabled ? "coordinator" : "ordinary", revision: mode.revision + 1 };
+      return { ok: true, value: mode };
+    });
+    Object.assign(b.remote, { mode: async () => ({ ok: true, value: mode }), setEnabled });
+    const prompt = vi.fn();
+    const binding = { sessionId, session: { prompt } };
+    Object.assign(b.root.sessions, {
+      binding: (id: string) => id === sessionId ? binding : undefined,
+    });
+    const requestDraftInitialization = vi.fn(() => "applied");
+    Object.assign(b.root.conversation, { input: { requestDraftInitialization } });
+    await b.client.refreshMode(sessionId);
+    const entry = b.slots.entries("conversation.input.dock")
+      .find((item) => item.options.id === "project-mode.first-run-guide")!;
+    const Bubble = entry.component as any;
+    const element = () => <>
+      {guideToggle(b, sessionId, session, input)}
+      <Bubble sessionId={sessionId} session={{ ...session }} input={{ ...input }}
+        useChat={(select: (snapshot: typeof chat) => unknown) => select(chat)} t={t} />
+    </>;
+    const view = render(element());
+    const stage = () => view.container.querySelector("[data-guide-stage]")?.getAttribute("data-guide-stage");
+    return { view, redraw: () => view.rerender(element()), stage, binding, prompt, requestDraftInitialization, setEnabled };
+  }
+
+  const first = await mount();
+  expect(first.stage()).toBeUndefined();
+  expect(screen.getByRole("button", { name: en.guideClose })).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: en.project })));
+  expect(first.setEnabled).toHaveBeenCalledExactlyOnceWith(sessionId, true, 1, expect.any(String));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  expect(first.stage()).toBe("example");
+  fireEvent.click(screen.getByRole("button", { name: en.guideFill }));
+  expect(first.requestDraftInitialization).toHaveBeenCalledExactlyOnceWith(first.binding, {
+    prompt: en.guideExamplePrompt,
+    whenDraftExists: "keep",
+  });
+  expect(first.prompt).not.toHaveBeenCalled();
+  input.draft = en.guideExamplePrompt;
+  first.redraw();
+  expect(first.stage()).toBe("send");
+
+  session.blank = false;
+  mode = { ...mode, canToggle: false, modeLocked: true };
+  finish(1, 20, "completed");
+  first.redraw();
+  expect(first.stage()).toBeUndefined();
+  turns.clear();
+  inputSource = "user";
+  finish(1, 21, "handoff");
+  finish(2, 35, "aborted");
+  first.redraw();
+  expect(first.stage()).toBeUndefined();
+
+  finish(3, 51, "completed");
+  first.redraw();
+  expect(first.stage()).toBe("result");
+  expect(screen.getByRole("status").querySelector(".pm-guide-readable")?.textContent).toBe(resultCopy);
+  expect(within(first.view.container.querySelector<HTMLElement>('[data-guide-stage="result"]')!).queryByRole("img", { name: en.project })).toBeNull();
+  expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
+  first.view.unmount();
+
+  const reopened = await mount();
+  expect(reopened.stage()).toBeUndefined();
+});
+
+it("shows attachment-only timeline input and opens its existing native file resource", async () => {
+  const b = await bench("", [
+    {
+      type: "image",
+      attachment: {
+        attachmentId: AttachmentId("e".repeat(64)),
+        name: "diagram.png",
+        mediaType: "image/png",
+        bytes: 31,
+        width: 2,
+        height: 3,
+      },
+      path: "/attachments/diagram.png",
+    },
+  ]);
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((e: any) => e.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  const openResource = vi.fn();
+  const signal = new AbortController().signal;
+  const ui = render(
+    <Component
+      {...entry.inject?.()}
+      sessionId={sid("parent")}
+      t={t}
+      useTabInfo={() => ({
+        tab: { visible: true, signal, actions: { openResource } },
+      })}
+    />,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "diagram.png" }));
+  expect(openResource).toHaveBeenCalledWith(
+    expect.stringContaining("diagram.png"),
+  );
+  expect(
+    [...ui.container.querySelectorAll("summary")].some(
+      (summary) => summary.textContent === "",
+    ),
+  ).toBe(false);
+});
 
 it.each([
   {
@@ -198,24 +527,155 @@ it.each([
     expect(screen.queryByRole("button", { name: en.copy })).toBeNull();
     fireEvent.click(excerpt);
     expect(disclosure.open).toBe(true);
+    await vi.waitFor(() => expect(summary.textContent).toBe(en.collapseText));
     if (kind === "table") expect(await screen.findByRole("table")).toBeTruthy();
     else {
       expect(await screen.findByRole("button", { name: en.copy })).toBeTruthy();
-      expect(summary.querySelector("pre code")?.textContent).toContain(
+      expect(disclosure.querySelector("pre code")?.textContent).toContain(
         "const last = 2;",
       );
     }
+    expect(summary.querySelector("table,pre,button,a")).toBeNull();
     fireEvent.click(summary);
     expect(disclosure.open).toBe(false);
-    // Native details toggles notify React asynchronously; expanded code can
-    // already match the same plain text, so wait for its controls to unmount.
-    await waitFor(() => {
-      expect(screen.queryByRole("table")).toBeNull();
-      expect(screen.queryByRole("button", { name: en.copy })).toBeNull();
-    });
-    expect(screen.getByText(preview)).toBeTruthy();
+    await screen.findByText(preview);
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByRole("button", { name: en.copy })).toBeNull();
   },
 );
+
+it("shows one input, output and artifact section per turn in chronological order", async () => {
+  const b = await bench(undefined, undefined, [
+    timelineTurn(2),
+    timelineTurn(1),
+  ]);
+  const ui = drawTimeline(b);
+  await screen.findByText("Findings 2 Exact result 2.");
+  const entries = [...ui.container.querySelectorAll(".pm-axis-turn")];
+  expect(
+    entries.map((entry) => entry.querySelector("strong")?.textContent),
+  ).toEqual(["Turn 1", "Turn 2"]);
+  for (const entry of entries) {
+    expect(
+      [...entry.querySelectorAll("h4")].map((heading) => heading.textContent),
+    ).toEqual([en.timelineInputs, en.timelineOutputs, en.timelineArtifacts]);
+    expect(entry.tagName).toBe("ARTICLE");
+  }
+  const older = timelineEntry(1);
+  expect(within(older).getByText("Assignment 1 Exact task 1.")).toBeDefined();
+  fireEvent.click(within(older).getByText("Findings 1 Exact result 1."));
+  expect(
+    await within(older).findByRole("heading", { name: "Findings 1" }),
+  ).toBeDefined();
+  fireEvent.click(within(older).getByRole("button", { name: "report-1.md" }));
+  expect(ui.openResource).toHaveBeenCalledExactlyOnceWith(
+    expect.stringContaining("/child/report-1.md"),
+  );
+  expect(
+    ui.container.querySelector(".pm-task-card,.pm-task-messages"),
+  ).toBeNull();
+});
+
+it("keeps all input messages together and exposes their attachments without another disclosure layer", async () => {
+  const turn = timelineTurn(2, {
+    inputs: [
+      {
+        id: "task",
+        seq: 20,
+        time: 1700000000000,
+        actor: "coordinator",
+        text: "From: coordinator\n### Clean task\n\nActual responsibility.",
+        displayText: "### Clean task\n\nActual responsibility.",
+      },
+      {
+        id: "followup",
+        seq: 21,
+        time: 1700000000100,
+        actor: "agent",
+        text: "Request ID: original-request\nFrom: teammate\n### Exact followup\n\nRetain this entire message.",
+        displayText: "### Exact followup\n\nRetain this entire message.",
+        attachments: [
+          {
+            type: "image",
+            path: "/attachments/followup.png",
+            attachment: {
+              attachmentId: AttachmentId("f".repeat(64)),
+              name: "followup.png",
+              mediaType: "image/png",
+              bytes: 31,
+              width: 2,
+              height: 3,
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const b = await bench(undefined, undefined, [turn]);
+  const ui = drawTimeline(b);
+  const preview = await screen.findByText(
+    "Clean task Actual responsibility. Exact followup Retain this entire message.",
+  );
+  const entry = timelineEntry(2);
+  expect(entry.querySelectorAll(".pm-axis-section")).toHaveLength(3);
+  expect(ui.container.textContent).not.toContain("From: coordinator");
+  expect(ui.container.textContent).not.toContain(
+    "Request ID: original-request",
+  );
+  fireEvent.click(within(entry).getByRole("button", { name: "followup.png" }));
+  expect(ui.openResource).toHaveBeenCalledExactlyOnceWith(
+    expect.stringContaining("followup.png"),
+  );
+  fireEvent.click(preview);
+  expect(
+    await within(entry).findByRole("heading", { name: "Clean task" }),
+  ).toBeDefined();
+  expect(
+    within(entry).getByRole("heading", { name: "Exact followup" }),
+  ).toBeDefined();
+  expect(within(entry).getByText("Retain this entire message.")).toBeDefined();
+});
+
+it("preserves an expanded input or output while new chronological turns stream in", async () => {
+  const second = timelineTurn(2),
+    first = timelineTurn(1);
+  const b = await bench(undefined, undefined, [second, first]);
+  const ui = drawTimeline(b);
+  await screen.findByText("Findings 2 Exact result 2.");
+  const secondEntry = timelineEntry(2);
+  fireEvent.click(within(secondEntry).getByText("Findings 2 Exact result 2."));
+  await within(secondEntry).findByRole("heading", { name: "Findings 2" });
+  const updated = {
+    ...second,
+    outputs: [
+      {
+        ...second.outputs[0],
+        text: "### Updated evidence\n\nLater streamed result.",
+      },
+    ],
+  };
+  act(() => b.emitTimeline([timelineTurn(3), updated, first]));
+  await screen.findByRole("heading", { name: "Updated evidence" });
+  expect(timelineEntry(2)).toBe(secondEntry);
+  expect(within(secondEntry).getByText("Later streamed result.")).toBeDefined();
+  expect(
+    [...ui.container.querySelectorAll(".pm-axis-turn strong")].map(
+      (node) => node.textContent,
+    ),
+  ).toEqual(["Turn 1", "Turn 2", "Turn 3"]);
+  expect(b.remote.timeline).toHaveBeenCalledTimes(1);
+});
+
+it("retains all three sections for a turn without new input, output or artifacts", async () => {
+  const b = await bench(undefined, undefined, [
+    timelineTurn(2, { inputs: [], outputs: [], artifacts: [] }),
+  ]);
+  drawTimeline(b);
+  expect(await screen.findByText(en.emptyInput)).toBeDefined();
+  expect(screen.getByText(en.emptyReply)).toBeDefined();
+  expect(screen.getByText(en.noArtifacts)).toBeDefined();
+  expect(timelineEntry(2).querySelectorAll("h4")).toHaveLength(3);
+});
 
 it("registers a native Workers tab and defaults once to Workers and the native notes preview without reopening closed tabs", async () => {
   const b = await bench();
@@ -299,7 +759,11 @@ it("selects workers inside one native tab, renders per-turn inputs/outputs/artif
   ).toBeTruthy();
   fireEvent.click(outputText);
   expect(output.open).toBe(true);
-  fireEvent.click(outputText);
+  await vi.waitFor(() =>
+    expect(outputSummary.textContent).toBe(en.collapseText),
+  );
+  expect(input.open).toBe(true);
+  fireEvent.click(outputSummary);
   expect(output.open).toBe(false);
   expect(screen.getByText("Keep").tagName).toBe("STRONG");
   expect(screen.getByText("report.md")).toBeTruthy();
@@ -343,6 +807,109 @@ it("offers explicit reopen actions only while a Project is selected", async () =
   );
   act(() => b.sidebar.mounted.set(sid("ordinary")));
   expect(screen.queryByRole("menuitem", { name: "Workers" })).toBeNull();
+});
+
+it("reopens a failed first timeline when the same Worker becomes natively ready, without restarting healthy streams on later activity", async () => {
+  const b = await bench();
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((e: any) => e.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  const initial = snapshot();
+  b.client.store.accept({
+    ...initial,
+    revision: 2,
+    workers: initial.workers.map((worker) => ({
+      ...worker,
+      lifecycle: "provisioning" as const,
+      availability: "unavailable" as const,
+      phase: "starting" as const,
+    })),
+  });
+  b.remote.timeline.mockImplementationOnce(() => ({
+    dispose: b.streamDisposals,
+    async *[Symbol.asyncIterator]() {
+      throw new Error("Native session not found before activation");
+    },
+  }));
+  const signal = new AbortController().signal;
+  render(
+    <Component
+      {...entry.inject?.()}
+      sessionId={sid("parent")}
+      t={t}
+      useTabInfo={() => ({ tab: { visible: true, signal, actions: {} } })}
+    />,
+  );
+  await screen.findByText("Native session not found before activation");
+  expect(b.remote.timeline).toHaveBeenCalledTimes(1);
+  act(() => b.client.store.accept({ ...initial, revision: 3 }));
+  await screen.findByText("Output child");
+  expect(
+    screen.queryByText("Native session not found before activation"),
+  ).toBeNull();
+  expect(b.remote.timeline).toHaveBeenCalledTimes(2);
+  for (const [revision, availability, status, phase] of [
+    [4, "cold", "idle", "idle"],
+    [5, "live", "busy", "working"],
+  ] as const) {
+    act(() =>
+      b.client.store.accept({
+        ...initial,
+        revision,
+        workers: initial.workers.map((worker) => ({
+          ...worker,
+          availability,
+          status,
+          phase,
+        })),
+      }),
+    );
+  }
+  expect(b.remote.timeline).toHaveBeenCalledTimes(2);
+});
+
+it("keeps a ready Worker's actual timeline failure visible until explicit retry", async () => {
+  const b = await bench();
+  const entry = b.slots
+    .entries("sidebar.right.pane.tab")
+    .find((e: any) => e.options.key === "project-mode-workers")!;
+  const Component = entry.component as any;
+  b.remote.timeline.mockImplementationOnce(() => ({
+    dispose: b.streamDisposals,
+    async *[Symbol.asyncIterator]() {
+      throw new Error("Native history is unreadable");
+    },
+  }));
+  const signal = new AbortController().signal;
+  render(
+    <Component
+      {...entry.inject?.()}
+      sessionId={sid("parent")}
+      t={t}
+      useTabInfo={() => ({ tab: { visible: true, signal, actions: {} } })}
+    />,
+  );
+  await screen.findByText("Native history is unreadable");
+  for (const [revision, availability] of [
+    [2, "cold"],
+    [3, "live"],
+  ] as const) {
+    act(() =>
+      b.client.store.accept({
+        ...snapshot(),
+        revision,
+        workers: snapshot().workers.map((worker) => ({
+          ...worker,
+          availability,
+        })),
+      }),
+    );
+  }
+  expect(b.remote.timeline).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: en.retry }));
+  await screen.findByText("Output child");
+  expect(b.remote.timeline).toHaveBeenCalledTimes(2);
 });
 
 it("omits removed and uncreated workers, switches away from a deleted selection and clears the final removed timeline", async () => {
@@ -403,7 +970,7 @@ it("omits removed and uncreated workers, switches away from a deleted selection 
   await screen.findByText("Output child");
   expect(originalSignal.aborted).toBe(true);
   expect(screen.queryByText("Output recoverable")).toBeNull();
-  expect(b.client.store.get(sid("parent"))!.workers).toHaveLength(4);
+  expect(b.client.store.project(sid("parent"))!.workers).toHaveLength(4);
   act(() =>
     b.client.store.accept({
       ...next,
