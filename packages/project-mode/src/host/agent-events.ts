@@ -199,7 +199,9 @@ async function normalizeCoordinatorStep(
         (d.targetId ?? rootId) === agent.id &&
         d.state !== "consumed" &&
         d.state !== "suppressed" &&
-        !messages.some((m) => m.id === d.message.id)
+        !messages.some((m) => m.id === d.message.id) &&
+        // Native receipt precedes the asynchronous outbox acknowledgement.
+        !projected(host.ctx, agent.session).consumed.includes(d.message.id)
       ) {
         agent.inbox.remove(d.message.id);
         messages.push(freezeMessage(d.message));
