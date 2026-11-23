@@ -2,6 +2,7 @@
 
 ## 0.2.12 — 2026-11-24
 
+- Prevent a Worker’s final answer from reaching the Coordinator twice when a new step starts before the delivery receipt finishes saving.
 - Add `node scripts/moa.mjs` as a second entry point for the isolated Web launcher. Both `moa.mjs` and `project-mode.mjs` accept the same `setup`, `doctor` and `start` commands.
 - List all 22 packages in the rc.3 compatibility table, including the `dsh-subprocess` type declaration for managed process ranges.
 - Add two optional fields to trial feedback so contributors can name the model and provider and record the checks they ran or where they needed to intervene.
