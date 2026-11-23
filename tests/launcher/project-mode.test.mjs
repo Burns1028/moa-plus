@@ -21,7 +21,7 @@ import { dirname, join, resolve, delimiter } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const script = join(root, "scripts/project-mode.mjs");
+const script = join(root, "scripts/moa.mjs");
 const markerName = ".project-mode-runtime.json";
 const fakeNpmName = process.platform === "win32" ? "npm-cli.js" : "npm";
 const digest = (path) =>
@@ -164,6 +164,17 @@ test("help describes all commands without creating an installation", () => {
   assert.match(result.stdout, /setup\|start\|doctor/);
   assert.match(result.stdout, /--dir/);
   assert.match(result.stdout, /24\.9/);
+});
+
+test("legacy launcher forwards arguments and preserves the exit status", () => {
+  const legacy = join(root, "scripts/project-mode.mjs");
+  for (const args of [["--help"], ["start", "--", "--profile=other"]]) {
+    const current = cli(...args);
+    const old = spawnSync(process.execPath, [legacy, ...args], { encoding: "utf8" });
+    assert.equal(old.status, current.status);
+    assert.equal(old.stdout, current.stdout);
+    assert.equal(old.stderr, current.stderr);
+  }
 });
 
 test("setup refuses a populated foreign directory without modifying it", (t) => {

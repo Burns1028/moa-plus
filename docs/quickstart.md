@@ -44,6 +44,8 @@ The Web server listens on `127.0.0.1` by default and selects an available port. 
 
 ## Check or choose the location
 
+On `main`, `node scripts/moa.mjs` accepts the same commands and uses the same runtime as `node scripts/project-mode.mjs`. Use the latter with the v0.2.11 tag shown above.
+
 ```sh
 node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
 node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime -- --no-open --port 8080
