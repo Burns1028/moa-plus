@@ -23,7 +23,7 @@ The historical **v0.1.23** tag used three earlier extensions: Agent-local tool s
 
 ## rc.3 native boundary
 
-`compat/rc3/manifest.json` is the authoritative rc.3 file and SHA-256 list. It covers these **21 packages**, with separate npm/Desktop Client variants and explicit upgrades from previously published compatibility bytes:
+`compat/rc3/manifest.json` is the authoritative rc.3 file and SHA-256 list. It covers these **22 packages**, with separate npm/Desktop Client variants and explicit upgrades from previously published compatibility bytes:
 
 | Native package | Required extension |
 | --- | --- |
@@ -41,6 +41,7 @@ The historical **v0.1.23** tag used three earlier extensions: Agent-local tool s
 | `dsh-tool-bash` | Expose actual foreground/promoted Bash execution for native adoption. |
 | `dsh-shell` | Managed shell resource termination/exit contract. |
 | `dsh-bash-local` | Actual subprocess-backed managed termination and exit observation. |
+| `dsh-subprocess` | Declaration-only `SubprocessSpawnSpec.requireManagedRange` capability; no rc.3 runtime implementation change. |
 | `dsh-subagent` | Promptless borrowing of the true cold parent chain; authorized, deduplicated child file admission with native receipt binding and retirement. |
 | `dsh-sandbox` | Typed per-execution readonly paths, preserved independently of the permission mode. |
 | `dsh-sandbox-policy` | Scoped session readonly contributions, including approved mode escalation. |
