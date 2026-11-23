@@ -692,7 +692,9 @@ async function main(argv) {
   return command === "start" ? start(paths, forwarded) : 0;
 }
 
-export async function runLauncher() {
+export async function runLauncher(moduleUrl) {
+  if (!process.argv[1] || resolve(process.argv[1]) !== fileURLToPath(moduleUrl))
+    return;
   try {
     process.exitCode = await main(process.argv.slice(2));
   } catch (error) {
@@ -701,4 +703,4 @@ export async function runLauncher() {
   }
 }
 
-if (import.meta.main) await runLauncher();
+await runLauncher(import.meta.url);
