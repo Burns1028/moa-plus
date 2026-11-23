@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, freezeMessage } from "@deepseek-ai/dsh-llm";
 import { fixture, response } from "./fixture.ts";
+import type { RecordState } from "../../packages/project-mode/src/host/state.ts";
 
 const input = (text: string) => createUserMessage({
   source: { kind: "user" }, content: [{ type: "text", text }],
@@ -14,6 +15,54 @@ function untilAborted(signal: AbortSignal): Promise<never> {
     if (signal.aborted) aborted();
   });
 }
+
+it("uses the native result receipt on the next step while the outbox acknowledgement is pending", async () => {
+  const f = await fixture();
+  try {
+    const { agent } = await f.ctx.agents.create({
+      sessionId: SessionId("pending-result-ack"),
+      meta: { cwd: f.root },
+      agentOptions: { provider: "test", model: "test" },
+    });
+    await f.ctx.projectMode.setEnabled(agent.id, true, 0, "enable");
+    const { workerId } = await f.ctx.projectMode.controlForAgent(
+      agent,
+      { action: "spawn", name: "worker", task: "initial" },
+      "spawn",
+      new AbortController().signal,
+    ) as { workerId: ReturnType<typeof SessionId> };
+    await f.ctx.agents.get(workerId)?.whenIdle();
+    await f.ctx.projectMode.snapshot(agent.id);
+    await agent.whenIdle();
+    const host = f.ctx.projectMode as any;
+    await vi.waitFor(() => expect(host.record(agent.id).deliveries[0]?.state).toBe("consumed"));
+    const resultIds = () => agent.session.snapshotEvents().flatMap(event =>
+      event.type === "user/message" && event.data.source.kind === "project-mode-result"
+        ? [event.data.id] : [],
+    );
+    const delivered = host.record(agent.id).deliveries[0].message.id;
+    expect(resultIds()).toEqual([delivered]);
+
+    // Recreate the interval between the native receipt and its asynchronous outbox write.
+    await host.update(agent.id, (record: RecordState) => ({
+      ...record,
+      deliveries: record.deliveries.map(d => ({ ...d, state: "admitted" })),
+    }));
+    f.adapter.handler = async () => {
+      await host.outbox.consume(agent.id, delivered);
+      return response("Continued.");
+    };
+    const followup = input("Continue.");
+    agent.followup(followup);
+    await agent.whenIdle();
+    expect(agent.session.snapshotEvents().some(e =>
+      e.type === "user/message" && e.data.id === followup.id,
+    )).toBe(true);
+    expect(resultIds()).toEqual([delivered]);
+  } finally {
+    await f.dispose();
+  }
+});
 
 it.each(["completed", "aborted"] as const)(
   "parks a %s Worker result after joined Stop and returns it once on human resume",

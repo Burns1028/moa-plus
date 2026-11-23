@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createUserMessage, type GenerateOptions, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
@@ -272,10 +272,15 @@ it.each([
       { type: "text", text: original }, { type: "file", attachment },
     ] }));
     await agent.whenIdle();
+    const end = agent.session.snapshotEvents().findLast(event => event.type === "turn/end");
+    expect(end?.data.reason).toEqual({ kind: "completed" });
     expect(steps).toBe(3);
     expect(agent.session.snapshotEvents().slice(0, auditPrefix.length)).toEqual(auditPrefix);
     expect(agent.session.snapshotEvents().filter(event => event.type === "user/message" && event.data.source.kind === "user")).toHaveLength(2);
-    if (mode === "on-demand") await vi.waitFor(() => expect(host.record(agent.id).operations["moa:completion-input"]).toMatchObject({ finished: true }));
+    if (mode === "on-demand") {
+      await host.settledJobs(agent.id);
+      expect(host.record(agent.id).operations["moa:completion-input"]).toMatchObject({ finished: true });
+    }
     agent.followup(createUserMessage({ source: { kind: "moa-completion", form: "notice", summary: "retained task notice" }, content: [{ type: "text", text: "A notification about prior work." }] }));
     await agent.whenIdle();
     agent.followup(prompt(nextTask));

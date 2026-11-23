@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
-import { npmInvocation } from "./project-mode.mjs";
+import { npmInvocation } from "./moa.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const nested = join(root, "packages/project-mode");

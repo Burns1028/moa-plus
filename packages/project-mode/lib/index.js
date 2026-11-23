@@ -848,7 +848,7 @@ async function normalizeCoordinatorStep(host, options, agent, signal, next) {
 		control.throwIfAborted();
 		const messages = decision.messages.filter((m) => !managed.includes(m));
 		const r = host.record(rootId);
-		for (const d of r.deliveries) if ((d.targetId ?? rootId) === agent.id && d.state !== "consumed" && d.state !== "suppressed" && !messages.some((m) => m.id === d.message.id)) {
+		for (const d of r.deliveries) if ((d.targetId ?? rootId) === agent.id && d.state !== "consumed" && d.state !== "suppressed" && !messages.some((m) => m.id === d.message.id) && !projected(host.ctx, agent.session).consumed.includes(d.message.id)) {
 			agent.inbox.remove(d.message.id);
 			messages.push(freezeMessage(d.message));
 			claimed.add(d.message.id);

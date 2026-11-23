@@ -1,6 +1,6 @@
 # Run MoA+ in an isolated DSH Web runtime
 
-Set up the **MoA+ v0.2.11 stable release** in a separate local Web environment. Use the plugin and compatibility profile from this same release. The commands below clone the published **[v0.2.11](https://github.com/Burns1028/moa-plus/tree/v0.2.11)** tag.
+Set up the **MoA+ v0.2.12 stable release** in a separate local Web environment. Use the plugin and compatibility profile from this same release. The commands below clone the published **[v0.2.12](https://github.com/Burns1028/moa-plus/tree/v0.2.12)** tag.
 
 Requires **Node 24.9+**, npm, and Git, plus the matching **DSH 0.2.1-rc.3 compatibility runtime**. Its explicit manifest extends **22 native packages across 50 file paths**; stock rc.3 and runtimes prepared from another plugin revision cannot be substituted.
 
@@ -11,15 +11,15 @@ This release also includes an audited **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 
 Choose a new empty directory outside this checkout and your ordinary DSH home. Replace `/absolute/empty-moa-runtime` below and reuse the same `--dir` for setup, doctor, and start.
 
 ```sh
-git clone --branch v0.2.11 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.12 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 npm run build
-node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs doctor --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime
 ```
 
 Check the read-only `doctor` result before starting. Resolve reported mismatches before configuring a model or sending a task.
@@ -44,9 +44,11 @@ The Web server listens on `127.0.0.1` by default and selects an available port. 
 
 ## Check or choose the location
 
+Existing scripts can keep using `node scripts/project-mode.mjs`. Both commands use the same runtime directory and profile.
+
 ```sh
-node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime -- --no-open --port 8080
+node scripts/moa.mjs doctor --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime -- --no-open --port 8080
 ```
 
 `doctor` is read-only. It checks ownership, runtime lock/package versions, the plugin artifact, and applied native hashes. Symlinked paths are refused; on macOS, the canonical temporary root is `/private/tmp` rather than `/tmp`.

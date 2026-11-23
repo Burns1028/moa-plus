@@ -22,7 +22,7 @@ The tool names below describe the historical v0.2.0 execution, not the current A
 4. Back in the main conversation, the Coordinator checked Docs' current state and relevant human/AI history with `QueryAgent`, then brought both Workers into line.
 5. Workers returned complete final replies; the Coordinator checked actual output, saved reusable knowledge, and finished through the independent completion-review flow.
 
-## Reproduce on v0.2.11
+## Reproduce on v0.2.12
 
 Copy [examples/note-bundle](../examples/note-bundle) into a new Git workspace. Prepare the [matching runtime](quickstart.md), create a new conversation, and select **MoA+** before its first message. Use separate source files for each Worker so the shared workspace has clear ownership.
 

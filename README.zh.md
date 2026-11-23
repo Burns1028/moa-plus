@@ -20,7 +20,7 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 ## 快速开始
 
-本页说明 **[MoA+ v0.2.11 稳定版](https://github.com/Burns1028/moa-plus/releases/tag/v0.2.11)**。
+本页说明 **[MoA+ v0.2.12 稳定版](https://github.com/Burns1028/moa-plus/releases/tag/v0.2.12)**。
 
 本版使用经过审查的 **DSH 0.2.1-rc.3** 与
 **DSH 0.2.2-rc.1 / DSH Next 2.0.22-next** 兼容配置。rc.3 清单扩展了
@@ -32,19 +32,19 @@ Coordinator 把握目标与全局方向；Workers 在各自的会话中调查、
 
 更新后的 rc.2 Desktop Next 配置支持 Windows 受保护 Worker 使用原生非持久 PowerShell，以及已安装的 Bash。Coordinator 原子更新现有记录时，保护持续生效，进程必须由原生 Windows Job 管理。持久终端和未适配生命周期的进程提供者仍拒绝受保护调用。rc.3 配置仍需 macOS Seatbelt 或 Linux bubblewrap，尚未加入这项 Windows 扩展。支持的策略与文件范围见[后端要求][compatibility]。
 
-下方命令安装 `v0.2.11`，并准备同一版本的兼容运行时。
+下方命令安装 `v0.2.12`，并准备同一版本的兼容运行时。
 
 克隆项目，准备独立的 Web 运行环境：
 
 ```sh
-git clone --branch v0.2.11 --single-branch https://github.com/Burns1028/moa-plus.git
+git clone --branch v0.2.12 --single-branch https://github.com/Burns1028/moa-plus.git
 cd moa-plus
 npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 npm run build
-node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime
 ```
 
 兼容命令先备份将要修改的文件，再扩展当前 checkout 的依赖。安装流程准备独立的运行时、home、配置、文档与原生文件备份，保留个人 Desktop 应用与 `~/.dsh` 配置。选择 checkout 之外的空目录，后续命令沿用同一个 `--dir`。
