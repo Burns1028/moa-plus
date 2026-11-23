@@ -44,8 +44,8 @@ npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 npm run build
-node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime
 ```
 
 The compatibility command backs up the changed files before extending this checkout's dependencies. Setup prepares an isolated runtime with its own home, configuration, documents, and native backups; it leaves your personal Desktop app and `~/.dsh` profile untouched. Use an empty directory outside the checkout and reuse the same `--dir` for subsequent commands.

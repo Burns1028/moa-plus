@@ -43,8 +43,8 @@ npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 npm run build
-node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime
 ```
 
 兼容命令先备份将要修改的文件，再扩展当前 checkout 的依赖。安装流程准备独立的运行时、home、配置、文档与原生文件备份，保留个人 Desktop 应用与 `~/.dsh` 配置。选择 checkout 之外的空目录，后续命令沿用同一个 `--dir`。

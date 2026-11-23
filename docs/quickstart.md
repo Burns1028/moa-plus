@@ -17,9 +17,9 @@ npm ci
 node scripts/apply-native-compat.mjs --dry-run
 node scripts/apply-native-compat.mjs --backup "$PWD/.superpowers/native-backup"
 npm run build
-node scripts/project-mode.mjs setup --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs setup --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs doctor --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime
 ```
 
 Check the read-only `doctor` result before starting. Resolve reported mismatches before configuring a model or sending a task.
@@ -44,11 +44,11 @@ The Web server listens on `127.0.0.1` by default and selects an available port. 
 
 ## Check or choose the location
 
-On `main`, `node scripts/moa.mjs` accepts the same commands and uses the same runtime as `node scripts/project-mode.mjs`. Use the latter with the v0.2.11 tag shown above.
+Existing scripts can keep using `node scripts/project-mode.mjs`. Both commands use the same runtime directory and profile.
 
 ```sh
-node scripts/project-mode.mjs doctor --dir /absolute/empty-moa-runtime
-node scripts/project-mode.mjs start --dir /absolute/empty-moa-runtime -- --no-open --port 8080
+node scripts/moa.mjs doctor --dir /absolute/empty-moa-runtime
+node scripts/moa.mjs start --dir /absolute/empty-moa-runtime -- --no-open --port 8080
 ```
 
 `doctor` is read-only. It checks ownership, runtime lock/package versions, the plugin artifact, and applied native hashes. Symlinked paths are refused; on macOS, the canonical temporary root is `/private/tmp` rather than `/tmp`.
