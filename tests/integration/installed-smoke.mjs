@@ -93,6 +93,7 @@ assert.deepEqual(
   [
     "@deepseek-ai/dsh-client-ui-primitives",
     "react",
+    "react-dom",
     "react/jsx-runtime",
     "zod",
   ],

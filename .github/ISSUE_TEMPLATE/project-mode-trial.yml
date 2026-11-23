@@ -13,7 +13,7 @@ body:
     attributes:
       label: Versions
       description: Plugin version and DSH version; paste the launcher's doctor summary if available.
-      placeholder: "MoA+ 0.2.9; DSH 0.2.1-rc.3"
+      placeholder: "MoA+ 0.2.11; DSH 0.2.1-rc.3"
     validations:
       required: true
   - type: dropdown

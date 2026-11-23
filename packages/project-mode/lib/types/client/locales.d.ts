@@ -1,4 +1,17 @@
 export declare const en: {
+    readonly guideEnable: "Select MoA+ to try a task with multiple assistants.";
+    readonly guideClose: "Close the MoA+ guide";
+    readonly guideExample: "Try a sample task, or write something of your own.";
+    readonly guideSend: "Make the request your own, then send it when ready.";
+    readonly guideWorkers: "Open a worker card above to see how that part is going.";
+    readonly guideResult: "Your result is ready.";
+    readonly guideResultOneWorker: "Your result is ready. One worker contributed.";
+    readonly guideResultWorkers: "Your result is ready. {count} workers contributed.";
+    readonly guideFill: "Fill in sample";
+    readonly guideSkip: "Skip";
+    readonly guideDone: "Got it";
+    readonly guideMenu: "MoA+ first-run guide";
+    readonly guideExamplePrompt: "Our notes exporter supports both default order and title sorting. Work on two things in parallel: write a three-line user update and list three acceptance checks. Combine them into a short release card.";
     readonly timeline: "Work timeline";
     readonly noWorkers: "No workers yet";
     readonly selectWorker: "Select a worker to view its work.";

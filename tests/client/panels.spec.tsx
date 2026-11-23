@@ -22,6 +22,7 @@ import { submissionFixture } from "./submission-fixture.ts";
 import { snapshot, sid } from "./fixture.ts";
 import { en } from "../../packages/project-mode/src/client/locales.ts";
 import type {
+  SessionModeView,
   WorkerMessageAttachment,
   WorkerTimelineTurn,
 } from "../../packages/project-mode/src/shared/index.ts";
@@ -54,6 +55,7 @@ async function bench(
       name: "root",
       children: {
         "conversation.input.left": { kind: "list", scope: "session" },
+        "conversation.input.dock": { kind: "list", scope: "session" },
         "conversation.chat.node": { kind: "keyed", scope: "session" },
         "conversation.composer": { kind: "chain", scope: "session" },
         "conversation.session.header.actions": {
@@ -266,6 +268,186 @@ function timelineEntry(turn: number): HTMLElement {
     .getByText(t("timelineTurn", { turn }))
     .closest<HTMLElement>("article")!;
 }
+
+function guideToggle(
+  b: Awaited<ReturnType<typeof bench>>,
+  sessionId: ReturnType<typeof sid>,
+  session: { openState: string; blank: boolean; running: boolean; subagent: null },
+  input: { draft: string; attachmentIds: unknown[]; phase: string },
+) {
+  const entry = b.slots.entries("conversation.input.left")
+    .find((item) => item.options.id === "project-mode.toggle")!;
+  const Toggle = entry.component as any;
+  return <Toggle {...entry.inject?.()} sessionId={sessionId} t={t}
+    useSession={(select: (snapshot: typeof session) => unknown) => select(session)}
+    useInput={(select: (snapshot: typeof input) => unknown) => select(input)} />;
+}
+
+it("closes the guide beside the off button and remembers the dismissal", async () => {
+  const sessionId = sid("parent");
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, {
+      mode: async () => ({ ok: true, value: { sessionId, enabled: false, role: "ordinary", canToggle: true, revision: 1 } }),
+    });
+    await b.client.refreshMode(sessionId);
+    return { b, view: render(guideToggle(b, sessionId, session, input)) };
+  }
+  const first = await mount();
+  const toggle = screen.getByRole("button", { name: en.project });
+  const guide = document.querySelector('[data-guide-stage="enable"]');
+  expect(guide?.querySelector(".pm-guide-readable")?.textContent).toBe(en.guideEnable);
+  expect(document.getElementById(toggle.getAttribute("aria-describedby")!)).toBe(guide?.querySelector(".pm-guide-description"));
+  input.draft = "My own task";
+  first.view.rerender(guideToggle(first.b, sessionId, session, input));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  input.draft = "";
+  first.view.rerender(guideToggle(first.b, sessionId, session, input));
+  fireEvent.click(screen.getByRole("button", { name: en.guideClose }));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  first.view.unmount();
+  await mount();
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+});
+
+it("remembers the first guide appearance without a click or dismissal", async () => {
+  const sessionId = sid("parent");
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  async function mount() {
+    const b = await bench();
+    Object.assign(b.remote, {
+      mode: async () => ({ ok: true, value: { sessionId, enabled: false, role: "ordinary", canToggle: true, revision: 1 } }),
+    });
+    await b.client.refreshMode(sessionId);
+    return render(guideToggle(b, sessionId, session, input));
+  }
+  const first = await mount();
+  expect(screen.getByRole("button", { name: en.guideClose })).toBeTruthy();
+  first.unmount();
+
+  await mount();
+  expect(screen.getByRole("button", { name: en.project }).getAttribute("aria-pressed")).toBe("false");
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+});
+
+it.each([
+  [0, en.guideResult],
+  [1, en.guideResultOneWorker],
+  [2, en.guideResultWorkers.replace("{count}", "2")],
+] as const)("shows the first real task's result once with %i participating workers", async (workerCount, resultCopy) => {
+  const sessionId = sid("parent");
+  let mode: SessionModeView = {
+    sessionId,
+    role: "ordinary",
+    enabled: false,
+    canToggle: true,
+    revision: 1,
+  };
+  const session = { openState: "open", blank: true, running: false, subagent: null };
+  const input = { draft: "", attachmentIds: [], phase: "plain" };
+  const turns = new Map<number, { end: { seq: number; data: { reason: { kind: string } } } }>();
+  let inputSource = "project-mode-assignment";
+  const chat = {
+    nodes: { values: () => [{ kind: "user", data: { seq: 10, source: { kind: inputSource } } }] },
+    timeline: { turns, get turnOrder() { return [...turns.keys()]; } },
+  };
+  const finish = (turn: number, seq: number, kind: string) => {
+    turns.set(turn, { end: { seq, data: { reason: { kind } } } });
+  };
+  async function mount() {
+    const b = await bench();
+    const initial = snapshot();
+    const [worker] = initial.workers;
+    const [membership] = initial.turnMemberships;
+    const deleted = sid("removed");
+    const participants = [sid("exporter"), sid("reviewer")].slice(0, workerCount);
+    b.client.store.accept({
+      ...initial,
+      revision: initial.revision + 1,
+      workers: [
+        worker,
+        { ...worker, workerId: deleted, lifecycle: "deleted" },
+        ...participants.map(workerId => ({ ...worker, workerId })),
+      ],
+      turnMemberships: [
+        { ...membership, coordinatorTurn: 2 },
+        { ...membership, workerId: deleted },
+        ...participants.flatMap(workerId => [
+          { ...membership, workerId, segmentStartSeq: 10 },
+          { ...membership, workerId, segmentStartSeq: 40 },
+        ]),
+      ],
+    });
+    const setEnabled = vi.fn(async (_id: typeof sessionId, enabled: boolean) => {
+      mode = { ...mode, enabled, role: enabled ? "coordinator" : "ordinary", revision: mode.revision + 1 };
+      return { ok: true, value: mode };
+    });
+    Object.assign(b.remote, { mode: async () => ({ ok: true, value: mode }), setEnabled });
+    const prompt = vi.fn();
+    const binding = { sessionId, session: { prompt } };
+    Object.assign(b.root.sessions, {
+      binding: (id: string) => id === sessionId ? binding : undefined,
+    });
+    const requestDraftInitialization = vi.fn(() => "applied");
+    Object.assign(b.root.conversation, { input: { requestDraftInitialization } });
+    await b.client.refreshMode(sessionId);
+    const entry = b.slots.entries("conversation.input.dock")
+      .find((item) => item.options.id === "project-mode.first-run-guide")!;
+    const Bubble = entry.component as any;
+    const element = () => <>
+      {guideToggle(b, sessionId, session, input)}
+      <Bubble sessionId={sessionId} session={{ ...session }} input={{ ...input }}
+        useChat={(select: (snapshot: typeof chat) => unknown) => select(chat)} t={t} />
+    </>;
+    const view = render(element());
+    const stage = () => view.container.querySelector("[data-guide-stage]")?.getAttribute("data-guide-stage");
+    return { view, redraw: () => view.rerender(element()), stage, binding, prompt, requestDraftInitialization, setEnabled };
+  }
+
+  const first = await mount();
+  expect(first.stage()).toBeUndefined();
+  expect(screen.getByRole("button", { name: en.guideClose })).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: en.project })));
+  expect(first.setEnabled).toHaveBeenCalledExactlyOnceWith(sessionId, true, 1, expect.any(String));
+  expect(screen.queryByRole("button", { name: en.guideClose })).toBeNull();
+  expect(first.stage()).toBe("example");
+  fireEvent.click(screen.getByRole("button", { name: en.guideFill }));
+  expect(first.requestDraftInitialization).toHaveBeenCalledExactlyOnceWith(first.binding, {
+    prompt: en.guideExamplePrompt,
+    whenDraftExists: "keep",
+  });
+  expect(first.prompt).not.toHaveBeenCalled();
+  input.draft = en.guideExamplePrompt;
+  first.redraw();
+  expect(first.stage()).toBe("send");
+
+  session.blank = false;
+  mode = { ...mode, canToggle: false, modeLocked: true };
+  finish(1, 20, "completed");
+  first.redraw();
+  expect(first.stage()).toBeUndefined();
+  turns.clear();
+  inputSource = "user";
+  finish(1, 21, "handoff");
+  finish(2, 35, "aborted");
+  first.redraw();
+  expect(first.stage()).toBeUndefined();
+
+  finish(3, 51, "completed");
+  first.redraw();
+  expect(first.stage()).toBe("result");
+  expect(screen.getByRole("status").querySelector(".pm-guide-readable")?.textContent).toBe(resultCopy);
+  expect(within(first.view.container.querySelector<HTMLElement>('[data-guide-stage="result"]')!).queryByRole("img", { name: en.project })).toBeNull();
+  expect(screen.getByRole("button", { name: en.guideDone })).toBeTruthy();
+  first.view.unmount();
+
+  const reopened = await mount();
+  expect(reopened.stage()).toBeUndefined();
+});
 
 it("shows attachment-only timeline input and opens its existing native file resource", async () => {
   const b = await bench("", [

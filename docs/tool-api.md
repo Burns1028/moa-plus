@@ -1,6 +1,6 @@
 # MoA tool API
 
-This describes the MoA+ v0.2.9 runtime. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
+This describes the MoA+ v0.2.11 runtime. The published v0.1.23 preview used `control_workers`; that name remains in backend compatibility paths and historical records, but is no longer mounted as a model tool here. Native DSH still owns execution, permissions, inboxes, and Session history.
 
 The Coordinator receives `moa_dispatch`, `moa_branch`, `moa_message`, `moa_observe`, and `moa_stop`. Every managed participant receives `moa_message` and `moa_context`. A Worker gets the creation/query/kill controls only when its creator explicitly enabled `nested`. Alternative native delegation entries are suppressed in the participating scope; ordinary conversations are unaffected.
 
