@@ -6,7 +6,7 @@
   "type": "module",
   "description": "Public, dependency-free Project Mode demonstration fixture",
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node scripts/run-suite.mjs",
     "demo": "node note-bundle.mjs notes --sort title --output dist/notes.md"
   },
   "engines": {

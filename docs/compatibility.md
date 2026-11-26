@@ -89,6 +89,20 @@ helper, or explicitly reported runtime block does not become a pass: it reports
 the failure and joins native cleanup. Stop and incoming human direction keep
 priority. This is not a claim that every Windows build or test workflow works.
 
+### Running Node tests in a Windows Worker
+
+The native Windows sandbox restricts named pipes. Node's default test runner
+uses them to collect output from its test processes, so `node --test` can fail
+with `spawn EPERM` before any assertions run. For a Node 24 suite that can
+share one process, use `node --test --test-isolation=none` as its test command.
+This keeps test discovery and assertion failures visible. For a single test
+file you can also run `node hello.test.cjs` directly.
+
+Tests that launch a CLI create a second process of their own. If they need
+its output, pass temporary file descriptors for stdout and stderr and check
+the child's exit status. The [Note Bundle example](../examples/note-bundle)
+shows this approach with a separate Node process for each test file.
+
 ## Prepare explicitly
 
 For a first trial, use the [isolated Web setup](quickstart.md). It installs locked rc.3 dependencies and applies the matching manifest inside a new owned directory, with backups. It does not change an installed Desktop application.

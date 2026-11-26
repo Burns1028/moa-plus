@@ -53,7 +53,10 @@ console.log('__MOA_GRADE__' + JSON.stringify(checks));
   });
 }
 
-const packageFile = name => JSON.stringify({ name, private: true, type: 'module', scripts: { test: 'node --test' } }, null, 2) + '\n';
+// These Node 24 fixtures run on the host that creates them. The confined
+// Windows runner supports in-process discovery but not Node's per-file pipes.
+const testCommand = process.platform === 'win32' ? 'node --test --test-isolation=none' : 'node --test';
+const packageFile = name => JSON.stringify({ name, private: true, type: 'module', scripts: { test: testCommand } }, null, 2) + '\n';
 
 const csvCase = {
   id: 'code-csv-boundaries',
