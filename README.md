@@ -2,6 +2,12 @@
 
 # MoA+
 
+DeepSeek Harness 的多智能体协作插件，支持智能体持续工作、共享知识、直接通信和独立审查。
+
+Multi-agent collaboration for DeepSeek Harness: persistent agents, shared knowledge, direct communication, and independent review.
+
+[简体中文](README.zh.md) | English
+
 **Advancing intelligence through agent collaboration.**
 
 Watch two Workers build a CLI together, exchange messages directly, and bring a human change back to the Coordinator.
@@ -13,8 +19,6 @@ Watch two Workers build a CLI together, exchange messages directly, and bring a 
 MoA+ is a **Mixture of Agents collaboration plugin for DeepSeek Harness**. It connects persistent agents through independent contexts, direct communication, and shared knowledge, with the goal of expanding what the whole system can accomplish together.
 
 A Coordinator keeps the goal and overall direction in view. Workers investigate, build, challenge, and review in their own conversations, remaining available for the next assignment. The team can explore different approaches, work in parallel, and carry its findings into later tasks.
-
-English | [简体中文](README.zh.md)
 
 [Quick start](#quick-start) · [How it works](#how-it-works) · [Demo](#see-it-in-action) · [Documentation][roles]
 
